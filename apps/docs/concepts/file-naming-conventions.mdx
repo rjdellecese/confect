@@ -10,17 +10,17 @@ Confect requires a small number of fixed entry-point files in your `confect/` di
 
 Name each group's spec and impl with `.spec.ts` and `.impl.ts` suffixes. Each file must default-export its `GroupSpec` or `GroupImpl`; additional named exports on `.spec.ts` (for example error classes) are fine.
 
-A complete pair looks like this. The impl default-imports its sibling spec, passes it to `FunctionImpl.make` and `GroupImpl.make`, and finalizes the resulting layer with `GroupImpl.finalize`:
+By convention, default-import a group spec as `<name>Spec` and an application table as `<name>Table`. For example, `notesSpec` describes the functions in the `notes` group, while `notesTable` supplies its document schema and selects the table for reads and writes.
 
 ```ts confect/notes.spec.ts
 import { GroupSpec, FunctionSpec } from "@confect/core";
 import * as Schema from "effect/Schema";
 
-import notes from "./_generated/tables/notes";
+import notesTable from "./_generated/tables/notes";
 
 const list = FunctionSpec.publicQuery({
   name: "list",
-  returns: () => Schema.Array(notes.Doc),
+  returns: () => Schema.Array(notesTable.Doc),
 });
 
 export default GroupSpec.make().addFunction(list);
@@ -32,7 +32,7 @@ import * as Layer from "effect/Layer";
 
 import { FunctionImpl, GroupImpl } from "./_generated/server";
 import { DatabaseReader } from "./_generated/services";
-import notes from "./_generated/tables/notes";
+import notesTable from "./_generated/tables/notes";
 import notesSpec from "./notes.spec";
 
 const list = FunctionImpl.make(notesSpec, "list", () =>
@@ -40,7 +40,7 @@ const list = FunctionImpl.make(notesSpec, "list", () =>
     const reader = yield* DatabaseReader;
 
     return yield* reader
-      .table(notes)
+      .table(notesTable)
       .index("by_creation_time", "desc")
       .collect();
   }).pipe(Effect.orDie),

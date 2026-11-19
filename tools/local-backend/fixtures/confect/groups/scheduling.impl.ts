@@ -9,7 +9,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as MutableRef from "effect/MutableRef";
 import { FunctionImpl, GroupImpl } from "../_generated/server";
-import scheduling from "./scheduling.spec";
+import schedulingSpec from "./scheduling.spec";
 
 const sumToN = Effect.fnUntraced(function* (n: number) {
   const sum = MutableRef.make(0);
@@ -22,15 +22,17 @@ const sumToN = Effect.fnUntraced(function* (n: number) {
   return MutableRef.get(sum);
 });
 
-const manyOpsQuery = FunctionImpl.make(scheduling, "manyOpsQuery", () =>
+const manyOpsQuery = FunctionImpl.make(schedulingSpec, "manyOpsQuery", () =>
   sumToN(5000),
 );
 
-const manyOpsMutation = FunctionImpl.make(scheduling, "manyOpsMutation", () =>
-  sumToN(5000),
+const manyOpsMutation = FunctionImpl.make(
+  schedulingSpec,
+  "manyOpsMutation",
+  () => sumToN(5000),
 );
 
-export default GroupImpl.make(scheduling).pipe(
+export default GroupImpl.make(schedulingSpec).pipe(
   Layer.provide(manyOpsQuery),
   Layer.provide(manyOpsMutation),
   GroupImpl.finalize,

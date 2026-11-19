@@ -9,14 +9,14 @@ import {
   MutationRunner,
   QueryRunner,
 } from "../_generated/services";
-import transactionNotes from "../_generated/tables/transactionNotes";
-import transactions, { RejectedWrite } from "./transactions.spec";
+import transactionNotesTable from "../_generated/tables/transactionNotes";
+import transactionsSpec, { RejectedWrite } from "./transactions.spec";
 
-const read = FunctionImpl.make(transactions, "read", ({ caseId }) =>
+const read = FunctionImpl.make(transactionsSpec, "read", ({ caseId }) =>
   Effect.gen(function* () {
     const reader = yield* DatabaseReader;
     const notes = yield* reader
-      .table(transactionNotes)
+      .table(transactionNotesTable)
       .index("by_caseId", (q) => q.eq("caseId", caseId))
       .collect();
     return Array.map(notes, (note) => note.value);
@@ -24,13 +24,13 @@ const read = FunctionImpl.make(transactions, "read", ({ caseId }) =>
 );
 
 const write = FunctionImpl.make(
-  transactions,
+  transactionsSpec,
   "write",
   ({ caseId, value, fail }) =>
     Effect.gen(function* () {
       const writer = yield* DatabaseWriter;
       yield* writer
-        .table(transactionNotes)
+        .table(transactionNotesTable)
         .insert({ caseId, value })
         .pipe(Effect.orDie);
       if (fail) return yield* RejectedWrite.make({ value });
@@ -38,19 +38,19 @@ const write = FunctionImpl.make(
     }),
 );
 
-const seed = FunctionImpl.make(transactions, "seed", ({ caseId, count }) =>
+const seed = FunctionImpl.make(transactionsSpec, "seed", ({ caseId, count }) =>
   Effect.gen(function* () {
     const writer = yield* DatabaseWriter;
     const reader = yield* DatabaseReader;
     const notes = yield* reader
-      .table(transactionNotes)
+      .table(transactionNotesTable)
       .index("by_caseId", (q) => q.eq("caseId", caseId))
       .collect();
     for (const note of notes)
-      yield* writer.table(transactionNotes).delete(note._id);
+      yield* writer.table(transactionNotesTable).delete(note._id);
     for (let i = 0; i < count; i++) {
       yield* writer
-        .table(transactionNotes)
+        .table(transactionNotesTable)
         .insert({ caseId, value: `seed-${i}` });
     }
     return null;
@@ -58,7 +58,7 @@ const seed = FunctionImpl.make(transactions, "seed", ({ caseId, count }) =>
 );
 
 const limitedRead = FunctionImpl.make(
-  transactions,
+  transactionsSpec,
   "limitedRead",
   ({ caseId, limit }) =>
     Effect.gen(function* () {
@@ -74,7 +74,7 @@ const limitedRead = FunctionImpl.make(
 );
 
 const limitedReadFromMutation = FunctionImpl.make(
-  transactions,
+  transactionsSpec,
   "limitedReadFromMutation",
   ({ caseId, limit }) =>
     Effect.gen(function* () {
@@ -90,7 +90,7 @@ const limitedReadFromMutation = FunctionImpl.make(
 );
 
 const limitedWrite = FunctionImpl.make(
-  transactions,
+  transactionsSpec,
   "limitedWrite",
   ({ caseId, limit }) =>
     Effect.gen(function* () {
@@ -105,10 +105,12 @@ const limitedWrite = FunctionImpl.make(
     }).pipe(Effect.orDie),
 );
 
-const rollback = FunctionImpl.make(transactions, "rollback", ({ caseId }) =>
+const rollback = FunctionImpl.make(transactionsSpec, "rollback", ({ caseId }) =>
   Effect.gen(function* () {
     const writer = yield* DatabaseWriter;
-    yield* writer.table(transactionNotes).insert({ caseId, value: "parent" });
+    yield* writer
+      .table(transactionNotesTable)
+      .insert({ caseId, value: "parent" });
     const mutations = yield* MutationRunner;
     return yield* mutations
       .runMutation(
@@ -126,13 +128,13 @@ const rollback = FunctionImpl.make(transactions, "rollback", ({ caseId }) =>
 );
 
 const staleRead = FunctionImpl.make(
-  transactions,
+  transactionsSpec,
   "staleRead",
   ({ caseId, stale }) =>
     Effect.gen(function* () {
       const writer = yield* DatabaseWriter;
       yield* writer
-        .table(transactionNotes)
+        .table(transactionNotesTable)
         .insert({ caseId, value: "uncommitted" });
       const queries = yield* QueryRunner;
       return yield* queries.runQuery(
@@ -146,7 +148,7 @@ const staleRead = FunctionImpl.make(
     }).pipe(Effect.orDie),
 );
 
-export default GroupImpl.make(transactions).pipe(
+export default GroupImpl.make(transactionsSpec).pipe(
   Layer.provide(read),
   Layer.provide(write),
   Layer.provide(seed),

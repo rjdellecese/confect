@@ -12,13 +12,13 @@ import * as HttpApiBuilder from "effect/http-api/HttpApiBuilder";
 import * as HttpApiEndpoint from "effect/http-api/HttpApiEndpoint";
 import * as HttpApiGroup from "effect/http-api/HttpApiGroup";
 import * as HttpApiScalar from "effect/http-api/HttpApiScalar";
-import notes from "./_generated/tables/notes";
+import notesTable from "./_generated/tables/notes";
 import refs from "./_generated/refs";
 import { QueryRunner } from "./_generated/services";
 
 class NotesGroup extends HttpApiGroup.make("notes").add(
   HttpApiEndpoint.get("listNotes", "/notes", {
-    success: Schema.Array(notes.Doc),
+    success: Schema.Array(notesTable.Doc),
   }),
 ) {}
 

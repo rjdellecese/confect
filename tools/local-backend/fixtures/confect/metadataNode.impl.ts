@@ -2,9 +2,9 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import { FunctionImpl, GroupImpl } from "./_generated/server";
 import { ExecutionMetadata, RequestMetadata } from "./_generated/services";
-import metadataNode from "./metadataNode.spec";
+import metadataNodeSpec from "./metadataNode.spec";
 
-const metadata = FunctionImpl.make(metadataNode, "metadata", () =>
+const metadata = FunctionImpl.make(metadataNodeSpec, "metadata", () =>
   Effect.gen(function* () {
     const execution = yield* ExecutionMetadata;
     const request = yield* RequestMetadata;
@@ -22,7 +22,7 @@ const metadata = FunctionImpl.make(metadataNode, "metadata", () =>
   }),
 );
 
-export default GroupImpl.make(metadataNode).pipe(
+export default GroupImpl.make(metadataNodeSpec).pipe(
   Layer.provide(metadata),
   GroupImpl.finalize,
 );

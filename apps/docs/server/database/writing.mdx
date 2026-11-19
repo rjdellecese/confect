@@ -9,12 +9,12 @@ Use `DatabaseWriter` in a mutation to insert, modify, or delete documents. Pass 
 ```ts
 import * as Effect from "effect/Effect";
 import { DatabaseWriter } from "./confect/_generated/services";
-import notes from "./confect/_generated/tables/notes";
+import notesTable from "./confect/_generated/tables/notes";
 
 Effect.gen(function* () {
   const writer = yield* DatabaseWriter;
 
-  return yield* writer.table(notes).insert({
+  return yield* writer.table(notesTable).insert({
     text: "This is my first note",
   });
 });
@@ -27,7 +27,7 @@ Effect.gen(function* () {
 Insert a new document.
 
 ```ts
-writer.table(notes).insert({
+writer.table(notesTable).insert({
   text: "This is my first note",
   tag: "drafts",
 });
@@ -38,7 +38,7 @@ writer.table(notes).insert({
 Shallow merge the provided object with the existing document. New fields are added. Existing fields are overwritten. Optional fields set to `undefined` are unset.
 
 ```ts
-writer.table(notes).patch(noteId, {
+writer.table(notesTable).patch(noteId, {
   text: "Patched text",
   author: { role: "user", name: "John Doe" },
   tag: undefined,
@@ -50,7 +50,7 @@ writer.table(notes).patch(noteId, {
 Replace the entire document.
 
 ```ts
-writer.table(notes).replace(noteId, {
+writer.table(notesTable).replace(noteId, {
   text: "I'm replacing the whole document",
 });
 ```
@@ -60,5 +60,5 @@ writer.table(notes).replace(noteId, {
 Delete the document with the given ID.
 
 ```ts
-writer.table(notes).delete(noteId);
+writer.table(notesTable).delete(noteId);
 ```

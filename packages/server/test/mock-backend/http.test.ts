@@ -16,7 +16,7 @@ import * as HttpRouter from "effect/http/HttpRouter";
 import * as HttpServerRequest from "effect/http/HttpServerRequest";
 import * as HttpServerResponse from "effect/http/HttpServerResponse";
 import { vi } from "vitest";
-import notes from "./fixtures/confect/_generated/tables/notes";
+import notesTable from "./fixtures/confect/_generated/tables/notes";
 import {
   DatabaseWriter,
   VectorSearch,
@@ -285,7 +285,7 @@ it.layer(TestConfect.layer, { buildPerTest: true })("HttpRouter", (test) => {
           Effect.gen(function* () {
             const writer = yield* DatabaseWriter;
 
-            return yield* writer.table(notes).insert({ text });
+            return yield* writer.table(notesTable).insert({ text });
           }),
           Id("notes"),
         );

@@ -20,7 +20,7 @@ import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
 import type * as Types from "effect/Types";
-import notes from "./fixtures/confect/_generated/tables/notes";
+import notesTable from "./fixtures/confect/_generated/tables/notes";
 import {
   DatabaseReader,
   DatabaseWriter,
@@ -79,9 +79,13 @@ const paginateAll = <
 const insertNotes = Effect.fnUntraced(function* (texts: ReadonlyArray<string>) {
   const writer = yield* DatabaseWriter;
 
-  yield* Effect.forEach(texts, (text) => writer.table(notes).insert({ text }), {
-    concurrency: 1,
-  });
+  yield* Effect.forEach(
+    texts,
+    (text) => writer.table(notesTable).insert({ text }),
+    {
+      concurrency: 1,
+    },
+  );
 });
 
 it.layer(TestConfect.layer, { buildPerTest: true })("QueryStream", (test) => {
@@ -96,12 +100,12 @@ it.layer(TestConfect.layer, { buildPerTest: true })("QueryStream", (test) => {
           const reader = yield* DatabaseReader;
 
           const ascending = yield* collectTexts(
-            reader.table(notes).stream("by_text"),
+            reader.table(notesTable).stream("by_text"),
           );
           expect(ascending).toEqual(["apple", "banana", "cherry"]);
 
           const descending = yield* collectTexts(
-            reader.table(notes).stream("by_text", "desc"),
+            reader.table(notesTable).stream("by_text", "desc"),
           );
           expect(descending).toEqual(["cherry", "banana", "apple"]);
         }),
@@ -120,7 +124,7 @@ it.layer(TestConfect.layer, { buildPerTest: true })("QueryStream", (test) => {
           const reader = yield* DatabaseReader;
 
           const stream = reader
-            .table(notes)
+            .table(notesTable)
             .stream("by_text", (q) => q.gte("text", "a"));
 
           // The leaf stores the query recipe, not a (one-shot) Convex
@@ -152,7 +156,7 @@ it.layer(TestConfect.layer, { buildPerTest: true })("QueryStream", (test) => {
 
           const reader = yield* DatabaseReader;
 
-          const noteStream = reader.table(notes).stream("by_text");
+          const noteStream = reader.table(notesTable).stream("by_text");
           const texts = noteStream.pipe(Stream.map((note) => note.text));
           const firstTwo = yield* texts.pipe(Stream.take(2), Stream.runCollect);
           expect(firstTwo).toEqual(["apple", "banana"]);
@@ -177,19 +181,23 @@ it.layer(TestConfect.layer, { buildPerTest: true })("QueryStream", (test) => {
           const reader = yield* DatabaseReader;
 
           const fromB = yield* collectTexts(
-            reader.table(notes).stream("by_text", (q) => q.gte("text", "b")),
+            reader
+              .table(notesTable)
+              .stream("by_text", (q) => q.gte("text", "b")),
           );
           expect(fromB).toEqual(["banana", "cherry"]);
 
           const bOnly = yield* collectTexts(
             reader
-              .table(notes)
+              .table(notesTable)
               .stream("by_text", (q) => q.gte("text", "b").lt("text", "c")),
           );
           expect(bOnly).toEqual(["banana"]);
 
           const exactly = yield* collectTexts(
-            reader.table(notes).stream("by_text", (q) => q.eq("text", "apple")),
+            reader
+              .table(notesTable)
+              .stream("by_text", (q) => q.eq("text", "apple")),
           );
           expect(exactly).toEqual(["apple"]);
         }),
@@ -206,7 +214,7 @@ it.layer(TestConfect.layer, { buildPerTest: true })("QueryStream", (test) => {
           yield* insertNotes(["a", "b"]);
 
           const reader = yield* DatabaseReader;
-          const noteStream = reader.table(notes).stream("by_text");
+          const noteStream = reader.table(notesTable).stream("by_text");
           type Note = Stream.Success<typeof noteStream>;
           const nothing = QueryStream.empty<Note>()(
             Result.getOrThrowWith(
@@ -234,7 +242,7 @@ it.layer(TestConfect.layer, { buildPerTest: true })("QueryStream", (test) => {
                 QueryStream.merge(
                   Array.map(some, (text) =>
                     reader
-                      .table(notes)
+                      .table(notesTable)
                       .stream("by_text", (q) =>
                         q.gte("text", text).lte("text", text),
                       ),
@@ -266,8 +274,8 @@ it.layer(TestConfect.layer, { buildPerTest: true })("QueryStream", (test) => {
           ] = ["asc", "desc"];
           expect(() =>
             QueryStream.merge([
-              reader.table(notes).stream("by_text", directions[0]),
-              reader.table(notes).stream("by_text", directions[1]),
+              reader.table(notesTable).stream("by_text", directions[0]),
+              reader.table(notesTable).stream("by_text", directions[1]),
             ]),
           ).toThrow(/must share an order/);
         }),
@@ -293,12 +301,12 @@ it.layer(TestConfect.layer, { buildPerTest: true })("QueryStream", (test) => {
             ["a", "3"],
             ["b", "4"],
           ] as const) {
-            yield* writer.table(notes).insert({ text, tag });
+            yield* writer.table(notesTable).insert({ text, tag });
           }
 
           const streamFor = (text: string, order: "asc" | "desc") =>
             reader
-              .table(notes)
+              .table(notesTable)
               .stream("by_text", (q) => q.eq("text", text), order);
 
           const merged = QueryStream.merge([
@@ -335,7 +343,7 @@ it.layer(TestConfect.layer, { buildPerTest: true })("QueryStream", (test) => {
 
           const filtered = yield* collectTexts(
             reader
-              .table(notes)
+              .table(notesTable)
               .stream("by_text")
               .pipe(
                 QueryStream.filterEffect((note) =>
@@ -366,15 +374,19 @@ it.layer(TestConfect.layer, { buildPerTest: true })("QueryStream", (test) => {
             ["a", "5"],
             ["b", "6"],
           ] as const) {
-            yield* writer.table(notes).insert({ text, tag });
+            yield* writer.table(notesTable).insert({ text, tag });
           }
 
           // One stream value serves every page: a QueryStream is a
           // description, and leaves rebuild their (one-shot) Convex query
           // from stored reflection data on each run.
           const composed = QueryStream.merge([
-            reader.table(notes).stream("by_text", (q) => q.eq("text", "a")),
-            reader.table(notes).stream("by_text", (q) => q.eq("text", "b")),
+            reader
+              .table(notesTable)
+              .stream("by_text", (q) => q.eq("text", "a")),
+            reader
+              .table(notesTable)
+              .stream("by_text", (q) => q.eq("text", "b")),
           ]).pipe(
             QueryStream.filterEffect((note) =>
               Effect.succeed(note.tag !== "3"),
@@ -421,7 +433,7 @@ it.layer(TestConfect.layer, { buildPerTest: true })("QueryStream", (test) => {
           yield* insertNotes(["a", "b", "c", "d"]);
 
           const reader = yield* DatabaseReader;
-          const stream = reader.table(notes).stream("by_text");
+          const stream = reader.table(notesTable).stream("by_text");
 
           const page1 = yield* QueryStream.paginate(stream, {
             numItems: 2,
@@ -459,7 +471,7 @@ it.layer(TestConfect.layer, { buildPerTest: true })("QueryStream", (test) => {
 
             const result = yield* QueryStream.paginate(
               reader
-                .table(notes)
+                .table(notesTable)
                 .stream("by_text")
                 .pipe(QueryStream.filterEffect(() => Effect.succeed(false))),
               { numItems: 3, cursor: null, maximumRowsRead: 2 },
@@ -484,7 +496,7 @@ it.layer(TestConfect.layer, { buildPerTest: true })("QueryStream", (test) => {
           Effect.gen(function* () {
             yield* insertNotes(["a", "b"]);
             const reader = yield* DatabaseReader;
-            const source = reader.table(notes).stream("by_text");
+            const source = reader.table(notesTable).stream("by_text");
             const first = yield* QueryStream.paginate(source, {
               cursor: null,
               numItems: 1,
@@ -523,7 +535,7 @@ it.layer(TestConfect.layer, { buildPerTest: true })("QueryStream", (test) => {
             );
 
             const reader = yield* DatabaseReader;
-            const noteStream = reader.table(notes).stream("by_text");
+            const noteStream = reader.table(notesTable).stream("by_text");
             const initials = (page: ReadonlyArray<{ text: string }>) =>
               Array.map(page, (note) => note.text[0]);
             const [first] = yield* Stream.runCollect(noteStream);
@@ -559,8 +571,12 @@ it.layer(TestConfect.layer, { buildPerTest: true })("QueryStream", (test) => {
             // two ranges (which pre-fetches from both) still stops early and
             // covers every document across its pages.
             const merged = QueryStream.merge([
-              reader.table(notes).stream("by_text", (q) => q.lt("text", "c")),
-              reader.table(notes).stream("by_text", (q) => q.gte("text", "c")),
+              reader
+                .table(notesTable)
+                .stream("by_text", (q) => q.lt("text", "c")),
+              reader
+                .table(notesTable)
+                .stream("by_text", (q) => q.gte("text", "c")),
             ]);
             const budgeted = (
               cursor: string | null,
@@ -601,7 +617,7 @@ it.layer(TestConfect.layer, { buildPerTest: true })("QueryStream", (test) => {
 
           const reader = yield* DatabaseReader;
           const leaf = reader
-            .table(notes)
+            .table(notesTable)
             .stream("by_text", (q) => q.eq("text", "b"));
 
           const page1 = yield* QueryStream.paginate(leaf, {
@@ -645,7 +661,7 @@ it.layer(TestConfect.layer, { buildPerTest: true })("QueryStream", (test) => {
 
           const reader = yield* DatabaseReader;
           const derived = reader
-            .table(notes)
+            .table(notesTable)
             .stream("by_text")
             .pipe(
               QueryStream.filter((note) => note.text !== "c"),
@@ -692,7 +708,7 @@ it.layer(TestConfect.layer, { buildPerTest: true })("QueryStream", (test) => {
             Effect.gen(function* () {
               yield* insertNotes(["a", "b", "b", "c", "d", "d", "e"]);
               const reader = yield* DatabaseReader;
-              const leaf = reader.table(notes).stream("by_text", order);
+              const leaf = reader.table(notesTable).stream("by_text", order);
               const elements = yield* Stream.runCollect(leaf.annotated).pipe(
                 Effect.provideServiceEffect(
                   QueryStreamReadBudget.QueryStreamReadBudget,
@@ -740,10 +756,10 @@ it.layer(TestConfect.layer, { buildPerTest: true })("QueryStream", (test) => {
               >(leaf.orderDirection, leaf.keyLayout, leaf.annotated);
               const composed = QueryStream.merge([
                 reader
-                  .table(notes)
+                  .table(notesTable)
                   .stream("by_text", (q) => q.lt("text", "c"), order),
                 reader
-                  .table(notes)
+                  .table(notesTable)
                   .stream("by_text", (q) => q.gte("text", "c"), order),
               ]).pipe(
                 QueryStream.filter(
@@ -826,7 +842,7 @@ it.layer(TestConfect.layer, { buildPerTest: true })("QueryStream", (test) => {
             Effect.gen(function* () {
               yield* insertNotes(["a", "b", "c", "d", "e"]);
               const reader = yield* DatabaseReader;
-              const leaf = reader.table(notes).stream("by_text", order);
+              const leaf = reader.table(notesTable).stream("by_text", order);
               const texts = yield* collectTexts(leaf);
               const start = {
                 keyValues: [Array.getUnsafe(texts, 1)],
@@ -898,16 +914,16 @@ it.layer(TestConfect.layer, { buildPerTest: true })("QueryStream", (test) => {
                 ["x1", "a"],
                 ["x2", "b"],
               ] as const) {
-                yield* writer.table(notes).insert({ text, tag });
+                yield* writer.table(notesTable).insert({ text, tag });
               }
               const joined = reader
-                .table(notes)
+                .table(notesTable)
                 .stream("by_text", (q) => q.gte("text", "x"), order)
                 .pipe(
                   QueryStream.flatMap(
                     (note) =>
                       reader
-                        .table(notes)
+                        .table(notesTable)
                         .stream(
                           "by_text",
                           (q) => q.eq("text", note.tag ?? ""),
@@ -978,7 +994,7 @@ it.layer(TestConfect.layer, { buildPerTest: true })("QueryStream", (test) => {
           yield* insertNotes(["banana", "apple", "banana"]);
 
           const reader = yield* DatabaseReader;
-          const stream = reader.table(notes).stream("by_text");
+          const stream = reader.table(notesTable).stream("by_text");
 
           const pages = yield* paginateAll(stream, 1);
           expect(
@@ -998,7 +1014,7 @@ it.layer(TestConfect.layer, { buildPerTest: true })("QueryStream", (test) => {
           yield* insertNotes(["a", "b", "c"]);
 
           const reader = yield* DatabaseReader;
-          const stream = reader.table(notes).stream("by_text", "desc");
+          const stream = reader.table(notesTable).stream("by_text", "desc");
 
           const pages = yield* paginateAll(stream, 1);
           expect(
@@ -1019,7 +1035,7 @@ it.layer(TestConfect.layer, { buildPerTest: true })("QueryStream", (test) => {
 
           const reader = yield* DatabaseReader;
           const stream = reader
-            .table(notes)
+            .table(notesTable)
             .stream("by_text", (q) => q.gte("text", "b"));
 
           const pages = yield* paginateAll(stream, 1);
@@ -1049,17 +1065,17 @@ it.layer(TestConfect.layer, { buildPerTest: true })("QueryStream", (test) => {
             ["x2", "b"],
             ["x3", "none"],
           ] as const) {
-            yield* writer.table(notes).insert({ text, tag });
+            yield* writer.table(notesTable).insert({ text, tag });
           }
 
           const outer = reader
-            .table(notes)
+            .table(notesTable)
             .stream("by_text", (q) => q.gte("text", "x"));
           const joined = outer.pipe(
             QueryStream.flatMap(
               (note) =>
                 reader
-                  .table(notes)
+                  .table(notesTable)
                   .stream("by_text", (q) => q.eq("text", note.tag ?? "")),
               {
                 innerKeyLayout: Result.getOrThrowWith(
@@ -1085,7 +1101,7 @@ it.layer(TestConfect.layer, { buildPerTest: true })("QueryStream", (test) => {
             QueryStream.flatMap(
               (note) =>
                 reader
-                  .table(notes)
+                  .table(notesTable)
                   .stream("by_text", (q) => q.eq("text", note.tag ?? "")),
               {
                 innerKeyLayout: Result.getOrThrowWith(
@@ -1125,17 +1141,17 @@ it.layer(TestConfect.layer, { buildPerTest: true })("QueryStream", (test) => {
             ["x1", "a"],
             ["x2", "b"],
           ] as const) {
-            yield* writer.table(notes).insert({ text, tag });
+            yield* writer.table(notesTable).insert({ text, tag });
           }
 
           const joined = reader
-            .table(notes)
+            .table(notesTable)
             .stream("by_text", (q) => q.gte("text", "x"))
             .pipe(
               QueryStream.flatMap(
                 (note) =>
                   reader
-                    .table(notes)
+                    .table(notesTable)
                     .stream("by_text", (q) => q.eq("text", note.tag ?? "")),
                 {
                   innerKeyLayout: Result.getOrThrowWith(
@@ -1174,16 +1190,16 @@ it.layer(TestConfect.layer, { buildPerTest: true })("QueryStream", (test) => {
               ["x1", "a"],
               ["x2", "b"],
             ] as const) {
-              yield* writer.table(notes).insert({ text, tag });
+              yield* writer.table(notesTable).insert({ text, tag });
             }
 
             const outer = reader
-              .table(notes)
+              .table(notesTable)
               .stream("by_text", (q) => q.gte("text", "x"));
             type Note = Stream.Success<typeof outer>;
             const inner = (note: Note) =>
               reader
-                .table(notes)
+                .table(notesTable)
                 .stream("by_text", (q) => q.eq("text", note.tag ?? ""));
 
             // "x0" has no inner rows: the placeholder stands in for them, in
@@ -1233,7 +1249,7 @@ it.layer(TestConfect.layer, { buildPerTest: true })("QueryStream", (test) => {
           yield* insertNotes(["c", "a", "b"]);
 
           const reader = yield* DatabaseReader;
-          const noteStream = reader.table(notes).stream("by_text");
+          const noteStream = reader.table(notesTable).stream("by_text");
           const makeTransform = Effect.fnUntraced(function* (
             predecessors: number,
           ) {
@@ -1314,10 +1330,10 @@ it.layer(TestConfect.layer, { buildPerTest: true })("QueryStream", (test) => {
             ["x1", "a"],
             ["x2", "b"],
           ] as const) {
-            yield* writer.table(notes).insert({ text, tag });
+            yield* writer.table(notesTable).insert({ text, tag });
           }
 
-          const noteStream = reader.table(notes).stream("by_text");
+          const noteStream = reader.table(notesTable).stream("by_text");
           const collectTextsResult20 = yield* collectTexts(
             QueryStream.reverse(noteStream),
           );
@@ -1344,8 +1360,12 @@ it.layer(TestConfect.layer, { buildPerTest: true })("QueryStream", (test) => {
 
           // Through a merge and the transforms.
           const feed = QueryStream.merge([
-            reader.table(notes).stream("by_text", (q) => q.lt("text", "b")),
-            reader.table(notes).stream("by_text", (q) => q.gte("text", "b")),
+            reader
+              .table(notesTable)
+              .stream("by_text", (q) => q.lt("text", "b")),
+            reader
+              .table(notesTable)
+              .stream("by_text", (q) => q.gte("text", "b")),
           ]).pipe(
             QueryStream.filter((note) => note.text !== "x1"),
             QueryStream.map((note) => note.text),
@@ -1358,13 +1378,13 @@ it.layer(TestConfect.layer, { buildPerTest: true })("QueryStream", (test) => {
           // Through a join—the inner streams reverse with the outer—and
           // on to pagination, with cursors still pushed down.
           const joined = reader
-            .table(notes)
+            .table(notesTable)
             .stream("by_text", (q) => q.gte("text", "x"))
             .pipe(
               QueryStream.flatMap(
                 (note) =>
                   reader
-                    .table(notes)
+                    .table(notesTable)
                     .stream("by_text", (q) => q.eq("text", note.tag ?? "")),
                 {
                   innerKeyLayout: Result.getOrThrowWith(
@@ -1406,7 +1426,7 @@ it.layer(TestConfect.layer, { buildPerTest: true })("QueryStream", (test) => {
             ["b", "b2"],
             ["c", "c1"],
           ] as const) {
-            yield* writer.table(notes).insert({ text, tag });
+            yield* writer.table(notesTable).insert({ text, tag });
           }
 
           const tagsOf = <E, R>(
@@ -1418,7 +1438,7 @@ it.layer(TestConfect.layer, { buildPerTest: true })("QueryStream", (test) => {
 
           const firstPerText = yield* tagsOf(
             reader
-              .table(notes)
+              .table(notesTable)
               .stream("by_text")
               .pipe(QueryStream.distinct(["text"])),
           );
@@ -1428,7 +1448,7 @@ it.layer(TestConfect.layer, { buildPerTest: true })("QueryStream", (test) => {
           // group's last in ascending order.
           const firstPerTextDesc = yield* tagsOf(
             reader
-              .table(notes)
+              .table(notesTable)
               .stream("by_text", "desc")
               .pipe(QueryStream.distinct(["text"])),
           );
@@ -1454,11 +1474,11 @@ it.layer(TestConfect.layer, { buildPerTest: true })("QueryStream", (test) => {
             ["b", "b2"],
             ["c", "c1"],
           ] as const) {
-            yield* writer.table(notes).insert({ text, tag });
+            yield* writer.table(notesTable).insert({ text, tag });
           }
 
           const distinctTexts = reader
-            .table(notes)
+            .table(notesTable)
             .stream("by_text")
             .pipe(QueryStream.distinct(["text"]));
 
@@ -1495,14 +1515,14 @@ it.layer(TestConfect.layer, { buildPerTest: true })("QueryStream", (test) => {
             const writer = yield* DatabaseWriter;
             const reader = yield* DatabaseReader;
 
-            yield* writer.table(notes).insert({ text: "a", tag: "ta1" });
-            yield* writer.table(notes).insert({
+            yield* writer.table(notesTable).insert({ text: "a", tag: "ta1" });
+            yield* writer.table(notesTable).insert({
               author: { name: "A", role: "admin" },
               tag: "tr1",
               text: "x1",
             });
-            yield* writer.table(notes).insert({ text: "m", tag: "ta2" });
-            yield* writer.table(notes).insert({
+            yield* writer.table(notesTable).insert({ text: "m", tag: "ta2" });
+            yield* writer.table(notesTable).insert({
               author: { name: "U", role: "user" },
               tag: "tr2",
               text: "x2",
@@ -1511,10 +1531,10 @@ it.layer(TestConfect.layer, { buildPerTest: true })("QueryStream", (test) => {
             // Two different indexes over the same table: the range bounds
             // keep their document sets disjoint.
             const byText = reader
-              .table(notes)
+              .table(notesTable)
               .stream("by_text", (q) => q.lt("text", "x"));
             const byRole = reader
-              .table(notes)
+              .table(notesTable)
               .stream("by_role", (q) => q.gte("author.role", "admin"));
 
             // `by_role`'s key is ["author.role", "_creationTime"]; relabel
@@ -1559,7 +1579,7 @@ it.layer(TestConfect.layer, { buildPerTest: true })("QueryStream", (test) => {
             ["x1", "a"],
             ["x2", "b"],
           ] as const) {
-            yield* writer.table(notes).insert({ text, tag });
+            yield* writer.table(notesTable).insert({ text, tag });
           }
 
           const tagsOf = <E, R>(
@@ -1572,13 +1592,13 @@ it.layer(TestConfect.layer, { buildPerTest: true })("QueryStream", (test) => {
           // Type-level key ["text", "_creationTime", "_creationTime"]; the
           // runtime key also carries the outer row's `_id` in the middle.
           const joined = reader
-            .table(notes)
+            .table(notesTable)
             .stream("by_text", (q) => q.gte("text", "x"))
             .pipe(
               QueryStream.flatMap(
                 (note) =>
                   reader
-                    .table(notes)
+                    .table(notesTable)
                     .stream("by_text", (q) => q.eq("text", note.tag ?? "")),
                 {
                   innerKeyLayout: Result.getOrThrowWith(
@@ -1643,13 +1663,15 @@ it.layer(TestConfect.layer, { buildPerTest: true })("QueryStream", (test) => {
           const writer = yield* DatabaseWriter;
           const reader = yield* DatabaseReader;
           for (const text of ["outer", "outer", "middle", "middle"]) {
-            yield* writer.table(notes).insert({ text });
+            yield* writer.table(notesTable).insert({ text });
           }
           for (const tag of ["l1", "l2"]) {
-            yield* writer.table(notes).insert({ text: "leaf", tag });
+            yield* writer.table(notesTable).insert({ text: "leaf", tag });
           }
           const scan = (text: string) =>
-            reader.table(notes).stream("by_text", (q) => q.eq("text", text));
+            reader
+              .table(notesTable)
+              .stream("by_text", (q) => q.eq("text", text));
           const leaf = scan("leaf");
           const inner = QueryStream.flatMap(scan("middle"), () => leaf, {
             innerKeyLayout: leaf.keyLayout,
@@ -1702,11 +1724,11 @@ it.layer(TestConfect.layer, { buildPerTest: true })("QueryStream", (test) => {
           Effect.gen(function* () {
             const writer = yield* DatabaseWriter;
             const reader = yield* DatabaseReader;
-            const id = yield* writer.table(notes).insert({ text: "only" });
+            const id = yield* writer.table(notesTable).insert({ text: "only" });
             const pinned = reader
-              .table(notes)
+              .table(notesTable)
               .stream("by_id", (q) => q.eq("_id", id));
-            const outer = reader.table(notes).stream("by_creation_time");
+            const outer = reader.table(notesTable).stream("by_creation_time");
             const joined = QueryStream.flatMap(outer, () => pinned, {
               innerKeyLayout: pinned.keyLayout,
             });
@@ -1773,15 +1795,17 @@ it.layer(TestConfect.layer, { buildPerTest: true })("QueryStream", (test) => {
       yield* c.run(
         Effect.gen(function* () {
           const writer = yield* DatabaseWriter;
-          const noteId = yield* writer.table(notes).insert({ text: "only" });
-          yield* writer.table(notes).insert({ text: "other" });
+          const noteId = yield* writer
+            .table(notesTable)
+            .insert({ text: "only" });
+          yield* writer.table(notesTable).insert({ text: "other" });
 
           const reader = yield* DatabaseReader;
           // Pinning the whole `by_id` key leaves an *empty* key; the
           // cursor round-trip must not rebuild ranges past the index's
           // fields.
           const pinned = reader
-            .table(notes)
+            .table(notesTable)
             .stream("by_id", (q) => q.eq("_id", noteId));
 
           const page1 = yield* QueryStream.paginate(pinned, {
@@ -1812,7 +1836,7 @@ it.layer(TestConfect.layer, { buildPerTest: true })("QueryStream", (test) => {
             yield* insertNotes(["a", "b", "c"]);
 
             const reader = yield* DatabaseReader;
-            const stream = reader.table(notes).stream("by_text");
+            const stream = reader.table(notesTable).stream("by_text");
 
             const page1 = yield* QueryStream.paginate(stream, {
               numItems: 2,
@@ -1840,7 +1864,7 @@ it.layer(TestConfect.layer, { buildPerTest: true })("QueryStream", (test) => {
           yield* insertNotes(["a"]);
 
           const reader = yield* DatabaseReader;
-          const stream = reader.table(notes).stream("by_text");
+          const stream = reader.table(notesTable).stream("by_text");
 
           const fromCursor = (cursor: string) =>
             QueryStream.paginate(stream, { numItems: 1, cursor }).pipe(
@@ -1872,7 +1896,7 @@ it.layer(TestConfect.layer, { buildPerTest: true })("QueryStream", (test) => {
           Effect.gen(function* () {
             yield* insertNotes(["a", "b", "c"]);
             const reader = yield* DatabaseReader;
-            const source = reader.table(notes).stream("by_text");
+            const source = reader.table(notesTable).stream("by_text");
             const page = yield* QueryStream.paginate(source, {
               cursor: null,
               numItems: 10,
@@ -1935,7 +1959,7 @@ it.layer(TestConfect.layer, { buildPerTest: true })("QueryStream", (test) => {
           const reader = yield* DatabaseReader;
 
           const shouted = reader
-            .table(notes)
+            .table(notesTable)
             .stream("by_text")
             .pipe(
               QueryStream.filter((note) => note.text !== "b"),
@@ -1970,7 +1994,9 @@ it.layer(TestConfect.layer, { buildPerTest: true })("QueryStream", (test) => {
 
           const reader = yield* DatabaseReader;
           const byText = (text: string) =>
-            reader.table(notes).stream("by_text", (q) => q.eq("text", text));
+            reader
+              .table(notesTable)
+              .stream("by_text", (q) => q.eq("text", text));
 
           const none = yield* QueryStream.unique(byText("missing"));
           assertEquals(Option.isNone(none), true);
@@ -2014,7 +2040,7 @@ describe("QueryStream types", () => {
     const _typeChecks = Effect.gen(function* () {
       const reader = yield* DatabaseReader;
 
-      const full = reader.table(notes).stream("by_text");
+      const full = reader.table(notesTable).stream("by_text");
       expectTypeOf<LabelsOf<typeof full>>().toEqualTypeOf<
         QueryStreamKeyLabels.QueryStreamKeyLabels<
           readonly ["text", "_creationTime"]
@@ -2022,7 +2048,7 @@ describe("QueryStream types", () => {
       >();
 
       const pinned = reader
-        .table(notes)
+        .table(notesTable)
         .stream("by_text", (q) => q.eq("text", "x"));
       expectTypeOf<LabelsOf<typeof pinned>>().toEqualTypeOf<
         QueryStreamKeyLabels.QueryStreamKeyLabels<readonly ["_creationTime"]>
@@ -2030,7 +2056,7 @@ describe("QueryStream types", () => {
 
       // Bounded fields still vary, so they are not consumed.
       const bounded = reader
-        .table(notes)
+        .table(notesTable)
         .stream("by_text", (q) => q.gte("text", "a"));
       expectTypeOf<LabelsOf<typeof bounded>>().toEqualTypeOf<
         QueryStreamKeyLabels.QueryStreamKeyLabels<
@@ -2038,7 +2064,9 @@ describe("QueryStream types", () => {
         >
       >();
 
-      const byCreationTime = reader.table(notes).stream("by_creation_time");
+      const byCreationTime = reader
+        .table(notesTable)
+        .stream("by_creation_time");
       expectTypeOf<LabelsOf<typeof byCreationTime>>().toEqualTypeOf<
         QueryStreamKeyLabels.QueryStreamKeyLabels<readonly ["_creationTime"]>
       >();
@@ -2096,18 +2124,18 @@ describe("QueryStream types", () => {
       void mergedMismatched;
 
       const wrongField = reader
-        .table(notes)
+        .table(notesTable)
         // @ts-expect-error—`eq` must target the next index field.
         .stream("by_text", (q) => q.eq("tag", "x"));
       void wrongField;
 
       const wrongValue = reader
-        .table(notes)
+        .table(notesTable)
         // @ts-expect-error—the value must match the field's type.
         .stream("by_text", (q) => q.eq("text", 42));
       void wrongValue;
 
-      const afterBound = reader.table(notes).stream("by_text", (q) => {
+      const afterBound = reader.table(notesTable).stream("by_text", (q) => {
         const lowerBounded = q.gte("text", "a");
         // @ts-expect-error—after a lower bound, `eq` is gone.
         void lowerBounded.eq;
@@ -2250,17 +2278,17 @@ describe("QueryStream types", () => {
       // The order direction is tracked in the type: "asc" when omitted, a
       // literal when given one, the union when only known at runtime.
       expectTypeOf<DirectionOf<typeof full>>().toEqualTypeOf<"asc">();
-      const descending = reader.table(notes).stream("by_text", "desc");
+      const descending = reader.table(notesTable).stream("by_text", "desc");
       expectTypeOf<DirectionOf<typeof descending>>().toEqualTypeOf<"desc">();
       const descendingBounded = reader
-        .table(notes)
+        .table(notesTable)
         .stream("by_text", (q) => q.gte("text", "a"), "desc");
       expectTypeOf<
         DirectionOf<typeof descendingBounded>
       >().toEqualTypeOf<"desc">();
       const runtimeOrder =
         "asc" as QueryStreamOrderDirection.QueryStreamOrderDirection;
-      const dynamic = reader.table(notes).stream("by_text", runtimeOrder);
+      const dynamic = reader.table(notesTable).stream("by_text", runtimeOrder);
       expectTypeOf<
         DirectionOf<typeof dynamic>
       >().toEqualTypeOf<QueryStreamOrderDirection.QueryStreamOrderDirection>();

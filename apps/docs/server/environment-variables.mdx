@@ -17,9 +17,9 @@ import * as Config from "effect/Config";
 import * as Effect from "effect/Effect";
 
 import { FunctionImpl } from "./_generated/server";
-import settings from "./settings.spec";
+import settingsSpec from "./settings.spec";
 
-const getApiKey = FunctionImpl.make(settings, "getApiKey", () =>
+const getApiKey = FunctionImpl.make(settingsSpec, "getApiKey", () =>
   Config.String("API_KEY").pipe(Effect.orDie),
 );
 ```
@@ -75,9 +75,9 @@ import * as ConfigProvider from "effect/ConfigProvider";
 import * as Effect from "effect/Effect";
 
 import { FunctionImpl } from "./_generated/server";
-import settings from "./settings.spec";
+import settingsSpec from "./settings.spec";
 
-const getApiKey = FunctionImpl.make(settings, "getApiKey", () =>
+const getApiKey = FunctionImpl.make(settingsSpec, "getApiKey", () =>
   Config.nested(Config.String("KEY"), "API").pipe(
     Effect.provideService(
       ConfigProvider.ConfigProvider,

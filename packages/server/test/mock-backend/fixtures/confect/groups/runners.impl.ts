@@ -7,10 +7,10 @@ import {
   MutationRunner,
   QueryRunner,
 } from "../_generated/services";
-import runners from "./runners.spec";
+import runnersSpec from "./runners.spec";
 
 const insertNoteViaRunner = FunctionImpl.make(
-  runners,
+  runnersSpec,
   "insertNoteViaRunner",
   ({ text }) =>
     Effect.gen(function* () {
@@ -20,7 +20,7 @@ const insertNoteViaRunner = FunctionImpl.make(
 );
 
 const getNumberViaRunner = FunctionImpl.make(
-  runners,
+  runnersSpec,
   "getNumberViaRunner",
   () =>
     Effect.gen(function* () {
@@ -30,7 +30,7 @@ const getNumberViaRunner = FunctionImpl.make(
 );
 
 const countNotesViaRunner = FunctionImpl.make(
-  runners,
+  runnersSpec,
   "countNotesViaRunner",
   () =>
     Effect.gen(function* () {
@@ -40,7 +40,7 @@ const countNotesViaRunner = FunctionImpl.make(
     }).pipe(Effect.orDie),
 );
 
-export default GroupImpl.make(runners).pipe(
+export default GroupImpl.make(runnersSpec).pipe(
   Layer.provide(insertNoteViaRunner),
   Layer.provide(getNumberViaRunner),
   Layer.provide(countNotesViaRunner),

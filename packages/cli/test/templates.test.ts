@@ -325,8 +325,8 @@ export default Table.make(() => {
           path.join(directory, "runtime.ts"),
           `export { default } from "./schema";
 export { reads } from "./reads";
-import notes from "./tables/notes";
-export const fields = () => notes.Fields;
+import notesTable from "./tables/notes";
+export const fields = () => notesTable.Fields;
 `,
         );
         yield* fs.writeFileString(
@@ -530,7 +530,7 @@ layer(NodeServices.layer)("assembledSpec", (test) => {
             (index) =>
               `${prefix}${pipe(String(index + 1), Str.padStart(3, "0"))}`,
           );
-        const rootNames = names("g", 600);
+        const rootNames = ["Group", ...names("g", 600)];
         const childNames = names("c", 300);
         const deepNames = names("d", 100);
         const lastRoot = rootNames[rootNames.length - 1]!;
@@ -684,10 +684,10 @@ const wrongArgs: typeof deep["~Args"] = { id: 1 };
         );
         expect(declaration).toContain("declare const spec:");
         expect(declaration).toContain(
-          `GroupSpec.NamedAt<typeof ${lastRoot}, "${lastRoot}">`,
+          `Group.NamedAt<typeof ${lastRoot}Spec, "${lastRoot}">`,
         );
         expect(declaration).toContain(
-          `typeof nested_${lastChild}_level3_level4_${lastDeep}`,
+          `typeof nested_${lastChild}_level3_level4_${lastDeep}Spec`,
         );
         expect(
           Option.getOrNull(pipe(declaration, Str.match(/typeof /g))),

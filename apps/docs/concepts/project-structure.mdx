@@ -99,7 +99,7 @@ The default export lists the declared application table names without importing 
 
 #### `tables/`
 
-Contains one wrapper module per user-authored table (for example `tables/notes.ts` for `confect/tables/notes.ts`). Each wrapper applies the filename-derived table name to the `Table` defined in `confect/tables/<name>.ts` and re-exports it as the default. Specs, impls, and other consumers should default-import from `confect/_generated/tables/<name>` to reach a table's `Doc`, `Fields`, and `tableName` properties—for example, `import notes from "../_generated/tables/notes"` and then `notes.Doc`. These wrappers are client-safe: they do not import `@confect/server`, so a spec that uses `notes.Doc` can ship in `_generated/refs.ts` without pulling the server package into the browser.
+Contains one wrapper module per user-authored table (for example `tables/notes.ts` for `confect/tables/notes.ts`). Each wrapper applies the filename-derived table name to the `Table` defined in `confect/tables/<name>.ts` and re-exports it as the default. Specs, impls, and other consumers should default-import from `confect/_generated/tables/<name>` to reach a table's `Doc`, `Fields`, and `tableName` properties—for example, `import notesTable from "../_generated/tables/notes"` and then `notesTable.Doc`. These wrappers are client-safe: they do not import `@confect/server`, so a spec that uses `notesTable.Doc` can ship in `_generated/refs.ts` without pulling the server package into the browser.
 
 #### `services.ts`
 

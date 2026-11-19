@@ -10,8 +10,8 @@ import {
 import { TestConfect as TestConfect_ } from "../../../test/src";
 import * as Context from "effect/Context";
 import * as Layer from "effect/Layer";
-import notes from "./fixtures/confect/_generated/tables/notes";
-import users from "./fixtures/confect/_generated/tables/users";
+import notesTable from "./fixtures/confect/_generated/tables/notes";
+import usersTable from "./fixtures/confect/_generated/tables/users";
 import tableNames from "./fixtures/confect/_generated/tableNames";
 import type databaseSchema from "./fixtures/confect/_generated/schema";
 import convexSchema from "./fixtures/confect/_generated/convexSchema";
@@ -43,7 +43,7 @@ const insertUser = Effect.fnUntraced(function* (username: string) {
   yield* c.run(
     Effect.gen(function* () {
       const writer = yield* DatabaseWriter;
-      yield* writer.table(users).insert({ username });
+      yield* writer.table(usersTable).insert({ username });
     }),
   );
 }, Effect.orDie);
@@ -54,7 +54,7 @@ const listNoteTexts = Effect.gen(function* () {
     Effect.gen(function* () {
       const reader = yield* DatabaseReader;
       const documents = yield* reader
-        .table(notes)
+        .table(notesTable)
         .index("by_creation_time", "asc")
         .collect();
       return Array.map(documents, (note) => note.text);
@@ -534,7 +534,7 @@ it.layer(TestConfect.layer, { buildPerTest: true })("middleware", (test) => {
           yield* c.run(
             Effect.gen(function* () {
               const writer = yield* DatabaseWriter;
-              yield* writer.table(users).insert({ username: "ada" });
+              yield* writer.table(usersTable).insert({ username: "ada" });
             }),
           );
           const group = refs.public.groups.middlewareOptions;

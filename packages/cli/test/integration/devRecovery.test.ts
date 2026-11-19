@@ -48,10 +48,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
         Effect.gen(function* () {
           const project = yield* Project.make;
           yield* project.write("confect/other.spec.ts", Project.spec);
-          const otherImpl = pipe(
-            Project.impl,
-            Str.replace('"./notes.spec"', '"./other.spec"'),
-          );
+          const otherImpl = Project.implFor("other");
           yield* project.write("confect/other.impl.ts", otherImpl);
           const watching = yield* project.start("dev");
           yield* watching.waitFor(success);

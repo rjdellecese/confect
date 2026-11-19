@@ -43,11 +43,11 @@ import { MiddlewareSpec } from "@confect/core";
 import * as Context from "effect/Context";
 import * as Schema from "effect/Schema";
 
-import type users from "../_generated/tables/users";
+import type usersTable from "../_generated/tables/users";
 
 export class CurrentUser extends Context.Service<
   CurrentUser,
-  { readonly user: typeof users.Doc.Type }
+  { readonly user: typeof usersTable.Doc.Type }
 >()("confect/middleware/RequireUser.spec/CurrentUser") {}
 
 export class NotSignedIn extends Schema.TaggedError<NotSignedIn>()(
@@ -271,7 +271,7 @@ import * as Effect from "effect/Effect";
 
 import { FunctionImpl } from "./_generated/server";
 import { DatabaseWriter } from "./_generated/services";
-import notes from "./_generated/tables/notes";
+import notesTable from "./_generated/tables/notes";
 import { CurrentUser } from "./middleware/RequireUser.spec";
 import notesSpec from "./notes.spec";
 
@@ -280,7 +280,7 @@ const create = FunctionImpl.make(notesSpec, "create", ({ text }) =>
     const { user } = yield* CurrentUser;
     const writer = yield* DatabaseWriter;
 
-    return yield* writer.table(notes).insert({ text, userId: user._id });
+    return yield* writer.table(notesTable).insert({ text, userId: user._id });
   }).pipe(Effect.orDie),
 );
 ```
@@ -303,7 +303,7 @@ import * as Option from "effect/Option";
 
 import { MiddlewareImpl } from "../_generated/server";
 import { Auth, DatabaseReader } from "../_generated/services";
-import users from "../_generated/tables/users";
+import usersTable from "../_generated/tables/users";
 import RequireUser, { CurrentUser, NotSignedIn } from "./RequireUser.spec";
 
 export default MiddlewareImpl.provides(
@@ -317,7 +317,7 @@ export default MiddlewareImpl.provides(
       Effect.mapError(() => new NotSignedIn()),
     );
     const user = yield* reader
-      .table(users)
+      .table(usersTable)
       .index("by_token_identifier", (q) =>
         q.eq("tokenIdentifier", identity.tokenIdentifier),
       )

@@ -1,41 +1,41 @@
-import { GroupSpec, Spec } from "@confect/core";
-import databaseReader from "../databaseReader.spec";
-import groups_aliasImporter from "../groups/aliasImporter.spec";
-import groups_cjsImporter from "../groups/cjsImporter.spec";
-import groups_middleware from "../groups/middleware.spec";
-import groups_middlewareHelpers from "../groups/middlewareHelpers.spec";
-import groups_middlewareOptions from "../groups/middlewareOptions.spec";
-import groups_middlewareOrder from "../groups/middlewareOrder.spec";
-import groups_notes from "../groups/notes.spec";
-import groups_random from "../groups/random.spec";
-import groups_random_stats from "../groups/random/stats.spec";
-import groups_runners from "../groups/runners.spec";
-import groups_scheduling from "../groups/scheduling.spec";
-import groups_typedErrors from "../groups/typedErrors.spec";
-import typedErrorsNode from "../typedErrorsNode.spec";
+import { GroupSpec as Group, Spec } from "@confect/core";
+import databaseReaderSpec from "../databaseReader.spec";
+import groups_aliasImporterSpec from "../groups/aliasImporter.spec";
+import groups_cjsImporterSpec from "../groups/cjsImporter.spec";
+import groups_middlewareHelpersSpec from "../groups/middlewareHelpers.spec";
+import groups_middlewareOptionsSpec from "../groups/middlewareOptions.spec";
+import groups_middlewareOrderSpec from "../groups/middlewareOrder.spec";
+import groups_middlewareSpec from "../groups/middleware.spec";
+import groups_notesSpec from "../groups/notes.spec";
+import groups_randomSpec from "../groups/random.spec";
+import groups_random_statsSpec from "../groups/random/stats.spec";
+import groups_runnersSpec from "../groups/runners.spec";
+import groups_schedulingSpec from "../groups/scheduling.spec";
+import groups_typedErrorsSpec from "../groups/typedErrors.spec";
+import typedErrorsNodeSpec from "../typedErrorsNode.spec";
 
 const spec: Spec.Spec<{
-  readonly databaseReader: GroupSpec.NamedAt<typeof databaseReader, "databaseReader">;
-  readonly groups: GroupSpec.NamedAt<GroupSpec.GroupSpec<"Convex", "groups", never, GroupSpec.NamedAt<typeof groups_aliasImporter, "aliasImporter"> | GroupSpec.NamedAt<typeof groups_cjsImporter, "cjsImporter"> | GroupSpec.NamedAt<typeof groups_middleware, "middleware"> | GroupSpec.NamedAt<typeof groups_middlewareHelpers, "middlewareHelpers"> | GroupSpec.NamedAt<typeof groups_middlewareOptions, "middlewareOptions"> | GroupSpec.NamedAt<typeof groups_middlewareOrder, "middlewareOrder"> | GroupSpec.NamedAt<typeof groups_notes, "notes"> | GroupSpec.NamedAt<GroupSpec.AddGroups<typeof groups_random, GroupSpec.NamedAt<typeof groups_random_stats, "stats">>, "random"> | GroupSpec.NamedAt<typeof groups_runners, "runners"> | GroupSpec.NamedAt<typeof groups_scheduling, "scheduling"> | GroupSpec.NamedAt<typeof groups_typedErrors, "typedErrors">>, "groups">;
-  readonly typedErrorsNode: GroupSpec.NamedAt<typeof typedErrorsNode, "typedErrorsNode">;
+  readonly databaseReader: Group.NamedAt<typeof databaseReaderSpec, "databaseReader">;
+  readonly groups: Group.NamedAt<Group.GroupSpec<"Convex", "groups", never, Group.NamedAt<typeof groups_aliasImporterSpec, "aliasImporter"> | Group.NamedAt<typeof groups_cjsImporterSpec, "cjsImporter"> | Group.NamedAt<typeof groups_middlewareSpec, "middleware"> | Group.NamedAt<typeof groups_middlewareHelpersSpec, "middlewareHelpers"> | Group.NamedAt<typeof groups_middlewareOptionsSpec, "middlewareOptions"> | Group.NamedAt<typeof groups_middlewareOrderSpec, "middlewareOrder"> | Group.NamedAt<typeof groups_notesSpec, "notes"> | Group.NamedAt<Group.AddGroups<typeof groups_randomSpec, Group.NamedAt<typeof groups_random_statsSpec, "stats">>, "random"> | Group.NamedAt<typeof groups_runnersSpec, "runners"> | Group.NamedAt<typeof groups_schedulingSpec, "scheduling"> | Group.NamedAt<typeof groups_typedErrorsSpec, "typedErrors">>, "groups">;
+  readonly typedErrorsNode: Group.NamedAt<typeof typedErrorsNodeSpec, "typedErrorsNode">;
 }> = Spec.fromGroups({
-  ["databaseReader"]: databaseReader,
-  ["groups"]: GroupSpec.addGroupsAt(GroupSpec.make(), {
-    ["aliasImporter"]: groups_aliasImporter,
-    ["cjsImporter"]: groups_cjsImporter,
-    ["middleware"]: groups_middleware,
-    ["middlewareHelpers"]: groups_middlewareHelpers,
-    ["middlewareOptions"]: groups_middlewareOptions,
-    ["middlewareOrder"]: groups_middlewareOrder,
-    ["notes"]: groups_notes,
-    ["random"]: GroupSpec.addGroupsAt(groups_random, {
-      ["stats"]: groups_random_stats,
+  ["databaseReader"]: databaseReaderSpec,
+  ["groups"]: Group.addGroupsAt(Group.make(), {
+    ["aliasImporter"]: groups_aliasImporterSpec,
+    ["cjsImporter"]: groups_cjsImporterSpec,
+    ["middleware"]: groups_middlewareSpec,
+    ["middlewareHelpers"]: groups_middlewareHelpersSpec,
+    ["middlewareOptions"]: groups_middlewareOptionsSpec,
+    ["middlewareOrder"]: groups_middlewareOrderSpec,
+    ["notes"]: groups_notesSpec,
+    ["random"]: Group.addGroupsAt(groups_randomSpec, {
+      ["stats"]: groups_random_statsSpec,
     }),
-    ["runners"]: groups_runners,
-    ["scheduling"]: groups_scheduling,
-    ["typedErrors"]: groups_typedErrors,
+    ["runners"]: groups_runnersSpec,
+    ["scheduling"]: groups_schedulingSpec,
+    ["typedErrors"]: groups_typedErrorsSpec,
   }),
-  ["typedErrorsNode"]: typedErrorsNode,
+  ["typedErrorsNode"]: typedErrorsNodeSpec,
 }) as typeof spec;
 
 export default spec;

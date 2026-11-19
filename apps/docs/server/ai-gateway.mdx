@@ -26,14 +26,14 @@ import * as Layer from "effect/Layer";
 import * as LanguageModel from "effect/ai/LanguageModel";
 import * as FetchHttpClient from "effect/http/FetchHttpClient";
 import { FunctionImpl } from "./_generated/server";
-import assistant from "./assistant.spec";
+import assistantSpec from "./assistant.spec";
 
 const Claude = AiGatewayLanguageModel.model("anthropic/claude-sonnet-4.5").pipe(
   Layer.provide(AiGatewayLanguageClient.layer),
   Layer.provide(FetchHttpClient.layer),
 );
 
-const answer = FunctionImpl.make(assistant, "answer", ({ prompt }) =>
+const answer = FunctionImpl.make(assistantSpec, "answer", ({ prompt }) =>
   LanguageModel.generateText({ prompt }).pipe(
     Effect.map((response) => response.text),
     Effect.provide(Claude),

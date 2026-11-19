@@ -13,16 +13,16 @@ import * as Layer from "effect/Layer";
 import * as Random from "effect/Random";
 import { FunctionImpl, GroupImpl } from "../_generated/server";
 import { TransactionMetadata } from "../_generated/services";
-import cacheStubbed from "./cacheStubbed.spec";
+import cacheStubbedSpec from "./cacheStubbed.spec";
 
 const confectNoTime = FunctionImpl.make(
-  cacheStubbed,
+  cacheStubbedSpec,
   "confectNoTime",
   () => Random.next,
 );
 
 const confectWithSnapshot = FunctionImpl.make(
-  cacheStubbed,
+  cacheStubbedSpec,
   "confectWithSnapshot",
   () =>
     Effect.flatMap(TransactionMetadata, (transaction) =>
@@ -31,31 +31,36 @@ const confectWithSnapshot = FunctionImpl.make(
 );
 
 const confectWithClock = FunctionImpl.make(
-  cacheStubbed,
+  cacheStubbedSpec,
   "confectWithClock",
   () => Clock.currentTimeMillis,
 );
 
 const confectWithRawDateNow = FunctionImpl.make(
-  cacheStubbed,
+  cacheStubbedSpec,
   "confectWithRawDateNow",
   () =>
     // oxlint-disable-next-line effecttsgo/global-date-in-effect -- This fixture verifies that raw time access evicts Convex's query cache.
     Effect.sync(() => Date.now()),
 );
 
-const confectWithSpan = FunctionImpl.make(cacheStubbed, "confectWithSpan", () =>
-  Random.next.pipe(Effect.withSpan("cacheStubbed.confectWithSpan")),
+const confectWithSpan = FunctionImpl.make(
+  cacheStubbedSpec,
+  "confectWithSpan",
+  () => Random.next.pipe(Effect.withSpan("cacheStubbed.confectWithSpan")),
 );
 
-const confectWithLog = FunctionImpl.make(cacheStubbed, "confectWithLog", () =>
-  Effect.gen(function* () {
-    yield* Effect.logInfo("cacheStubbed.confectWithLog");
-    return yield* Random.next;
-  }),
+const confectWithLog = FunctionImpl.make(
+  cacheStubbedSpec,
+  "confectWithLog",
+  () =>
+    Effect.gen(function* () {
+      yield* Effect.logInfo("cacheStubbed.confectWithLog");
+      return yield* Random.next;
+    }),
 );
 
-export default GroupImpl.make(cacheStubbed).pipe(
+export default GroupImpl.make(cacheStubbedSpec).pipe(
   Layer.provide(confectWithSnapshot),
   Layer.provide(confectNoTime),
   Layer.provide(confectWithClock),

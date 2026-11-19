@@ -39,10 +39,10 @@ import * as Layer from "effect/Layer";
 import * as ChildProcess from "effect/process/ChildProcess";
 import { ChildProcessSpawner } from "effect/process/ChildProcessSpawner";
 import { FunctionImpl, GroupImpl } from "./_generated/server";
-import email from "./email.spec";
+import emailSpec from "./email.spec";
 
 const send = FunctionImpl.make(
-  email,
+  emailSpec,
   "send",
   Effect.fn(function* ({ to, subject, body }) {
     const spawner = yield* ChildProcessSpawner;
@@ -62,7 +62,7 @@ const send = FunctionImpl.make(
   }),
 );
 
-export default GroupImpl.make(email).pipe(
+export default GroupImpl.make(emailSpec).pipe(
   Layer.provide(send),
   GroupImpl.finalize,
 );

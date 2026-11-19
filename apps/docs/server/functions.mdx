@@ -29,11 +29,11 @@ Each function spec defines the function's name, argument fields, and returns sch
 import { GroupSpec, FunctionSpec } from "@confect/core";
 import * as Schema from "effect/Schema";
 
-import notes from "./_generated/tables/notes";
+import notesTable from "./_generated/tables/notes";
 
 const list = FunctionSpec.publicQuery({
   name: "list",
-  returns: () => Schema.Array(notes.Doc),
+  returns: () => Schema.Array(notesTable.Doc),
 });
 
 export default GroupSpec.make().addFunction(list);
@@ -86,7 +86,7 @@ import { FunctionSpec } from "@confect/core";
 import * as Schema from "effect/Schema";
 
 import { Id } from "./_generated/id";
-import notes from "./_generated/tables/notes";
+import notesTable from "./_generated/tables/notes";
 
 class NoteNotFound extends Schema.TaggedError<NoteNotFound>()("NoteNotFound", {
   noteId: Id("notes"),
@@ -95,7 +95,7 @@ class NoteNotFound extends Schema.TaggedError<NoteNotFound>()("NoteNotFound", {
 FunctionSpec.publicQuery({
   name: "getOrFail",
   args: () => ({ noteId: Id("notes") }),
-  returns: () => notes.Doc,
+  returns: () => notesTable.Doc,
   error: () => NoteNotFound,
 });
 ```
@@ -108,12 +108,12 @@ Define a paginated query with `FunctionSpec.publicPaginatedQuery` (or `internalP
 import { FunctionSpec } from "@confect/core";
 import * as Schema from "effect/Schema";
 
-import notes from "./_generated/tables/notes";
+import notesTable from "./_generated/tables/notes";
 
 FunctionSpec.publicPaginatedQuery({
   name: "listByAuthor",
   args: () => ({ author: Schema.String }), // optional; omit for no extra args
-  item: () => notes.Doc,
+  item: () => notesTable.Doc,
 });
 ```
 
@@ -122,7 +122,7 @@ Do not declare `paginationOpts` in `args`—it is added automatically, and decla
 The handler receives the decoded args including `paginationOpts`, which it typically forwards directly to [`paginate`](/server/database/reading#paginate):
 
 ```ts confect/notes.impl.ts
-import notes from "./_generated/tables/notes";
+import notesTable from "./_generated/tables/notes";
 import notesSpec from "./notes.spec";
 
 FunctionImpl.make(notesSpec, "listByAuthor", ({ author, paginationOpts }) =>
@@ -130,7 +130,7 @@ FunctionImpl.make(notesSpec, "listByAuthor", ({ author, paginationOpts }) =>
     const reader = yield* DatabaseReader;
 
     return yield* reader
-      .table(notes)
+      .table(notesTable)
       .index("by_creation_time", "desc")
       .paginate(paginationOpts, (q) => q.eq(q.field("author"), author));
   }).pipe(Effect.orDie),
@@ -151,7 +151,7 @@ import * as Layer from "effect/Layer";
 
 import { FunctionImpl, GroupImpl } from "./_generated/server";
 import { DatabaseReader } from "./_generated/services";
-import notes from "./_generated/tables/notes";
+import notesTable from "./_generated/tables/notes";
 import notesSpec from "./notes.spec";
 
 const list = FunctionImpl.make(notesSpec, "list", () =>
@@ -159,7 +159,7 @@ const list = FunctionImpl.make(notesSpec, "list", () =>
     const reader = yield* DatabaseReader;
 
     return yield* reader
-      .table(notes)
+      .table(notesTable)
       .index("by_creation_time", "desc")
       .collect();
   }).pipe(Effect.orDie),

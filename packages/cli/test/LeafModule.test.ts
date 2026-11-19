@@ -461,12 +461,12 @@ export default GroupSpec.make().middleware(Policy, "first").middleware(Policy, "
     }),
   );
 
-  // `groups/notes.spec.ts` uses `notes.Doc` from the generated table wrapper,
+  // `groups/notes.spec.ts` uses `notesTable.Doc` from the generated table wrapper,
   // which binds `confect/tables/notes.ts`. Both must stay free of
   // `@confect/server` so the spec (and thus `_generated/refs.ts`) can ship
   // to the client.
   it.effect(
-    "accepts a spec that uses `notes.Doc` from `_generated/tables/`",
+    "accepts a spec that uses `notesTable.Doc` from `_generated/tables/`",
     () =>
       Effect.gen(function* () {
         const leaf = yield* toLeafModule("groups/notes.spec.ts");
@@ -488,11 +488,11 @@ export default GroupSpec.make().middleware(Policy, "first").middleware(Policy, "
               },
               {
                 relativePath: "_generated/tables/_leaky.ts",
-                contents: `import unnamed from "../../tables/_leaky";\nexport default unnamed("_leaky");\n`,
+                contents: `import _leakyTable from "../../tables/_leaky";\nexport default _leakyTable("_leaky");\n`,
               },
               {
                 relativePath: "groups/_leakyTable.spec.ts",
-                contents: `import { FunctionSpec, GroupSpec } from "@confect/core";\nimport leaky from "../_generated/tables/_leaky";\nexport default GroupSpec.make().addFunction(FunctionSpec.publicQuery({ name: "get", returns: () => leaky.Doc }));\n`,
+                contents: `import { FunctionSpec, GroupSpec } from "@confect/core";\nimport _leakyTable from "../_generated/tables/_leaky";\nexport default GroupSpec.make().addFunction(FunctionSpec.publicQuery({ name: "get", returns: () => _leakyTable.Doc }));\n`,
               },
             ],
             loadSpec(leaf),
@@ -767,9 +767,9 @@ layer(LeafModuleLayer)("validateImpl", (it) => {
         withTempLeaf(
           "_mismatch",
           // Imports `./notes.spec` instead of its sibling `./_mismatch.spec`.
-          `import notes from "./notes.spec";
+          `import notesSpec from "./notes.spec";
 import * as Layer from "effect/Layer";
-void notes;
+void notesSpec;
 export default Layer.empty;
 `,
           validateImpl,
@@ -786,8 +786,8 @@ export default Layer.empty;
       const result = yield* Effect.result(
         withTempLeaf(
           "_notLayer",
-          `import notes from "./_notLayer.spec";
-export default notes;
+          `import _notLayerSpec from "./_notLayer.spec";
+export default _notLayerSpec;
 `,
           validateImpl,
         ),
@@ -803,7 +803,7 @@ export default notes;
       const result = yield* Effect.result(
         withTempLeaf(
           "_brokenSyntax",
-          `import notes from "./_brokenSyntax.spec";
+          `import _brokenSyntaxSpec from "./_brokenSyntax.spec";
 export default GroupImpl.make(
 `,
           validateImpl,
@@ -826,50 +826,50 @@ export default GroupImpl.make(
             `import { FunctionImpl, GroupImpl } from "../_generated/server";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import notes from "../_generated/tables/notes";
+import notesTable from "../_generated/tables/notes";
 import { DatabaseReader, DatabaseWriter } from "../_generated/services";
-import notesSpec from "./_unfinalized.spec";
+import _unfinalizedSpec from "./_unfinalized.spec";
 
-const insert = FunctionImpl.make(notesSpec, "insert", ({ text }) =>
+const insert = FunctionImpl.make(_unfinalizedSpec, "insert", ({ text }) =>
   Effect.gen(function* () {
     const writer = yield* DatabaseWriter;
-    return yield* writer.table(notes).insert({ text });
+    return yield* writer.table(notesTable).insert({ text });
   }).pipe(Effect.orDie),
 );
 
-const list = FunctionImpl.make(notesSpec, "list", () =>
+const list = FunctionImpl.make(_unfinalizedSpec, "list", () =>
   Effect.gen(function* () {
     const reader = yield* DatabaseReader;
     return yield* reader
-      .table(notes)
+      .table(notesTable)
       .index("by_creation_time", "desc")
       .collect();
   }).pipe(Effect.orDie),
 );
 
-const delete_ = FunctionImpl.make(notesSpec, "delete_", ({ noteId }) =>
+const delete_ = FunctionImpl.make(_unfinalizedSpec, "delete_", ({ noteId }) =>
   Effect.gen(function* () {
     const writer = yield* DatabaseWriter;
-    yield* writer.table(notes).delete(noteId);
+    yield* writer.table(notesTable).delete(noteId);
     return null;
   }).pipe(Effect.orDie),
 );
 
-const getFirst = FunctionImpl.make(notesSpec, "getFirst", () =>
+const getFirst = FunctionImpl.make(_unfinalizedSpec, "getFirst", () =>
   Effect.gen(function* () {
     const reader = yield* DatabaseReader;
-    return yield* reader.table(notes).index("by_creation_time").first();
+    return yield* reader.table(notesTable).index("by_creation_time").first();
   }).pipe(Effect.orDie),
 );
 
-const internalGetFirst = FunctionImpl.make(notesSpec, "internalGetFirst", () =>
+const internalGetFirst = FunctionImpl.make(_unfinalizedSpec, "internalGetFirst", () =>
   Effect.gen(function* () {
     const reader = yield* DatabaseReader;
-    return yield* reader.table(notes).index("by_creation_time").first();
+    return yield* reader.table(notesTable).index("by_creation_time").first();
   }).pipe(Effect.orDie),
 );
 
-export default GroupImpl.make(notesSpec).pipe(
+export default GroupImpl.make(_unfinalizedSpec).pipe(
   Layer.provide(insert),
   Layer.provide(list),
   Layer.provide(delete_),
@@ -896,18 +896,18 @@ export default GroupImpl.make(notesSpec).pipe(
             `import { FunctionImpl, GroupImpl } from "../_generated/server";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import notes from "../_generated/tables/notes";
+import notesTable from "../_generated/tables/notes";
 import { DatabaseWriter } from "../_generated/services";
-import notesSpec from "./_incomplete.spec";
+import _incompleteSpec from "./_incomplete.spec";
 
-const insert = FunctionImpl.make(notesSpec, "insert", ({ text }) =>
+const insert = FunctionImpl.make(_incompleteSpec, "insert", ({ text }) =>
   Effect.gen(function* () {
     const writer = yield* DatabaseWriter;
-    return yield* writer.table(notes).insert({ text });
+    return yield* writer.table(notesTable).insert({ text });
   }).pipe(Effect.orDie),
 );
 
-export default GroupImpl.make(notesSpec).pipe(
+export default GroupImpl.make(_incompleteSpec).pipe(
   Layer.provide(insert),
   // Cast away the remaining FunctionImpl requirements so the file
   // compiles even though only "insert" is implemented; the CLI must

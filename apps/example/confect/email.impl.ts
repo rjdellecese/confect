@@ -5,10 +5,10 @@ import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import { FunctionImpl, GroupImpl } from "./_generated/server";
-import email from "./email.spec";
+import emailSpec from "./email.spec";
 
 const send = FunctionImpl.make(
-  email,
+  emailSpec,
   "send",
   Effect.fn(function* ({ to, subject, body }) {
     const spawner = yield* ChildProcessSpawner;
@@ -31,7 +31,7 @@ const send = FunctionImpl.make(
 );
 
 const getInbox = FunctionImpl.make(
-  email,
+  emailSpec,
   "getInbox",
   Effect.fn(function* () {
     yield* Console.log("Getting inbox…");
@@ -50,7 +50,7 @@ const getInbox = FunctionImpl.make(
   }),
 );
 
-export default GroupImpl.make(email).pipe(
+export default GroupImpl.make(emailSpec).pipe(
   Layer.provide(send),
   Layer.provide(getInbox),
   GroupImpl.finalize,

@@ -1,3 +1,3 @@
-import unnamed from "../../tables/notes";
+import notesTable from "../../tables/notes";
 
-export default unnamed("notes");
+export default notesTable("notes");

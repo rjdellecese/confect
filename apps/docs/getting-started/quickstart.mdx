@@ -82,7 +82,7 @@ for how it affects optional properties and schema validation.
       information about what's permitted and what's not.
     </Note>
 
-    Define a table—one file per table under `confect/tables/`, where the **filename is the table name** (so filenames must be valid JS identifiers and may not start with `_`). Each file **must default-export** a `Table`; codegen reads `module.default` and applies the filename as the table name. From other modules (e.g. specs), default-import the codegen-emitted wrapper at `confect/_generated/tables/<name>` to reach the table's derived `Schema`s (`notes.Doc`, `notes.Fields`).
+    Define a table—one file per table under `confect/tables/`, where the **filename is the table name** (so filenames must be valid JS identifiers and may not start with `_`). Each file **must default-export** a `Table`; codegen reads `module.default` and applies the filename as the table name. From other modules (e.g. specs), default-import the codegen-emitted wrapper at `confect/_generated/tables/<name>` to reach the table's derived `Schema`s (`notesTable.Doc`, `notesTable.Fields`).
 
     ```ts confect/tables/notes.ts
     import { Table } from "@confect/core";
@@ -124,13 +124,13 @@ for how it affects optional properties and schema validation.
     import * as Schema from "effect/Schema";
 
     import { Id } from "./_generated/id";
-    import notes from "./_generated/tables/notes";
+    import notesTable from "./_generated/tables/notes";
 
     export default GroupSpec.make()
       .addFunction(
         FunctionSpec.publicQuery({
           name: "list",
-          returns: () => Schema.Array(notes.Doc),
+          returns: () => Schema.Array(notesTable.Doc),
         }),
       )
       .addFunction(
@@ -155,7 +155,7 @@ for how it affects optional properties and schema validation.
 
     import { FunctionImpl, GroupImpl } from "./_generated/server";
     import { DatabaseReader, DatabaseWriter } from "./_generated/services";
-    import notes from "./_generated/tables/notes";
+    import notesTable from "./_generated/tables/notes";
     import notesSpec from "./notes.spec";
 
     const list = FunctionImpl.make(notesSpec, "list", () =>
@@ -163,7 +163,7 @@ for how it affects optional properties and schema validation.
         const reader = yield* DatabaseReader;
 
         return yield* reader
-          .table(notes)
+          .table(notesTable)
           .index("by_creation_time", "desc")
           .collect();
       }).pipe(Effect.orDie),
@@ -173,7 +173,7 @@ for how it affects optional properties and schema validation.
       Effect.gen(function* () {
         const writer = yield* DatabaseWriter;
 
-        return yield* writer.table(notes).insert({ text });
+        return yield* writer.table(notesTable).insert({ text });
       }).pipe(Effect.orDie),
     );
 

@@ -12,13 +12,18 @@ Pass a bound table to `DatabaseReader.table` and `DatabaseWriter.table` so a fun
 - Import your implementation builders (`FunctionImpl`, `GroupImpl`, and `MiddlewareImpl`) from `_generated/server`. Remove the runtime schema import and the database schema argument from builder calls.
 - Replace `TestConfect.layer(schema, convexSchema, modules)` with `TestConfect.layer<typeof schema>(convexSchema, modules)`, importing the Confect schema as a type.
 
+By convention, default-import application tables as `<name>Table` and group specs as `<name>Spec`. These are local names, not changes to the table or function paths.
+
 Before:
 
 ```ts
 import { FunctionImpl } from "@confect/server";
+import * as Effect from "effect/Effect";
 import schema from "./_generated/schema";
+import { DatabaseReader } from "./_generated/services";
+import notesSpec from "./notes.spec";
 
-const list = FunctionImpl.make(schema, group, "list", () =>
+const list = FunctionImpl.make(schema, notesSpec, "list", () =>
   Effect.flatMap(DatabaseReader, (db) =>
     db.table("notes").index("by_creation_time").collect().pipe(Effect.orDie),
   ),
@@ -28,12 +33,15 @@ const list = FunctionImpl.make(schema, group, "list", () =>
 After:
 
 ```ts
+import * as Effect from "effect/Effect";
 import { FunctionImpl } from "./_generated/server";
-import notes from "./_generated/tables/notes";
+import { DatabaseReader } from "./_generated/services";
+import notesTable from "./_generated/tables/notes";
+import notesSpec from "./notes.spec";
 
-const list = FunctionImpl.make(group, "list", () =>
+const list = FunctionImpl.make(notesSpec, "list", () =>
   Effect.flatMap(DatabaseReader, (db) =>
-    db.table(notes).index("by_creation_time").collect().pipe(Effect.orDie),
+    db.table(notesTable).index("by_creation_time").collect().pipe(Effect.orDie),
   ),
 );
 ```

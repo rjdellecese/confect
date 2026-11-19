@@ -10,8 +10,8 @@ import {
   RequestMetadata,
   TransactionMetadata,
 } from "../_generated/services";
-import transactionNotes from "../_generated/tables/transactionNotes";
-import metadata, { ObserveExecution } from "./metadata.spec";
+import transactionNotesTable from "../_generated/tables/transactionNotes";
+import metadataSpec, { ObserveExecution } from "./metadata.spec";
 
 const readExecution = Effect.gen(function* () {
   const execution = yield* ExecutionMetadata;
@@ -34,7 +34,7 @@ const readRequest = Effect.gen(function* () {
   };
 });
 
-const queryMetadata = FunctionImpl.make(metadata, "queryMetadata", () =>
+const queryMetadata = FunctionImpl.make(metadataSpec, "queryMetadata", () =>
   Effect.gen(function* () {
     const execution = yield* readExecution;
     const transaction = yield* TransactionMetadata;
@@ -48,53 +48,59 @@ const queryMetadata = FunctionImpl.make(metadata, "queryMetadata", () =>
   }),
 );
 
-const mutationMetadata = FunctionImpl.make(metadata, "mutationMetadata", () =>
-  Effect.gen(function* () {
-    const execution = yield* readExecution;
-    const request = yield* readRequest;
-    const transaction = yield* TransactionMetadata;
-    const queries = yield* QueryRunner;
-    const mutations = yield* MutationRunner;
-    const snapshotTs = yield* transaction.getSnapshotTs();
-    const nestedQuery = yield* queries.runQuery(
-      refs.public.groups.metadata.queryMetadata,
-    );
-    const staleQuery = yield* queries.runQuery(
-      refs.public.groups.metadata.queryMetadata,
-      {},
-      { useStaleSnapshot: true },
-    );
-    const nestedMutation = yield* mutations.runMutation(
-      refs.internal.groups.metadata.snapshotMutation,
-    );
-    const metrics = yield* transaction.getMetrics();
-    return {
-      ...execution,
-      ...request,
-      remainingWrites: metrics.documentsWritten.remaining,
-      snapshotTs,
-      repeatedSnapshotTs: yield* transaction.getSnapshotTs(),
-      nestedQueryTs: nestedQuery.snapshotTs,
-      staleQueryTs: staleQuery.snapshotTs,
-      nestedMutationTs: nestedMutation.before,
-      nestedMutationAfterWriteTs: nestedMutation.after,
-    };
-  }).pipe(Effect.orDie),
+const mutationMetadata = FunctionImpl.make(
+  metadataSpec,
+  "mutationMetadata",
+  () =>
+    Effect.gen(function* () {
+      const execution = yield* readExecution;
+      const request = yield* readRequest;
+      const transaction = yield* TransactionMetadata;
+      const queries = yield* QueryRunner;
+      const mutations = yield* MutationRunner;
+      const snapshotTs = yield* transaction.getSnapshotTs();
+      const nestedQuery = yield* queries.runQuery(
+        refs.public.groups.metadata.queryMetadata,
+      );
+      const staleQuery = yield* queries.runQuery(
+        refs.public.groups.metadata.queryMetadata,
+        {},
+        { useStaleSnapshot: true },
+      );
+      const nestedMutation = yield* mutations.runMutation(
+        refs.internal.groups.metadata.snapshotMutation,
+      );
+      const metrics = yield* transaction.getMetrics();
+      return {
+        ...execution,
+        ...request,
+        remainingWrites: metrics.documentsWritten.remaining,
+        snapshotTs,
+        repeatedSnapshotTs: yield* transaction.getSnapshotTs(),
+        nestedQueryTs: nestedQuery.snapshotTs,
+        staleQueryTs: staleQuery.snapshotTs,
+        nestedMutationTs: nestedMutation.before,
+        nestedMutationAfterWriteTs: nestedMutation.after,
+      };
+    }).pipe(Effect.orDie),
 );
 
-const snapshotMutation = FunctionImpl.make(metadata, "snapshotMutation", () =>
-  Effect.gen(function* () {
-    const transaction = yield* TransactionMetadata;
-    const writer = yield* DatabaseWriter;
-    const before = yield* transaction.getSnapshotTs();
-    yield* writer
-      .table(transactionNotes)
-      .insert({ caseId: "snapshot-metadata", value: "pending" });
-    return { before, after: yield* transaction.getSnapshotTs() };
-  }).pipe(Effect.orDie),
+const snapshotMutation = FunctionImpl.make(
+  metadataSpec,
+  "snapshotMutation",
+  () =>
+    Effect.gen(function* () {
+      const transaction = yield* TransactionMetadata;
+      const writer = yield* DatabaseWriter;
+      const before = yield* transaction.getSnapshotTs();
+      yield* writer
+        .table(transactionNotesTable)
+        .insert({ caseId: "snapshot-metadata", value: "pending" });
+      return { before, after: yield* transaction.getSnapshotTs() };
+    }).pipe(Effect.orDie),
 );
 
-const actionMetadata = FunctionImpl.make(metadata, "actionMetadata", () =>
+const actionMetadata = FunctionImpl.make(metadataSpec, "actionMetadata", () =>
   Effect.gen(function* () {
     return { ...(yield* readExecution), ...(yield* readRequest) };
   }),
@@ -108,7 +114,7 @@ const observeExecution = MiddlewareImpl.make(ObserveExecution, (effect) =>
   }),
 );
 
-export default GroupImpl.make(metadata).pipe(
+export default GroupImpl.make(metadataSpec).pipe(
   Layer.provide(queryMetadata),
   Layer.provide(mutationMetadata),
   Layer.provide(snapshotMutation),

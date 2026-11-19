@@ -22,7 +22,7 @@ export interface SpecAssemblyNode {
 const importBindingFromLeaf = (leaf: LeafModule): SpecImportBinding => ({
   importPath: leaf.specImportPath,
   exportName: leaf.exportName,
-  localName: Array.join(leaf.pathSegments, "_"),
+  localName: `${Array.join(leaf.pathSegments, "_")}Spec`,
 });
 
 const assemblyNodesAtDepth = (
@@ -92,14 +92,14 @@ const writeGroupAssembly: (
   node: SpecAssemblyNode,
 ) => Effect.Effect<void> = Effect.fnUntraced(function* (cbw, node) {
   const group = Option.match(node.importBinding, {
-    onNone: () => "GroupSpec.make()",
+    onNone: () => "Group.make()",
     onSome: (binding) => binding.localName,
   });
   yield* Array.match(node.children, {
     onEmpty: () => cbw.write(group),
     onNonEmpty: (children) =>
       Effect.gen(function* () {
-        yield* cbw.write(`GroupSpec.addGroupsAt(${group}, {\n`);
+        yield* cbw.write(`Group.addGroupsAt(${group}, {\n`);
         yield* cbw.indent(
           Effect.forEach(children, (child) => writeGroupEntry(cbw, child), {
             concurrency: 1,
@@ -115,7 +115,7 @@ const groupTypeExpr = (node: SpecAssemblyNode): string =>
     onEmpty: () =>
       Option.match(node.importBinding, {
         onNone: () =>
-          `GroupSpec.GroupSpec<"Convex", "${node.segment}", never, never>`,
+          `Group.GroupSpec<"Convex", "${node.segment}", never, never>`,
         onSome: (binding) => `typeof ${binding.localName}`,
       }),
     onNonEmpty: (children) => {
@@ -126,15 +126,15 @@ const groupTypeExpr = (node: SpecAssemblyNode): string =>
       );
       return Option.match(node.importBinding, {
         onNone: () =>
-          `GroupSpec.GroupSpec<"Convex", "${node.segment}", never, ${childUnion}>`,
+          `Group.GroupSpec<"Convex", "${node.segment}", never, ${childUnion}>`,
         onSome: (binding) =>
-          `GroupSpec.AddGroups<typeof ${binding.localName}, ${childUnion}>`,
+          `Group.AddGroups<typeof ${binding.localName}, ${childUnion}>`,
       });
     },
   });
 
 const rootGroupTypeMember = (node: SpecAssemblyNode): string =>
-  `GroupSpec.NamedAt<${groupTypeExpr(node)}, "${node.segment}">`;
+  `Group.NamedAt<${groupTypeExpr(node)}, "${node.segment}">`;
 
 export const render = Effect.fnUntraced(function* (
   nodes: ReadonlyArray<SpecAssemblyNode>,
@@ -144,7 +144,8 @@ export const render = Effect.fnUntraced(function* (
   yield* cbw.writeLine(
     Array.match(nodes, {
       onEmpty: () => `import { Spec } from "@confect/core";`,
-      onNonEmpty: () => `import { GroupSpec, Spec } from "@confect/core";`,
+      onNonEmpty: () =>
+        `import { GroupSpec as Group, Spec } from "@confect/core";`,
     }),
   );
 

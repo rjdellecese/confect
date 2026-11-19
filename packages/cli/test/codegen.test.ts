@@ -242,10 +242,7 @@ layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
           yield* project.write("confect/other.spec.ts", Project.spec);
           yield* project.write(
             "confect/other.impl.ts",
-            pipe(
-              Project.impl,
-              String.replace('"./notes.spec"', '"./other.spec"'),
-            ),
+            Project.implFor("other"),
           );
           const { snapshot } = yield* project.provide(generateWithSnapshot);
           yield* project.write(
@@ -324,9 +321,8 @@ layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
           yield* project.write(
             "confect/notes/archived.impl.ts",
             pipe(
-              Project.impl,
+              Project.implFor("archived"),
               String.replaceAll('"./_generated/', '"../_generated/'),
-              String.replace('"./notes.spec"', '"./archived.spec"'),
             ),
           );
           const { snapshot } = yield* project.provide(generateWithSnapshot);
@@ -442,8 +438,8 @@ layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
             `import { FunctionImpl, GroupImpl } from "./_generated/server";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import spec from "./notes.spec";
-export default GroupImpl.make(spec).pipe(Layer.provide(FunctionImpl.make(spec, "list", () => Effect.succeed([]))), GroupImpl.finalize);
+import notesSpec from "./notes.spec";
+export default GroupImpl.make(notesSpec).pipe(Layer.provide(FunctionImpl.make(notesSpec, "list", () => Effect.succeed([]))), GroupImpl.finalize);
 `,
           );
           snapshot = yield* project.provide(
@@ -572,10 +568,7 @@ export default GroupImpl.make(spec).pipe(Layer.provide(FunctionImpl.make(spec, "
             yield* project.write(`confect/${name}.spec.ts`, Project.spec);
             yield* project.write(
               `confect/${name}.impl.ts`,
-              pipe(
-                Project.impl,
-                String.replace('"./notes.spec"', `"./${name}.spec"`),
-              ),
+              Project.implFor(name),
             );
           }
           const run = codegenHandler.pipe(
@@ -639,8 +632,8 @@ export default GroupImpl.make(spec).pipe(Layer.provide(FunctionImpl.make(spec, "
             yield* project.write(
               `confect/group${index}.impl.ts`,
               `import { GroupImpl } from "./_generated/server";
-import spec from "./group${index}.spec";
-export default GroupImpl.make(spec).pipe(GroupImpl.finalize);`,
+import group${index}Spec from "./group${index}.spec";
+export default GroupImpl.make(group${index}Spec).pipe(GroupImpl.finalize);`,
             );
           }
           const active = { spec: 0, impl: 0 };

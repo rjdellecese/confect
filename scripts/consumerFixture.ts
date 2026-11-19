@@ -38,10 +38,10 @@ export default GroupSpec.make().addFunction(FunctionSpec.internalMutation({
   "confect/tasks.impl.ts": `import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import { FunctionImpl, GroupImpl } from "./_generated/server";
-import tasks from "./tasks.spec";
+import tasksSpec from "./tasks.spec";
 
-export default GroupImpl.make(tasks).pipe(
-  Layer.provide(FunctionImpl.make(tasks, "count", () => Effect.void)),
+export default GroupImpl.make(tasksSpec).pipe(
+  Layer.provide(FunctionImpl.make(tasksSpec, "count", () => Effect.void)),
   GroupImpl.finalize,
 );
 `,
@@ -126,7 +126,7 @@ export default GroupSpec.make().addFunction(FunctionSpec.publicQuery({
 import * as Layer from "effect/Layer";
 import { FunctionImpl, GroupImpl } from "./_generated/server";
 import { Auth } from "./_generated/services";
-import notes from "./notes.spec";
+import notesSpec from "./notes.spec";
 
 export const count = Effect.fn("notes.count")(function* (args: { readonly count: number }) {
   const auth = yield* Auth;
@@ -134,8 +134,8 @@ export const count = Effect.fn("notes.count")(function* (args: { readonly count:
   return args.count + identity.subject.length;
 });
 
-const countImpl = FunctionImpl.make(notes, "count", count);
-export default GroupImpl.make(notes).pipe(
+const countImpl = FunctionImpl.make(notesSpec, "count", count);
+export default GroupImpl.make(notesSpec).pipe(
   Layer.provide(countImpl),
   GroupImpl.finalize,
 );
@@ -146,7 +146,7 @@ import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import refs from "./confect/_generated/refs";
 import type { NotesDoc } from "./confect/_generated/docs";
-import notes from "./confect/_generated/tables/notes";
+import notesTable from "./confect/_generated/tables/notes";
 import { Id } from "./confect/_generated/id";
 import type databaseSchema from "./confect/_generated/schema";
 import { DatabaseReader, MutationAuth, Storage, TransactionMetadata } from "./confect/_generated/services";
@@ -157,7 +157,7 @@ export const noteId: Id<"notes"> = Schema.decodeUnknownSync(Id("notes"))("consum
 export const readNotes: () => Effect.Effect<ReadonlyArray<NotesDoc>, never, DatabaseReader> =
   Effect.fn("consumer.readNotes")(function* () {
     const reader = yield* DatabaseReader;
-    return yield* reader.table(notes).index("by_creation_time").collect().pipe(Effect.orDie);
+    return yield* reader.table(notesTable).index("by_creation_time").collect().pipe(Effect.orDie);
   });
 
 export const copyBlob: (id: Id<"_storage">) => Effect.Effect<Id<"_storage">, never, Handler.MutationServices<typeof databaseSchema>> =
@@ -186,7 +186,7 @@ import * as MutableRef from "effect/Ref";
 import refs from "./confect/_generated/refs";
 import { GroupImpl } from "./confect/_generated/server";
 import { Auth } from "./confect/_generated/services";
-import notes from "./confect/_generated/tables/notes";
+import notesTable from "./confect/_generated/tables/notes";
 import notesImpl, { count } from "./confect/notes.impl";
 import { schemaBuilds } from "./confect/probes";
 
@@ -224,7 +224,7 @@ assert.deepEqual(Ref.decodeArgsSync(refs.public.notes.count, { count: "41" }), {
 assert.equal(Ref.decodeReturnsSync(refs.public.notes.count, "42"), 42);
 assert.deepEqual(schemaBuilds, { table: 0, args: 1, returns: 1 });
 assert.throws(() => Ref.decodeReturnsSync(refs.public.notes.count, "not-a-number"));
-assert.equal(notes.Doc, notes.Doc);
+assert.equal(notesTable.Doc, notesTable.Doc);
 assert.equal(schemaBuilds.table, 1);
 assert.equal(await Effect.runPromise(Ref.runWithCodec(refs.public.notes.count, { count: 41 }, (_ref, args) => {
   assert.deepEqual(args, { count: "41" });

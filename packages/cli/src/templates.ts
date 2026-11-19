@@ -42,14 +42,6 @@ interface TableModuleBinding {
 /**
  * Emit the opt-in registry of all application tables. Generated services and
  * document aliases use its type; function modules import individual handles.
- *
- * The `DatabaseSchema` import is aliased to `$DatabaseSchema` because each
- * table is imported under its own (filename-derived) name; a table named
- * `DatabaseSchema` would otherwise collide with the library import and emit a
- * duplicate-binding file. The leading `$` makes the alias collision-proof:
- * `validateConfectTableIdentifier` requires names to match
- * `/^[a-zA-Z][a-zA-Z0-9_]*$/`, which forbids `$`, so no valid table import can
- * ever shadow it.
  */
 export const runtimeSchema = ({
   tableModules,
@@ -72,7 +64,7 @@ const runtimeSchemaEffect = Effect.fnUntraced(function* ({
     yield* Effect.forEach(
       tableModules,
       ({ tableName, importPath }) =>
-        cbw.writeLine(`import ${tableName} from "${importPath}";`),
+        cbw.writeLine(`import ${tableName}Table from "${importPath}";`),
       { concurrency: 1 },
     );
   }
@@ -91,7 +83,7 @@ const runtimeSchemaEffect = Effect.fnUntraced(function* ({
       Effect.forEach(
         tableModules,
         ({ tableName }) =>
-          cbw.writeLine(`readonly ${tableName}: typeof ${tableName};`),
+          cbw.writeLine(`readonly ${tableName}: typeof ${tableName}Table;`),
         { concurrency: 1, discard: true },
       ),
     );
@@ -99,7 +91,7 @@ const runtimeSchemaEffect = Effect.fnUntraced(function* ({
     yield* cbw.indent(
       Effect.gen(function* () {
         for (const { tableName } of tableModules) {
-          yield* cbw.writeLine(`${tableName},`);
+          yield* cbw.writeLine(`${tableName}: ${tableName}Table,`);
         }
       }),
     );
@@ -119,13 +111,6 @@ const runtimeSchemaEffect = Effect.fnUntraced(function* ({
  * `Table.tableDefinition` lives in `@confect/server` because it is the
  * `defineTable` binding; the generated table wrappers themselves stay
  * client-safe (`Fields`/`Doc` from `@confect/core`).
- *
- * The `defineSchema` and `Table` imports are aliased with a leading `$` because
- * each table is imported under its own (filename-derived) name; a table named
- * `defineSchema` or `Table` would otherwise collide with the library import and
- * emit a duplicate-binding file. `validateConfectTableIdentifier` requires
- * names to match `/^[a-zA-Z][a-zA-Z0-9_]*$/`, which forbids `$`, so no valid
- * table import can ever shadow them.
  */
 export const convexSchema = ({
   tableModules,
@@ -149,7 +134,7 @@ const convexSchemaEffect = Effect.fnUntraced(function* ({
     yield* Effect.forEach(
       tableModules,
       ({ tableName, importPath }) =>
-        cbw.writeLine(`import ${tableName} from "${importPath}";`),
+        cbw.writeLine(`import ${tableName}Table from "${importPath}";`),
       { concurrency: 1 },
     );
   }
@@ -164,7 +149,7 @@ const convexSchemaEffect = Effect.fnUntraced(function* ({
       Effect.gen(function* () {
         for (const { tableName } of tableModules) {
           yield* cbw.writeLine(
-            `${tableName}: $Table.tableDefinition(${tableName}),`,
+            `${tableName}: $Table.tableDefinition(${tableName}Table),`,
           );
         }
       }),
@@ -234,9 +219,9 @@ const tableWrapperEffect = Effect.fnUntraced(function* ({
 }) {
   const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
 
-  yield* cbw.writeLine(`import unnamed from "${unnamedImportPath}";`);
+  yield* cbw.writeLine(`import ${tableName}Table from "${unnamedImportPath}";`);
   yield* cbw.blankLine();
-  yield* cbw.writeLine(`export default unnamed("${tableName}");`);
+  yield* cbw.writeLine(`export default ${tableName}Table("${tableName}");`);
 
   return yield* cbw.toString();
 });

@@ -1,36 +1,36 @@
-import { GroupSpec, Spec } from "@confect/core";
-import clients from "../clients.spec";
-import groups_authentication from "../groups/authentication.spec";
-import groups_cacheControl from "../groups/cacheControl.spec";
-import groups_cacheStubbed from "../groups/cacheStubbed.spec";
-import groups_contextReuse from "../groups/contextReuse.spec";
-import groups_documentIds from "../groups/documentIds.spec";
-import groups_httpVectors from "../groups/httpVectors.spec";
-import groups_metadata from "../groups/metadata.spec";
-import groups_scheduling from "../groups/scheduling.spec";
-import groups_storage from "../groups/storage.spec";
-import groups_transactions from "../groups/transactions.spec";
-import metadataNode from "../metadataNode.spec";
+import { GroupSpec as Group, Spec } from "@confect/core";
+import clientsSpec from "../clients.spec";
+import groups_authenticationSpec from "../groups/authentication.spec";
+import groups_cacheControlSpec from "../groups/cacheControl.spec";
+import groups_cacheStubbedSpec from "../groups/cacheStubbed.spec";
+import groups_contextReuseSpec from "../groups/contextReuse.spec";
+import groups_documentIdsSpec from "../groups/documentIds.spec";
+import groups_httpVectorsSpec from "../groups/httpVectors.spec";
+import groups_metadataSpec from "../groups/metadata.spec";
+import groups_schedulingSpec from "../groups/scheduling.spec";
+import groups_storageSpec from "../groups/storage.spec";
+import groups_transactionsSpec from "../groups/transactions.spec";
+import metadataNodeSpec from "../metadataNode.spec";
 
 const spec: Spec.Spec<{
-  readonly clients: GroupSpec.NamedAt<typeof clients, "clients">;
-  readonly groups: GroupSpec.NamedAt<GroupSpec.GroupSpec<"Convex", "groups", never, GroupSpec.NamedAt<typeof groups_authentication, "authentication"> | GroupSpec.NamedAt<typeof groups_cacheControl, "cacheControl"> | GroupSpec.NamedAt<typeof groups_cacheStubbed, "cacheStubbed"> | GroupSpec.NamedAt<typeof groups_contextReuse, "contextReuse"> | GroupSpec.NamedAt<typeof groups_documentIds, "documentIds"> | GroupSpec.NamedAt<typeof groups_httpVectors, "httpVectors"> | GroupSpec.NamedAt<typeof groups_metadata, "metadata"> | GroupSpec.NamedAt<typeof groups_scheduling, "scheduling"> | GroupSpec.NamedAt<typeof groups_storage, "storage"> | GroupSpec.NamedAt<typeof groups_transactions, "transactions">>, "groups">;
-  readonly metadataNode: GroupSpec.NamedAt<typeof metadataNode, "metadataNode">;
+  readonly clients: Group.NamedAt<typeof clientsSpec, "clients">;
+  readonly groups: Group.NamedAt<Group.GroupSpec<"Convex", "groups", never, Group.NamedAt<typeof groups_authenticationSpec, "authentication"> | Group.NamedAt<typeof groups_cacheControlSpec, "cacheControl"> | Group.NamedAt<typeof groups_cacheStubbedSpec, "cacheStubbed"> | Group.NamedAt<typeof groups_contextReuseSpec, "contextReuse"> | Group.NamedAt<typeof groups_documentIdsSpec, "documentIds"> | Group.NamedAt<typeof groups_httpVectorsSpec, "httpVectors"> | Group.NamedAt<typeof groups_metadataSpec, "metadata"> | Group.NamedAt<typeof groups_schedulingSpec, "scheduling"> | Group.NamedAt<typeof groups_storageSpec, "storage"> | Group.NamedAt<typeof groups_transactionsSpec, "transactions">>, "groups">;
+  readonly metadataNode: Group.NamedAt<typeof metadataNodeSpec, "metadataNode">;
 }> = Spec.fromGroups({
-  ["clients"]: clients,
-  ["groups"]: GroupSpec.addGroupsAt(GroupSpec.make(), {
-    ["authentication"]: groups_authentication,
-    ["cacheControl"]: groups_cacheControl,
-    ["cacheStubbed"]: groups_cacheStubbed,
-    ["contextReuse"]: groups_contextReuse,
-    ["documentIds"]: groups_documentIds,
-    ["httpVectors"]: groups_httpVectors,
-    ["metadata"]: groups_metadata,
-    ["scheduling"]: groups_scheduling,
-    ["storage"]: groups_storage,
-    ["transactions"]: groups_transactions,
+  ["clients"]: clientsSpec,
+  ["groups"]: Group.addGroupsAt(Group.make(), {
+    ["authentication"]: groups_authenticationSpec,
+    ["cacheControl"]: groups_cacheControlSpec,
+    ["cacheStubbed"]: groups_cacheStubbedSpec,
+    ["contextReuse"]: groups_contextReuseSpec,
+    ["documentIds"]: groups_documentIdsSpec,
+    ["httpVectors"]: groups_httpVectorsSpec,
+    ["metadata"]: groups_metadataSpec,
+    ["scheduling"]: groups_schedulingSpec,
+    ["storage"]: groups_storageSpec,
+    ["transactions"]: groups_transactionsSpec,
   }),
-  ["metadataNode"]: metadataNode,
+  ["metadataNode"]: metadataNodeSpec,
 }) as typeof spec;
 
 export default spec;

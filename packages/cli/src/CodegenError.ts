@@ -265,7 +265,7 @@ const renderImplMissingSpecImportError = (
   return singleLine(
     "Impl ",
     formatPath(error.implPath),
-    ` does not import its sibling spec; add \`import ${stem} from "./${stem}.spec"\` and pass it to FunctionImpl.make/GroupImpl.make.`,
+    ` does not import its sibling spec; add \`import ${stem}Spec from "./${stem}.spec"\` and pass it to FunctionImpl.make/GroupImpl.make.`,
   );
 };
 
@@ -282,7 +282,7 @@ const renderImplNotFinalizedError = (error: ImplNotFinalizedError): string =>
   singleLine(
     "Impl ",
     formatPath(error.implPath),
-    " is not finalized; append `GroupImpl.finalize` to the end of the pipeline (e.g. `GroupImpl.make(group).pipe(Layer.provide(...), GroupImpl.finalize)`).",
+    " is not finalized; append `GroupImpl.finalize` to the end of the pipeline (e.g. `GroupImpl.make(groupSpec).pipe(Layer.provide(...), GroupImpl.finalize)`).",
   );
 
 const renderImplMissingFunctionsError = (

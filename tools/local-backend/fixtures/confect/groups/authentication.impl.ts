@@ -3,13 +3,13 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import { FunctionImpl, GroupImpl, MiddlewareImpl } from "../_generated/server";
 import { MutationAuth } from "../_generated/services";
-import authentication, {
+import authenticationSpec, {
   SignedToken,
   SignInMiddleware,
 } from "./authentication.spec";
 
 const sign = FunctionImpl.make(
-  authentication,
+  authenticationSpec,
   "sign",
   ({ aud, expiresInSeconds, extraClaims }) =>
     Effect.gen(function* () {
@@ -23,7 +23,7 @@ const sign = FunctionImpl.make(
 );
 
 const signInMiddleware = FunctionImpl.make(
-  authentication,
+  authenticationSpec,
   "signInMiddleware",
   () => Effect.map(SignedToken, ({ token }) => token),
 );
@@ -39,7 +39,7 @@ const middleware = MiddlewareImpl.make(SignInMiddleware, (effect) =>
   }),
 );
 
-export default GroupImpl.make(authentication).pipe(
+export default GroupImpl.make(authenticationSpec).pipe(
   Layer.provide(sign),
   Layer.provide(signInMiddleware),
   Layer.provide(middleware),

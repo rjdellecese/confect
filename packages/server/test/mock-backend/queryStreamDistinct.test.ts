@@ -14,7 +14,7 @@ import * as Ref from "effect/Ref";
 import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
-import notes from "./fixtures/confect/_generated/tables/notes";
+import notesTable from "./fixtures/confect/_generated/tables/notes";
 import {
   DatabaseReader,
   DatabaseWriter,
@@ -34,7 +34,7 @@ const insert = Effect.fnUntraced(function* (
 ) {
   const writer = yield* DatabaseWriter;
   for (const [text, tag] of rows) {
-    yield* writer.table(notes).insert({ text, tag });
+    yield* writer.table(notesTable).insert({ text, tag });
   }
 });
 
@@ -48,7 +48,7 @@ const fixture = Effect.gen(function* () {
     ["c", "c1"],
   ]);
   const reader = yield* DatabaseReader;
-  const source = reader.table(notes).stream("by_text");
+  const source = reader.table(notesTable).stream("by_text");
   const rows = yield* Stream.runCollect(source);
   return { reader, source, rows };
 });
@@ -157,7 +157,7 @@ it.layer(TestConfect.layer, { buildPerTest: true })(
             expect(tagsResult6).toEqual(["a1"]);
 
             const empty = reader
-              .table(notes)
+              .table(notesTable)
               .stream("by_text", (q) => q.gt("text", "z"))
               .pipe(QueryStream.distinct([]));
             const tagsResult7 = yield* tags(empty);
@@ -362,7 +362,7 @@ it.layer(TestConfect.layer, { buildPerTest: true })(
             );
             assert(a2 !== undefined);
             const distinct = reader
-              .table(notes)
+              .table(notesTable)
               .stream("by_text", (q) => q.gte("text", "a").lte("text", "b"))
               .pipe(
                 QueryStream.narrow({
@@ -449,14 +449,14 @@ it.layer(TestConfect.layer, { buildPerTest: true })(
               ["x2", "b"],
             ]);
             const joined = reader
-              .table(notes)
+              .table(notesTable)
               .stream("by_text", (q) => q.gte("text", "x"))
               .pipe(
                 QueryStream.distinct(["text"]),
                 QueryStream.flatMap(
                   (row) =>
                     reader
-                      .table(notes)
+                      .table(notesTable)
                       .stream("by_text", (q) =>
                         q.gte("text", row.tag ?? "").lte("text", row.tag ?? ""),
                       )
@@ -497,13 +497,13 @@ it.layer(TestConfect.layer, { buildPerTest: true })(
               ["x3", "none"],
             ]);
             const joined = reader
-              .table(notes)
+              .table(notesTable)
               .stream("by_text", (q) => q.gte("text", "x"))
               .pipe(
                 QueryStream.flatMap(
                   (row) =>
                     reader
-                      .table(notes)
+                      .table(notesTable)
                       .stream("by_text", (q) => q.eq("text", row.tag ?? "")),
                   {
                     innerKeyLayout: Result.getOrThrowWith(
@@ -551,7 +551,7 @@ it.layer(TestConfect.layer, { buildPerTest: true })(
               Array.findFirst(rows, (row) => row.tag === "a1"),
             );
             assert(a1 !== undefined);
-            yield* writer.table(notes).delete(a1._id);
+            yield* writer.table(notesTable).delete(a1._id);
 
             const firstReplay = yield* QueryStream.paginate(distinct, {
               numItems: 1,
@@ -581,11 +581,11 @@ it.layer(TestConfect.layer, { buildPerTest: true })(
           Effect.gen(function* () {
             const writer = yield* DatabaseWriter;
             const earlier = yield* writer
-              .table(notes)
+              .table(notesTable)
               .insert({ text: "0", tag: "earlier" });
             const { reader } = yield* fixture;
             const distinct = reader
-              .table(notes)
+              .table(notesTable)
               .stream("by_text", (q) => q.gte("text", "a"))
               .pipe(QueryStream.distinct(["text"]));
             const first = yield* QueryStream.paginate(distinct, {
@@ -596,7 +596,7 @@ it.layer(TestConfect.layer, { buildPerTest: true })(
               numItems: 1,
               cursor: first.continueCursor,
             });
-            yield* writer.table(notes).patch(earlier, { text: "a" });
+            yield* writer.table(notesTable).patch(earlier, { text: "a" });
 
             const firstReplay = yield* QueryStream.paginate(distinct, {
               numItems: 1,
@@ -628,7 +628,7 @@ it.layer(TestConfect.layer, { buildPerTest: true })(
             const { reader } = yield* fixture;
             const writer = yield* DatabaseWriter;
             const distinct = reader
-              .table(notes)
+              .table(notesTable)
               .stream("by_text", "desc")
               .pipe(QueryStream.distinct(["text"]));
             const first = yield* QueryStream.paginate(distinct, {
@@ -644,7 +644,7 @@ it.layer(TestConfect.layer, { buildPerTest: true })(
               "b2",
             ]);
             expect(Array.map(second.page, (row) => row.tag)).toEqual(["a3"]);
-            yield* writer.table(notes).insert({ text: "b", tag: "b3" });
+            yield* writer.table(notesTable).insert({ text: "b", tag: "b3" });
 
             const firstReplay = yield* QueryStream.paginate(distinct, {
               numItems: 1,
@@ -929,7 +929,7 @@ it.layer(TestConfect.layer, { buildPerTest: true })(
           Effect.gen(function* () {
             const { reader } = yield* fixture;
             const distinct = reader
-              .table(notes)
+              .table(notesTable)
               .stream("by_text", (q) => q.gte("text", "a").lte("text", "a"))
               .pipe(
                 QueryStream.filter((row) => row.tag === "a3"),
@@ -996,11 +996,11 @@ it.layer(TestConfect.layer, { buildPerTest: true })(
         Effect.gen(function* () {
           const { reader } = yield* fixture;
           const first = reader
-            .table(notes)
+            .table(notesTable)
             .stream("by_text", (q) => q.gte("text", "a").lte("text", "a"))
             .pipe(QueryStream.distinct(["text"]));
           const second = reader
-            .table(notes)
+            .table(notesTable)
             .stream("by_text", (q) => q.gte("text", "b").lte("text", "b"))
             .pipe(QueryStream.distinct(["text"]));
           const result = yield* QueryStream.paginate(
@@ -1030,14 +1030,14 @@ it.layer(TestConfect.layer, { buildPerTest: true })(
             const { reader } = yield* fixture;
             yield* insert([["x", "a"]]);
             const joined = reader
-              .table(notes)
+              .table(notesTable)
               .stream("by_text", (q) => q.gte("text", "x"))
               .pipe(
                 QueryStream.distinct(["text"]),
                 QueryStream.flatMap(
                   (row) =>
                     reader
-                      .table(notes)
+                      .table(notesTable)
                       .stream("by_text", (q) =>
                         q.gte("text", row.tag ?? "").lte("text", row.tag ?? ""),
                       )

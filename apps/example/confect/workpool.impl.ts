@@ -1,18 +1,22 @@
 import * as Layer from "effect/Layer";
 import { FunctionImpl, GroupImpl } from "./_generated/server";
 import { backgroundWork, enqueue, onComplete, status } from "./workpool";
-import workpool from "./workpool.spec";
+import workpoolSpec from "./workpool.spec";
 
-const enqueueImpl = FunctionImpl.make(workpool, "enqueue", enqueue);
-const statusImpl = FunctionImpl.make(workpool, "status", status);
+const enqueueImpl = FunctionImpl.make(workpoolSpec, "enqueue", enqueue);
+const statusImpl = FunctionImpl.make(workpoolSpec, "status", status);
 const backgroundWorkImpl = FunctionImpl.make(
-  workpool,
+  workpoolSpec,
   "backgroundWork",
   backgroundWork,
 );
-const onCompleteImpl = FunctionImpl.make(workpool, "onComplete", onComplete);
+const onCompleteImpl = FunctionImpl.make(
+  workpoolSpec,
+  "onComplete",
+  onComplete,
+);
 
-export default GroupImpl.make(workpool).pipe(
+export default GroupImpl.make(workpoolSpec).pipe(
   Layer.provide(enqueueImpl),
   Layer.provide(statusImpl),
   Layer.provide(backgroundWorkImpl),

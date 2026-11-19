@@ -2,18 +2,21 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import { FunctionImpl, GroupImpl } from "../_generated/server";
-import users from "../_generated/tables/users";
+import usersTable from "../_generated/tables/users";
 import { DatabaseReader } from "../_generated/services";
-import middlewareHelpers from "./middlewareHelpers.spec";
+import middlewareHelpersSpec from "./middlewareHelpers.spec";
 
 const firstUsername = FunctionImpl.make(
-  middlewareHelpers,
+  middlewareHelpersSpec,
   "firstUsername",
   () =>
     Effect.gen(function* () {
       const reader = yield* DatabaseReader;
 
-      const user = yield* reader.table(users).index("by_creation_time").first();
+      const user = yield* reader
+        .table(usersTable)
+        .index("by_creation_time")
+        .first();
 
       return Option.match(user, {
         onNone: () => null,
@@ -22,7 +25,7 @@ const firstUsername = FunctionImpl.make(
     }).pipe(Effect.orDie),
 );
 
-export default GroupImpl.make(middlewareHelpers).pipe(
+export default GroupImpl.make(middlewareHelpersSpec).pipe(
   Layer.provide(firstUsername),
   GroupImpl.finalize,
 );

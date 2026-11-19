@@ -2,14 +2,14 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import { FunctionImpl, GroupImpl } from "./_generated/server";
 import { DatabaseReader, DatabaseWriter } from "./_generated/services";
-import users from "./_generated/tables/users";
+import usersTable from "./_generated/tables/users";
 import usersSpec from "./users.spec";
 
 const create = FunctionImpl.make(usersSpec, "create", ({ username }) =>
   Effect.gen(function* () {
     const writer = yield* DatabaseWriter;
 
-    yield* writer.table(users).insert({ username });
+    yield* writer.table(usersTable).insert({ username });
 
     return null;
   }).pipe(Effect.orDie),
@@ -21,13 +21,13 @@ const clearAll = FunctionImpl.make(usersSpec, "clearAll", () =>
     const writer = yield* DatabaseWriter;
 
     const allUsers = yield* reader
-      .table(users)
+      .table(usersTable)
       .index("by_creation_time")
       .collect();
 
     yield* Effect.forEach(
       allUsers,
-      (user) => writer.table(users).delete(user._id),
+      (user) => writer.table(usersTable).delete(user._id),
       { concurrency: 1 },
     );
 

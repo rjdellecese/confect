@@ -1,14 +1,14 @@
 import { DatabaseSchema as $DatabaseSchema } from "@confect/server";
 
-import httpVectors from "./tables/httpVectors";
-import transactionNotes from "./tables/transactionNotes";
+import httpVectorsTable from "./tables/httpVectors";
+import transactionNotesTable from "./tables/transactionNotes";
 
 const databaseSchema: $DatabaseSchema.DatabaseSchema<{
-  readonly httpVectors: typeof httpVectors;
-  readonly transactionNotes: typeof transactionNotes;
+  readonly httpVectors: typeof httpVectorsTable;
+  readonly transactionNotes: typeof transactionNotesTable;
 }> = $DatabaseSchema.make({
-  httpVectors,
-  transactionNotes,
+  httpVectors: httpVectorsTable,
+  transactionNotes: transactionNotesTable,
 });
 
 export default databaseSchema;

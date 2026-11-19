@@ -21,7 +21,7 @@ import { FunctionSpec, GroupSpec } from "@confect/core";
 import * as Schema from "effect/Schema";
 
 import { Id } from "./_generated/id";
-import notes from "./_generated/tables/notes";
+import notesTable from "./_generated/tables/notes";
 
 export class NoteNotFound extends Schema.TaggedError<NoteNotFound>()(
   "NoteNotFound",
@@ -32,7 +32,7 @@ export default GroupSpec.make().addFunction(
   FunctionSpec.publicQuery({
     name: "getOrFail",
     args: () => ({ noteId: Id("notes") }),
-    returns: () => notes.Doc,
+    returns: () => notesTable.Doc,
     error: () => NoteNotFound,
   }),
 );
@@ -73,7 +73,7 @@ import * as Effect from "effect/Effect";
 
 import { FunctionImpl } from "./_generated/server";
 import { DatabaseReader } from "./_generated/services";
-import notes from "./_generated/tables/notes";
+import notesTable from "./_generated/tables/notes";
 import notesSpec, { NoteNotFound } from "./notes.spec";
 
 const getOrFail = FunctionImpl.make(notesSpec, "getOrFail", ({ noteId }) =>
@@ -81,7 +81,7 @@ const getOrFail = FunctionImpl.make(notesSpec, "getOrFail", ({ noteId }) =>
     const reader = yield* DatabaseReader;
 
     return yield* reader
-      .table(notes)
+      .table(notesTable)
       .get(noteId)
       .pipe(Effect.mapError(() => new NoteNotFound({ noteId })));
   }),

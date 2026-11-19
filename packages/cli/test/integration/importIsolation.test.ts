@@ -94,9 +94,9 @@ export default GroupSpec.make().addFunction(
             `import * as Layer from "effect/Layer";
 import { FunctionImpl, GroupImpl } from "./_generated/server";
 import { ping } from "./ping";
-import plain from "./plain.spec";
-export default GroupImpl.make(plain).pipe(
-  Layer.provide(FunctionImpl.make(plain, "ping", ping)),
+import plainSpec from "./plain.spec";
+export default GroupImpl.make(plainSpec).pipe(
+  Layer.provide(FunctionImpl.make(plainSpec, "ping", ping)),
   GroupImpl.finalize,
 );`,
           );
@@ -115,10 +115,10 @@ export default GroupSpec.make()
 import * as Layer from "effect/Layer";
 import { FunctionImpl, GroupImpl } from "./_generated/server";
 import { ping } from "./ping";
-import mixed from "./mixed.spec";
-export default GroupImpl.make(mixed).pipe(
-  Layer.provide(FunctionImpl.make(mixed, "ping", ping)),
-  Layer.provide(FunctionImpl.make(mixed, "echo", () => Effect.succeed("echo"))),
+import mixedSpec from "./mixed.spec";
+export default GroupImpl.make(mixedSpec).pipe(
+  Layer.provide(FunctionImpl.make(mixedSpec, "ping", ping)),
+  Layer.provide(FunctionImpl.make(mixedSpec, "echo", () => Effect.succeed("echo"))),
   GroupImpl.finalize,
 );`,
           );
@@ -137,19 +137,19 @@ export default class Audit extends MiddlewareSpec.MiddlewareSpec<Audit>()("Audit
             `import * as Effect from "effect/Effect";
 import { MiddlewareImpl } from "../_generated/server";
 import { DatabaseReader } from "../_generated/services";
-import users from "../_generated/tables/users";
+import usersTable from "../_generated/tables/users";
 import Audit from "./audit.spec";
 export default MiddlewareImpl.make(Audit, (next) => Effect.gen(function* () {
   const reader = yield* DatabaseReader;
-  yield* reader.table(users).index("by_creation_time").first().pipe(Effect.orDie);
+  yield* reader.table(usersTable).index("by_creation_time").first().pipe(Effect.orDie);
   return yield* next;
 }));`,
           );
           yield* project.write(
             "confect/audited.spec.ts",
-            `import notes from "./notes.spec";
+            `import notesSpec from "./notes.spec";
 import Audit from "./middleware/audit.spec";
-export default notes.middleware(Audit);`,
+export default notesSpec.middleware(Audit);`,
           );
           yield* project.write(
             "confect/audited.impl.ts",
@@ -157,13 +157,13 @@ export default notes.middleware(Audit);`,
 import * as Layer from "effect/Layer";
 import { FunctionImpl, GroupImpl } from "./_generated/server";
 import { DatabaseReader } from "./_generated/services";
-import notes from "./_generated/tables/notes";
+import notesTable from "./_generated/tables/notes";
 import Audit from "./middleware/audit.impl";
-import audited from "./audited.spec";
-export default GroupImpl.make(audited).pipe(
-  Layer.provide(FunctionImpl.make(audited, "list", () => Effect.gen(function* () {
+import auditedSpec from "./audited.spec";
+export default GroupImpl.make(auditedSpec).pipe(
+  Layer.provide(FunctionImpl.make(auditedSpec, "list", () => Effect.gen(function* () {
     const reader = yield* DatabaseReader;
-    return yield* reader.table(notes).index("by_creation_time").collect().pipe(Effect.orDie);
+    return yield* reader.table(notesTable).index("by_creation_time").collect().pipe(Effect.orDie);
   }))),
   Layer.provide(Audit),
   GroupImpl.finalize,
