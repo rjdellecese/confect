@@ -1,12 +1,16 @@
 import * as DatabaseReader from "@confect/server/DatabaseReader";
 import * as DatabaseSchema from "@confect/server/DatabaseSchema";
 import type * as DataModel from "@confect/server/DataModel";
+import type * as Document from "@confect/server/Document";
+import type * as QueryStreamKeyLabels from "@confect/server/QueryStreamKeyLabels";
 import * as Table from "@confect/server/Table";
 import { expect, expectTypeOf, it } from "@effect/vitest";
 import type { GenericDatabaseReader } from "convex/server";
 import type { GenericId } from "convex/values";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
+import type * as Stream from "effect/Stream";
+import type * as Types from "effect/Types";
 import { vi } from "vitest";
 
 const notes = Table.make(() =>
@@ -94,6 +98,80 @@ it("infers named documents, indexes and IDs only for app and system handles", ()
     }
     // @ts-expect-error A note ID is not a user ID.
     expectTypeOf(reader.table(users).get(noteId));
+  };
+  expectTypeOf(check).toBeFunction();
+});
+
+it("reads a shared index without losing the document union or stream layout", () => {
+  const members = Table.make(() =>
+    Schema.Struct({ name: Schema.String, age: Schema.Finite }),
+  )
+    .index("shared", ["name"])
+    .index("by_value", ["age"])("members");
+  const teams = Table.make(() =>
+    Schema.Struct({ name: Schema.String, rank: Schema.Finite }),
+  )
+    .index("shared", ["name"])
+    .index("by_value", ["rank"])
+    .index("by_rank", ["rank"])("teams");
+  const app = DatabaseSchema.make({ members, teams });
+  interface NamedMember extends Omit<typeof members.Doc.Type, "name"> {
+    readonly name: "named member";
+  }
+  type MatchedDoc = NamedMember | Document.Document<typeof app, "teams">;
+  const check = (
+    reader: DatabaseReader.DatabaseReaderService<
+      typeof app,
+      { members: NamedMember }
+    >,
+    selected: typeof members | typeof teams,
+  ) => {
+    const table = reader.table(selected);
+    const docs = table.index("by_creation_time").collect();
+    expectTypeOf<Effect.Success<typeof docs>>().toEqualTypeOf<
+      ReadonlyArray<MatchedDoc>
+    >();
+    expectTypeOf(table.index("by_value", "desc").first()).toBeObject();
+    const shared = table.stream("shared", "desc");
+    expectTypeOf<Stream.Success<typeof shared>>().toEqualTypeOf<MatchedDoc>();
+    expectTypeOf(shared.orderDirection).toEqualTypeOf<"desc">();
+    expectTypeOf<
+      Types.Invariant.Type<(typeof shared)["~labels"]>
+    >().toEqualTypeOf<
+      QueryStreamKeyLabels.QueryStreamKeyLabels<
+        readonly ["name", "_creationTime"]
+      >
+    >();
+    const creation = table.stream("by_creation_time");
+    expectTypeOf(creation.orderDirection).toEqualTypeOf<"asc">();
+    // @ts-expect-error The runtime table may have a different stream key layout.
+    expectTypeOf(table.stream("by_value"));
+    // @ts-expect-error Only teams has this index.
+    table.index("by_rank");
+    // @ts-expect-error A range for one table cannot be used for both.
+    table.index("by_value", (q) => q.eq("rank", 1));
+    // @ts-expect-error A range for one table cannot be used for both.
+    expectTypeOf(table.stream("by_value", (q) => q.eq("rank", 1)));
+  };
+  expectTypeOf(check).toBeFunction();
+});
+
+it("does not expose indexes from a different app's structurally compatible handle", () => {
+  const otherUsers = Table.make(() => Schema.Struct({ name: Schema.String }))
+    .index("by_name", ["name"])
+    .searchIndex("text", { searchField: "name" })("users");
+  const check = (
+    reader: DatabaseReader.DatabaseReaderService<typeof schema>,
+    native: NativeReader,
+  ) => {
+    const table = reader.table(otherUsers);
+    expectTypeOf(table.index("by_creation_time")).toBeObject();
+    // @ts-expect-error The deployed users table has no by_name index.
+    table.index("by_name");
+    // @ts-expect-error The deployed users table has no text search index.
+    table.search("text", (q) => q.search("name", "Ada"));
+    // @ts-expect-error The handle declares indexes missing from the native model.
+    DatabaseReader.make(native).table(otherUsers);
   };
   expectTypeOf(check).toBeFunction();
 });
