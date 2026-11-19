@@ -8,6 +8,8 @@ import { Confect, Convex } from "@confect/alchemy";
 
 Use `Convex.providers()` in your Alchemy stack. The integration targets Alchemy `2.0.0-beta.85` and Effect v4.1 or later; it does not add Alchemy dependencies to Confect's runtime packages. Plain Convex applications can use `Convex.Code` without the Confect CLI.
 
+The resources use [`@confect/platform`](https://confect.dev/clients/platform) for Convex management and deployment requests. Use that package directly if you don't need Alchemy's resource lifecycle. To test the Alchemy adapter with a custom transport, provide `FetchHttpClient.Fetch` from `effect/http/FetchHttpClient` to `ConvexClient.layer()`.
+
 See the [deployment guide](https://confect.dev/guides/alchemy) for complete examples, credentials, ownership, and deletion policies.
 
 Use `Confect.Backend`'s `env` option to adopt existing readable environment variables and restore them on removal. To create or overwrite a name, including a hidden secret, declare a `Convex.AuthoritativeEnvironmentVariable`. It retains the value by default and cannot restore the previous one.

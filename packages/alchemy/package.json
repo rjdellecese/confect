@@ -7,7 +7,7 @@
     "url": "https://github.com/rjdellecese/confect/issues"
   },
   "dependencies": {
-    "@convex-dev/platform": "^0.1.10"
+    "@confect/platform": "workspace:*"
   },
   "devDependencies": {
     "@confect/cli": "workspace:*",

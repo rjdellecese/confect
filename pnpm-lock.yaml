@@ -332,9 +332,9 @@ importers:
 
   packages/alchemy:
     dependencies:
-      '@convex-dev/platform':
-        specifier: ^0.1.10
-        version: 0.1.11
+      '@confect/platform':
+        specifier: workspace:*
+        version: link:../platform
     devDependencies:
       '@confect/cli':
         specifier: workspace:*

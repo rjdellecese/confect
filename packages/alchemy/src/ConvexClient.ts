@@ -1,5 +1,7 @@
-import type * as DeploymentApi from "@convex-dev/platform/deploymentApi";
-import type * as ManagementApi from "@convex-dev/platform/managementApi";
+import type { DeploymentApi, ManagementApi } from "@confect/platform";
+import * as DeploymentClient from "@confect/platform/DeploymentClient";
+import * as ManagementClient from "@confect/platform/ManagementClient";
+import type { PlatformError } from "@confect/platform/PlatformError";
 import * as Config from "effect/Config";
 import * as Arr from "effect/Array";
 import * as Rec from "effect/Record";
@@ -7,13 +9,9 @@ import * as Str from "effect/String";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import * as Option from "effect/Option";
 import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
 import * as FetchHttpClient from "effect/http/FetchHttpClient";
-import * as HttpClient from "effect/http/HttpClient";
-import * as HttpClientRequest from "effect/http/HttpClientRequest";
-import type * as HttpClientResponse from "effect/http/HttpClientResponse";
 
 export type Project = ManagementApi.ProjectResponse;
 export type CreatedProject = ManagementApi.PlatformCreateProjectResponse;
@@ -182,127 +180,101 @@ const ProjectsPageSchema = Schema.Struct({
 const make = Effect.fn("ConvexClient.make")(function* (options?: {
   readonly token?: Redacted.Redacted<string>;
 }) {
-  const http = yield* HttpClient.HttpClient.pipe(
-    Effect.map(HttpClient.withScope),
+  const defaults = yield* Effect.context<never>().pipe(
+    Effect.map(
+      Context.pick(FetchHttpClient.Fetch, FetchHttpClient.RequestInit),
+    ),
   );
-  const readRequestInit = Effect.serviceOption(
-    FetchHttpClient.RequestInit,
-  ).pipe(Effect.map(Option.getOrUndefined));
-  const defaultRequestInit = yield* readRequestInit;
-  const managementAuthorization = Effect.gen(function* () {
-    const token =
-      options?.token ??
-      (yield* Config.Redacted("CONVEX_ACCESS_TOKEN").pipe(
-        Effect.mapError(() =>
-          ConvexApiError.make({
-            operation: "configure",
-            code: "InvalidConfiguration",
-          }),
-        ),
-      ));
-    return Redacted.make(`Bearer ${Redacted.value(token)}`);
-  });
-  const baseUrl = "https://api.convex.dev/v1";
+  const managementToken =
+    options?.token === undefined
+      ? Config.Redacted("CONVEX_ACCESS_TOKEN").pipe(
+          Effect.mapError(() =>
+            ConvexApiError.make({
+              operation: "configure",
+              code: "InvalidConfiguration",
+            }),
+          ),
+        )
+      : Effect.succeed(options.token);
 
+  type Fetch = (request: Request) => Promise<Response>;
   const send = Effect.fn("ConvexClient.request")(function* <A>(
     operation: string,
-    method: "GET" | "POST" | "PATCH",
-    url: string,
-    authorization: Redacted.Redacted<string>,
-    consume: (
-      response: HttpClientResponse.HttpClientResponse,
-    ) => Effect.Effect<A, ConvexApiError>,
-    body?: unknown,
-  ) {
-    let request = HttpClientRequest.make(method)(url).pipe(
-      HttpClientRequest.setHeader(
-        "authorization",
-        Redacted.value(authorization),
-      ),
-      HttpClientRequest.acceptJson,
-    );
-    if (body !== undefined) {
-      request = yield* HttpClientRequest.bodyJson(request, body).pipe(
-        Effect.mapError(() =>
-          ConvexApiError.make({ operation, code: "InvalidRequest" }),
-        ),
-      );
-    }
-    const statusError = (status: number) => {
-      const fields = { operation, status, code: "HttpError" } as const;
-      if (status === 404) return ConvexNotFound.make(fields);
-      if (status === 409) return ConvexConflict.make(fields);
-      return ConvexApiError.make(fields);
-    };
-    const requestInit = yield* readRequestInit;
-    return yield* http.execute(request).pipe(
-      Effect.provideService(FetchHttpClient.RequestInit, {
-        ...(requestInit ?? defaultRequestInit),
-        redirect: "manual",
-      }),
-      Effect.mapError(({ reason }) =>
-        reason._tag === "StatusCodeError"
-          ? statusError(reason.response.status)
-          : ConvexApiError.make({ operation, code: "TransportError" }),
-      ),
-      Effect.flatMap((response) =>
-        response.status < 200 || response.status >= 300
-          ? Effect.fail(statusError(response.status))
-          : consume(response),
-      ),
-      Effect.scoped,
-    );
-  });
-
-  const decode = Effect.fn("ConvexClient.decode")(function* <A>(
-    operation: string,
-    response: HttpClientResponse.HttpClientResponse,
+    invoke: (fetch: Fetch) => Effect.Effect<unknown, PlatformError>,
     schema: Schema.Decoder<A>,
   ) {
-    const invalidResponse = () =>
-      ConvexApiError.make({
-        operation,
-        status: response.status,
-        code: "InvalidResponse",
+    const current = yield* Effect.context<never>();
+    const context = Context.merge(defaults, current);
+    const transport = Context.get(context, FetchHttpClient.Fetch);
+    const init = Context.getOrUndefined(context, FetchHttpClient.RequestInit);
+    let status: number | undefined;
+    const data = yield* invoke((request) => {
+      const headers = new Headers(init?.headers);
+      headers.set("accept", "application/json");
+      request.headers.forEach((value, key) => headers.set(key, value));
+      headers.delete("content-length");
+      return transport(request, {
+        ...init,
+        method: request.method,
+        body: null,
+        headers,
+        signal: request.signal,
+        redirect: "manual",
+      }).then((response) => {
+        status = response.status;
+        if (
+          response.ok &&
+          schema.ast._tag === "Void" &&
+          response.body !== null
+        ) {
+          void response.body.cancel().catch(() => undefined);
+          return new Response(null, { status });
+        }
+        return response;
       });
-    const body = yield* response.json.pipe(Effect.mapError(invalidResponse));
-    return yield* Schema.decodeEffect(schema)(body).pipe(
-      Effect.mapError(invalidResponse),
+    }).pipe(
+      Effect.mapError((error) => {
+        const fields = {
+          operation,
+          code: error.code,
+          ...(error.status === undefined ? {} : { status: error.status }),
+        };
+        if (error.code === "HttpError" && error.status === 404)
+          return ConvexNotFound.make(fields);
+        if (error.code === "HttpError" && error.status === 409)
+          return ConvexConflict.make(fields);
+        return ConvexApiError.make(fields);
+      }),
+    );
+    return yield* Schema.decodeUnknownEffect(schema)(data).pipe(
+      Effect.mapError(() =>
+        ConvexApiError.make({
+          operation,
+          code: "InvalidResponse",
+          ...(status === undefined ? {} : { status }),
+        }),
+      ),
     );
   });
 
   const management = Effect.fn("ConvexClient.management")(function* <A>(
     operation: string,
-    method: "GET" | "POST" | "PATCH",
-    path: string,
+    request: (
+      client: ReturnType<typeof ManagementClient.make>,
+    ) => Effect.Effect<unknown, PlatformError>,
     schema: Schema.Decoder<A>,
-    body?: unknown,
   ) {
-    const authorization = yield* managementAuthorization;
+    const token = yield* managementToken;
     return yield* send(
       operation,
-      method,
-      `${baseUrl}${path}`,
-      authorization,
-      (response) => decode(operation, response, schema),
-      body,
-    );
-  });
-
-  const managementVoid = Effect.fn("ConvexClient.managementVoid")(function* (
-    operation: string,
-    method: "POST" | "PATCH",
-    path: string,
-    body?: unknown,
-  ) {
-    const authorization = yield* managementAuthorization;
-    yield* send(
-      operation,
-      method,
-      `${baseUrl}${path}`,
-      authorization,
-      () => Effect.void,
-      body,
+      (fetch) =>
+        request(
+          ManagementClient.make(token, {
+            baseUrl: "https://api.convex.dev/v1",
+            fetch,
+          }),
+        ),
+      schema,
     );
   });
 
@@ -331,7 +303,7 @@ const make = Effect.fn("ConvexClient.make")(function* (options?: {
     ) {
       return yield* invalidUrl();
     }
-    return `${parsed.origin}/api/v1`;
+    return parsed.origin;
   });
 
   return {
@@ -344,8 +316,13 @@ const make = Effect.fn("ConvexClient.make")(function* (options?: {
       while (true) {
         const page = yield* management(
           "listProjects",
-          "GET",
-          `/teams/${teamId}/projects${cursor === undefined ? "" : `?cursor=${encodeURIComponent(cursor)}`}`,
+          (client) =>
+            client.request("get", "/teams/{team_id}/projects", {
+              params: {
+                path: { team_id: teamId },
+                query: cursor === undefined ? {} : { cursor },
+              },
+            }),
           ProjectsPageSchema,
         );
         projects.push(...page.items);
@@ -367,50 +344,68 @@ const make = Effect.fn("ConvexClient.make")(function* (options?: {
       }
     }),
     getProject: Effect.fn("ConvexClient.getProject")((projectId: number) =>
-      management("getProject", "GET", `/projects/${projectId}`, ProjectSchema),
+      management(
+        "getProject",
+        (client) =>
+          client.request("get", "/projects/{project_id}", {
+            params: { path: { project_id: projectId } },
+          }),
+        ProjectSchema,
+      ),
     ),
     createProject: Effect.fn("ConvexClient.createProject")(
       (teamId: number, input: CreateProjectInput) =>
         management(
           "createProject",
-          "POST",
-          `/teams/${teamId}/create_project`,
+          (client) =>
+            client.request("post", "/teams/{team_id}/create_project", {
+              params: { path: { team_id: teamId } },
+              body: input,
+            }),
           CreatedProjectSchema,
-          input,
         ),
     ),
     updateProject: Effect.fn("ConvexClient.updateProject")(
       (projectId: number, input: UpdateProjectInput) =>
         management(
           "updateProject",
-          "PATCH",
-          `/projects/${projectId}`,
+          (client) =>
+            client.request("patch", "/projects/{project_id}", {
+              params: { path: { project_id: projectId } },
+              body: input,
+            }),
           ProjectSchema,
-          input,
         ),
     ),
     deleteProject: Effect.fn("ConvexClient.deleteProject")(
       (projectId: number) =>
-        managementVoid(
+        management(
           "deleteProject",
-          "POST",
-          `/projects/${projectId}/delete`,
+          (client) =>
+            client.request("post", "/projects/{project_id}/delete", {
+              params: { path: { project_id: projectId } },
+            }),
+          Schema.Void,
         ),
     ),
     listDeployments: Effect.fn("ConvexClient.listDeployments")(
       (projectId: number) =>
         management(
           "listDeployments",
-          "GET",
-          `/projects/${projectId}/list_deployments`,
+          (client) =>
+            client.request("get", "/projects/{project_id}/list_deployments", {
+              params: { path: { project_id: projectId } },
+            }),
           Schema.Array(DeploymentSchema),
         ),
     ),
     getDeployment: Effect.fn("ConvexClient.getDeployment")((name: string) =>
       management(
         "getDeployment",
-        "GET",
-        `/deployments/${encodeURIComponent(name)}`,
+        (client) =>
+          client.request("get", "/deployments/{deployment_name}", {
+            params: { path: { deployment_name: name } },
+          }),
         DeploymentSchema,
       ),
     ),
@@ -418,27 +413,35 @@ const make = Effect.fn("ConvexClient.make")(function* (options?: {
       (projectId: number, input: CreateDeploymentInput) =>
         management(
           "createDeployment",
-          "POST",
-          `/projects/${projectId}/create_deployment`,
+          (client) =>
+            client.request("post", "/projects/{project_id}/create_deployment", {
+              params: { path: { project_id: projectId } },
+              body: input,
+            }),
           DeploymentSchema,
-          input,
         ),
     ),
     updateDeployment: Effect.fn("ConvexClient.updateDeployment")(
       (name: string, input: UpdateDeploymentInput) =>
-        managementVoid(
+        management(
           "updateDeployment",
-          "PATCH",
-          `/deployments/${encodeURIComponent(name)}`,
-          input,
+          (client) =>
+            client.request("patch", "/deployments/{deployment_name}", {
+              params: { path: { deployment_name: name } },
+              body: input,
+            }),
+          Schema.Void,
         ),
     ),
     deleteDeployment: Effect.fn("ConvexClient.deleteDeployment")(
       (name: string) =>
-        managementVoid(
+        management(
           "deleteDeployment",
-          "POST",
-          `/deployments/${encodeURIComponent(name)}/delete`,
+          (client) =>
+            client.request("post", "/deployments/{deployment_name}/delete", {
+              params: { path: { deployment_name: name } },
+            }),
+          Schema.Void,
         ),
     ),
     createDeployKey: Effect.fn("ConvexClient.createDeployKey")(function* (
@@ -447,30 +450,47 @@ const make = Effect.fn("ConvexClient.make")(function* (options?: {
     ): Effect.fn.Return<CreatedDeployKey, ConvexClientError> {
       const response = yield* management(
         "createDeployKey",
-        "POST",
-        `/deployments/${encodeURIComponent(name)}/create_deploy_key`,
+        (client) =>
+          client.request(
+            "post",
+            "/deployments/{deployment_name}/create_deploy_key",
+            {
+              params: { path: { deployment_name: name } },
+              body: input,
+            },
+          ),
         Schema.Struct({ deployKey: Schema.String }),
-        input,
       );
       return { deployKey: Redacted.make(response.deployKey) };
     }),
     listDeployKeys: Effect.fn("ConvexClient.listDeployKeys")((name: string) =>
       management(
         "listDeployKeys",
-        "GET",
-        `/deployments/${encodeURIComponent(name)}/list_deploy_keys`,
+        (client) =>
+          client.request(
+            "get",
+            "/deployments/{deployment_name}/list_deploy_keys",
+            {
+              params: { path: { deployment_name: name } },
+            },
+          ),
         Schema.Array(DeployKeySchema),
       ),
     ),
     deleteDeployKey: Effect.fn("ConvexClient.deleteDeployKey")(
       (name: string, id: string | Redacted.Redacted<string>) =>
-        managementVoid(
+        management(
           "deleteDeployKey",
-          "POST",
-          `/deployments/${encodeURIComponent(name)}/delete_deploy_key`,
-          {
-            id: Redacted.isRedacted(id) ? Redacted.value(id) : id,
-          } satisfies ManagementApi.PlatformDeleteDeployKeyArgs,
+          (client) =>
+            client.request(
+              "post",
+              "/deployments/{deployment_name}/delete_deploy_key",
+              {
+                params: { path: { deployment_name: name } },
+                body: { id: Redacted.isRedacted(id) ? Redacted.value(id) : id },
+              },
+            ),
+          Schema.Void,
         ),
     ),
     listEnvironmentVariables: Effect.fn(
@@ -482,17 +502,14 @@ const make = Effect.fn("ConvexClient.make")(function* (options?: {
       const base = yield* deploymentUrl("listEnvironmentVariables", url);
       const result = yield* send(
         "listEnvironmentVariables",
-        "GET",
-        `${base}/list_environment_variables`,
-        Redacted.make(`Convex ${Redacted.value(key)}`),
-        (response) =>
-          decode(
-            "listEnvironmentVariables",
-            response,
-            Schema.Struct({
-              environmentVariables: Schema.Record(Schema.String, Schema.String),
-            }),
+        (fetch) =>
+          DeploymentClient.make(base, key, { fetch }).request(
+            "get",
+            "/list_environment_variables",
           ),
+        Schema.Struct({
+          environmentVariables: Schema.Record(Schema.String, Schema.String),
+        }),
       );
       return Rec.map(result.environmentVariables, (value) =>
         Redacted.make(value),
@@ -508,26 +525,26 @@ const make = Effect.fn("ConvexClient.make")(function* (options?: {
       const base = yield* deploymentUrl("updateEnvironmentVariables", url);
       yield* send(
         "updateEnvironmentVariables",
-        "POST",
-        `${base}/update_environment_variables`,
-        Redacted.make(`Convex ${Redacted.value(key)}`),
-        () => Effect.void,
-        {
-          changes: Arr.map(changes, ({ name, value }) => ({
-            name,
-            ...(value === undefined
-              ? {}
-              : {
-                  value: Redacted.isRedacted(value)
-                    ? Redacted.value(value)
-                    : value,
-                }),
-          })),
-        } satisfies {
-          readonly changes: Readonly<
-            DeploymentApi.UpdateEnvVarsRequest["changes"]
-          >;
-        },
+        (fetch) =>
+          DeploymentClient.make(base, key, { fetch }).request(
+            "post",
+            "/update_environment_variables",
+            {
+              body: {
+                changes: Arr.map(changes, ({ name, value }) => ({
+                  name,
+                  ...(value === undefined
+                    ? {}
+                    : {
+                        value: Redacted.isRedacted(value)
+                          ? Redacted.value(value)
+                          : value,
+                      }),
+                })),
+              },
+            },
+          ),
+        Schema.Void,
       );
     }),
   };

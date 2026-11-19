@@ -32,6 +32,7 @@ Confect is a library that integrates Effect with the Convex backend platform. It
 - `@confect/server` - Backend bindings to Convex (depends on core)
 - `@confect/js` - Runtime-agnostic JavaScript client (depends on core)
 - `@confect/platform` - Effect clients for the Convex management and deployment APIs (no workspace deps)
+- `@confect/alchemy` - Alchemy resources for Convex infrastructure and application deployments (depends on platform)
 - `@confect/foldkit` - Client-side bindings for Foldkit apps (depends on core, js)
 - `@confect/react` - Client-side React hooks (depends on core)
 - `@confect/cli` - CLI tooling for codegen and dev-mode watching (depends on core, server)

@@ -1,4 +1,4 @@
-import type { PlatformCreateDeployKeyArgs } from "@convex-dev/platform/managementApi";
+import type { ManagementApi } from "@confect/platform";
 import { isResolved } from "alchemy/Diff";
 import * as Provider from "alchemy/Provider";
 import { Resource } from "alchemy/Resource";
@@ -19,7 +19,9 @@ export interface DeployKeyProps {
   readonly deploymentName: string;
   readonly name?: string;
   readonly allowedActions?: ReadonlyArray<
-    NonNullable<PlatformCreateDeployKeyArgs["allowedActions"]>[number]
+    NonNullable<
+      ManagementApi.PlatformCreateDeployKeyArgs["allowedActions"]
+    >[number]
   >;
 }
 

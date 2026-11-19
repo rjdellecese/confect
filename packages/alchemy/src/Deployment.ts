@@ -1,8 +1,4 @@
-import type {
-  CreateDeploymentType,
-  PlatformDeploymentResponse,
-  RegionName,
-} from "@convex-dev/platform/managementApi";
+import type { ManagementApi } from "@confect/platform";
 import { OwnedBySomeoneElse, Unowned } from "alchemy/AdoptPolicy";
 import { isResolved } from "alchemy/Diff";
 import * as Provider from "alchemy/Provider";
@@ -18,9 +14,9 @@ import { checkpointResource } from "./internal/Lifecycle.js";
 
 export interface DeploymentProps {
   readonly projectId: number;
-  readonly type: CreateDeploymentType;
+  readonly type: ManagementApi.CreateDeploymentType;
   readonly reference?: string;
-  readonly region?: RegionName;
+  readonly region?: ManagementApi.RegionName;
 }
 
 export interface DeploymentAttributes {
@@ -28,9 +24,9 @@ export interface DeploymentAttributes {
   readonly name: string;
   readonly reference: string;
   readonly managedReference?: string;
-  readonly type: CreateDeploymentType;
+  readonly type: ManagementApi.CreateDeploymentType;
   readonly url: string;
-  readonly region: RegionName;
+  readonly region: ManagementApi.RegionName;
 }
 
 export type Deployment = Resource<
@@ -70,7 +66,7 @@ export class AmbiguousDeployment extends Schema.TaggedError<
 export const provider = Effect.gen(function* () {
   const client = yield* ConvexClient;
   const attributes = Effect.fn("Deployment.attributes")(function* (
-    deployment: PlatformDeploymentResponse,
+    deployment: ManagementApi.PlatformDeploymentResponse,
     managedReference?: string,
   ) {
     if (deployment.kind !== "cloud")

@@ -16,5 +16,6 @@
     "types": ["node"],
     "module": "NodeNext"
   },
-  "include": ["src"]
+  "include": ["src"],
+  "references": [{ "path": "../platform/tsconfig.src.json" }]
 }

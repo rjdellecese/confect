@@ -3,14 +3,11 @@ import * as ConvexClient from "@confect/alchemy/ConvexClient";
 import { describe, expect, it } from "@effect/vitest";
 import * as ConfigProvider from "effect/ConfigProvider";
 import * as Effect from "effect/Effect";
+import * as Fiber from "effect/Fiber";
 import * as Layer from "effect/Layer";
 import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
 import * as FetchHttpClient from "effect/http/FetchHttpClient";
-import * as HttpClient from "effect/http/HttpClient";
-import * as HttpClientError from "effect/http/HttpClientError";
-import type * as HttpClientRequest from "effect/http/HttpClientRequest";
-import * as HttpClientResponse from "effect/http/HttpClientResponse";
 import { inspect } from "node:util";
 
 const token = Redacted.make("management-secret-for-tests");
@@ -41,33 +38,38 @@ const deployment = {
   deploymentUrl,
 } satisfies ConvexClient.Deployment;
 
-const mockHttp = (responses: readonly Response[], filterStatus = false) => {
-  const requests: HttpClientRequest.HttpClientRequest[] = [];
-  const signals: AbortSignal[] = [];
-  const client = HttpClient.make((request, _url, signal) => {
-    const response = responses[requests.length];
-    requests.push(request);
-    signals.push(signal);
-    return response === undefined
-      ? Effect.die("Unexpected HTTP request")
-      : Effect.succeed(HttpClientResponse.fromWeb(request, response));
-  });
+const fetchLayer = (run: (request: Request) => Promise<Response>) =>
+  Layer.succeed(
+    FetchHttpClient.Fetch,
+    Object.assign(
+      (input: RequestInfo | URL, init?: RequestInit) =>
+        run(new Request(input, init)),
+      { preconnect: () => undefined },
+    ),
+  );
+
+const mockHttp = (responses: readonly Response[]) => {
+  const requests: Request[] = [];
   return {
     requests,
-    signals,
-    layer: Layer.succeed(
-      HttpClient.HttpClient,
-      filterStatus ? HttpClient.filterStatusOk(client) : client,
-    ),
+    layer: fetchLayer((request) => {
+      const response = responses[requests.length];
+      requests.push(request);
+      if (request.signal.aborted) return Promise.reject(request.signal.reason);
+      return response === undefined
+        ? Promise.reject("Unexpected HTTP request")
+        : Promise.resolve(response);
+    }),
   };
 };
 
 const requestBody = Effect.fn("requestBody")(function* (
-  request: HttpClientRequest.HttpClientRequest | undefined,
+  request: Request | undefined,
 ) {
-  if (request?.body._tag !== "Uint8Array") return undefined;
+  if (request === undefined) return undefined;
+  const text = yield* Effect.promise(() => request.text());
   return yield* Schema.decodeEffect(Schema.fromJsonString(Schema.Unknown))(
-    new TextDecoder().decode(request.body.body),
+    text,
   );
 });
 
@@ -146,7 +148,7 @@ describe("ConvexClient", () => {
           ]);
           for (const request of http.requests) {
             expect(request.method).toBe("GET");
-            expect(request.headers.authorization).toBe(
+            expect(request.headers.get("authorization")).toBe(
               `Bearer ${Redacted.value(token)}`,
             );
           }
@@ -457,7 +459,7 @@ describe("ConvexClient", () => {
             `${deploymentUrl}/api/v1/update_environment_variables`,
           ]);
           for (const request of http.requests) {
-            expect(request.headers.authorization).toBe(
+            expect(request.headers.get("authorization")).toBe(
               `Convex ${Redacted.value(deployKey)}`,
             );
           }
@@ -495,7 +497,7 @@ describe("ConvexClient", () => {
       return yield* Effect.gen(function* () {
         const client = yield* ConvexClient.ConvexClient;
         yield* client.getProject(42);
-        expect(http.requests[0]?.headers.authorization).toBe(
+        expect(http.requests[0]?.headers.get("authorization")).toBe(
           "Bearer config-token",
         );
       }).pipe(Effect.provideContext(services));
@@ -568,15 +570,15 @@ describe("ConvexClient", () => {
   );
 
   it.effect.each([false, true])(
-    "classifies status failures without retaining bodies or retrying mutations (status-filtered client: %s)",
-    (filterStatus) => {
+    "classifies status failures without retaining bodies or retrying mutations (JSON: %s)",
+    (json) => {
       const secret = "untrusted-error-body-secret";
-      const http = mockHttp(
-        Arr.map([404, 409, 401, 429, 500, 302], (status) =>
-          Response.json({ code: secret, message: secret }, { status }),
-        ),
-        filterStatus,
+      const responses = Arr.map([404, 409, 401, 429, 500, 302], (status) =>
+        json
+          ? Response.json({ code: secret, message: secret }, { status })
+          : new Response(secret, { status }),
       );
+      const http = mockHttp(responses);
       return Effect.gen(function* () {
         const services = yield* Layer.build(
           clientLayer.pipe(Layer.provide(http.layer)),
@@ -604,9 +606,13 @@ describe("ConvexClient", () => {
             yield* expectSecretSafe(error, Redacted.value(token));
           }
           expect(http.requests).toHaveLength(6);
-          expect(Arr.every(http.signals, (signal) => signal.aborted)).toBe(
-            true,
-          );
+          expect(
+            Arr.every(
+              responses,
+              (response, index) =>
+                response.bodyUsed || http.requests[index]?.signal.aborted,
+            ),
+          ).toBe(true);
         }).pipe(Effect.provideContext(services));
       });
     },
@@ -642,7 +648,7 @@ describe("ConvexClient", () => {
     const secret = "malformed-response-secret";
     const http = mockHttp([
       new Response(secret),
-      Response.json({ ...project, id: secret }),
+      Response.json({ ...project, id: secret }, { status: 201 }),
       Response.json({ deployKey: { secret } }),
       Response.json({ environmentVariables: { SECRET: { secret } } }),
     ]);
@@ -652,20 +658,26 @@ describe("ConvexClient", () => {
       );
       return yield* Effect.gen(function* () {
         const client = yield* ConvexClient.ConvexClient;
-        for (const operation of [
-          client.getProject(42).pipe(Effect.asVoid),
-          client.getProject(42).pipe(Effect.asVoid),
-          client
-            .createDeployKey(deployment.name, { name: "automation" })
-            .pipe(Effect.asVoid),
-          client
-            .listEnvironmentVariables(deploymentUrl, deployKey)
-            .pipe(Effect.asVoid),
-        ]) {
+        for (const [status, operation] of [
+          [200, client.getProject(42).pipe(Effect.asVoid)],
+          [201, client.getProject(42).pipe(Effect.asVoid)],
+          [
+            200,
+            client
+              .createDeployKey(deployment.name, { name: "automation" })
+              .pipe(Effect.asVoid),
+          ],
+          [
+            200,
+            client
+              .listEnvironmentVariables(deploymentUrl, deployKey)
+              .pipe(Effect.asVoid),
+          ],
+        ] as const) {
           const error = yield* operation.pipe(Effect.flip);
           expect(error).toMatchObject({
             _tag: "ConvexApiError",
-            status: 200,
+            status,
             code: "InvalidResponse",
           });
           yield* expectSecretSafe(error, secret);
@@ -678,21 +690,12 @@ describe("ConvexClient", () => {
     "sanitizes transport errors that include credentials and requests",
     () => {
       const secret = "network-secret";
-      const transport = HttpClient.make((request) =>
-        Effect.fail(
-          new HttpClientError.HttpClientError({
-            reason: new HttpClientError.TransportError({
-              request,
-              cause: { secret },
-            }),
-          }),
-        ),
+      const transport = fetchLayer((request) =>
+        Promise.reject({ request, secret }),
       );
       return Effect.gen(function* () {
         const services = yield* Layer.build(
-          clientLayer.pipe(
-            Layer.provide(Layer.succeed(HttpClient.HttpClient, transport)),
-          ),
+          clientLayer.pipe(Layer.provide(transport)),
         );
         return yield* Effect.gen(function* () {
           const client = yield* ConvexClient.ConvexClient;
@@ -708,51 +711,129 @@ describe("ConvexClient", () => {
     },
   );
 
-  it.effect("disables automatic redirects on the Fetch transport", () => {
-    const requests: (RequestInit | undefined)[] = [];
-    const fetch: typeof globalThis.fetch = Object.assign(
-      (...[_input, init]: Parameters<typeof globalThis.fetch>) => {
-        requests.push(init);
-        return Promise.resolve(
-          new Response(null, {
-            status: 302,
-            headers: { location: "https://attacker.example" },
-          }),
+  it.effect(
+    "aborts an in-flight SDK request when its fiber is interrupted",
+    () => {
+      const started = Promise.withResolvers<AbortSignal>();
+      const http = fetchLayer((request) => {
+        const pending = Promise.withResolvers<Response>();
+        request.signal.addEventListener(
+          "abort",
+          () => pending.reject(request.signal.reason),
+          { once: true },
         );
-      },
-      { preconnect: () => undefined },
-    );
-    return Effect.gen(function* () {
-      const services = yield* Layer.build(
-        clientLayer.pipe(Layer.provide(FetchHttpClient.layer)),
-      ).pipe(
-        Effect.provideService(FetchHttpClient.RequestInit, {
-          cache: "no-store",
-          redirect: "follow",
-        }),
-      );
-      return yield* Effect.gen(function* () {
-        const client = yield* ConvexClient.ConvexClient;
-        const readError = client
-          .listEnvironmentVariables(deploymentUrl, deployKey)
-          .pipe(Effect.flip);
-        const defaultError = yield* readError;
-        expect(defaultError).toMatchObject({
-          code: "HttpError",
+        started.resolve(request.signal);
+        return pending.promise;
+      });
+      return Effect.gen(function* () {
+        const services = yield* Layer.build(
+          clientLayer.pipe(Layer.provide(http)),
+        );
+        return yield* Effect.gen(function* () {
+          const client = yield* ConvexClient.ConvexClient;
+          const fiber = yield* client.getProject(42).pipe(Effect.forkChild);
+          const signal = yield* Effect.promise(() => started.promise);
+          expect(signal.aborted).toBe(false);
+          yield* Fiber.interrupt(fiber);
+          expect(signal.aborted).toBe(true);
+        }).pipe(Effect.provideContext(services));
+      });
+    },
+  );
+
+  it.effect.each(["pending", "rejected"] as const)(
+    "does not wait for %s cleanup of an unexpected successful void response body",
+    (cleanup) => {
+      let cancelled = false;
+      const body = new ReadableStream<Uint8Array>({
+        cancel() {
+          cancelled = true;
+          return cleanup === "pending"
+            ? Promise.withResolvers<void>().promise
+            : Promise.reject("cleanup failure");
+        },
+      });
+      const http = mockHttp([new Response(body)]);
+      return Effect.gen(function* () {
+        const services = yield* Layer.build(
+          clientLayer.pipe(Layer.provide(http.layer)),
+        );
+        return yield* Effect.gen(function* () {
+          const client = yield* ConvexClient.ConvexClient;
+          yield* client.deleteProject(project.id);
+          expect(cancelled).toBe(true);
+          expect(http.requests).toHaveLength(1);
+        }).pipe(Effect.provideContext(services));
+      });
+    },
+  );
+
+  it.effect(
+    "inherits fetch options but never redirects or overrides SDK credentials and payloads",
+    () => {
+      const redirect = () =>
+        new Response(null, {
           status: 302,
+          headers: { location: "https://attacker.example" },
         });
-        const overrideError = yield* readError.pipe(
+      const defaults = mockHttp([redirect()]);
+      const override = mockHttp([redirect()]);
+      return Effect.gen(function* () {
+        const services = yield* Layer.build(
+          clientLayer.pipe(Layer.provide(defaults.layer)),
+        ).pipe(
           Effect.provideService(FetchHttpClient.RequestInit, {
-            cache: "reload",
+            cache: "no-store",
             redirect: "follow",
+            headers: { "X-Custom": "default", Authorization: "untrusted" },
           }),
         );
-        expect(overrideError).toMatchObject({ code: "HttpError", status: 302 });
-        expect(requests).toMatchObject([
-          { cache: "no-store", redirect: "manual" },
-          { cache: "reload", redirect: "manual" },
-        ]);
-      }).pipe(Effect.provideContext(services));
-    }).pipe(Effect.provideService(FetchHttpClient.Fetch, fetch));
-  });
+        const scopedFetch = yield* Layer.build(override.layer);
+        return yield* Effect.gen(function* () {
+          const client = yield* ConvexClient.ConvexClient;
+          const operation = client
+            .updateEnvironmentVariables(deploymentUrl, deployKey, [])
+            .pipe(Effect.flip);
+          const defaultError = yield* operation;
+          expect(defaultError).toMatchObject({
+            code: "HttpError",
+            status: 302,
+          });
+          const overrideError = yield* operation.pipe(
+            Effect.provideContext(scopedFetch),
+            Effect.provideService(FetchHttpClient.RequestInit, {
+              cache: "reload",
+              redirect: "follow",
+              method: "DELETE",
+              body: "untrusted",
+              signal: AbortSignal.abort(),
+              headers: { "X-Custom": "override", Authorization: "untrusted" },
+            }),
+          );
+          expect(overrideError).toMatchObject({
+            code: "HttpError",
+            status: 302,
+          });
+          for (const [http, cache, custom] of [
+            [defaults, "no-store", "default"],
+            [override, "reload", "override"],
+          ] as const) {
+            expect(http.requests).toHaveLength(1);
+            const request = http.requests[0];
+            expect(request).toMatchObject({
+              method: "POST",
+              redirect: "manual",
+              cache,
+            });
+            expect(request?.headers.get("X-Custom")).toBe(custom);
+            expect(request?.headers.get("authorization")).toBe(
+              `Convex ${Redacted.value(deployKey)}`,
+            );
+            const body = yield* requestBody(request);
+            expect(body).toEqual({ changes: [] });
+          }
+        }).pipe(Effect.provideContext(services));
+      });
+    },
+  );
 });
