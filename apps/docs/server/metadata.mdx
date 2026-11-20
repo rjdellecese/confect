@@ -12,7 +12,7 @@ Confect provides three services for reading Convex metadata. Import them from `c
 | `RequestMetadata`     | `get()`                            | Mutations, actions, and HTTP handlers          |
 | `TransactionMetadata` | `getMetrics()`, `getSnapshotTs()`  | Queries and mutations                          |
 
-Actions include [Node actions](/server/node-actions). Each method returns an Effect containing the native Convex metadata value, without transforming its fields. If the underlying Convex call throws or rejects, the Effect fails with a defect rather than a typed error.
+Actions include [Node actions](/server/node-actions). Each method returns an Effect containing the native Convex metadata. In [Confect component handlers](/server/components#handler-capabilities), the request's `authToken` is redacted to `null`; application handlers receive the native value. If the underlying Convex call throws or rejects, the Effect fails with a defect rather than a typed error.
 
 ## Function and deployment metadata
 

@@ -1,10 +1,36 @@
 import * as Result from "effect/Result";
+import type * as Brand from "effect/Brand";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import * as GenericId from "@confect/core/GenericId";
+import * as IdScope from "@confect/core/IdScope";
 
 describe("GenericId", () => {
+  it("preserves component scope through schema composition", () => {
+    const definition = IdScope.component("counter");
+    const id = GenericId.GenericId("items", definition)
+      .check(Schema.isMinLength(1))
+      .annotate({ title: "Component item ID" });
+    const value = id.make("item");
+
+    expectTypeOf(value).toEqualTypeOf<
+      GenericId.GenericId<"items", typeof definition>
+    >();
+    expectTypeOf<typeof id.Encoded>().toEqualTypeOf<typeof value>();
+    expectTypeOf(value).not.toExtend<GenericId.GenericId<"items">>();
+    expect(GenericId.scope(id.ast)).toBe(definition);
+    expect(GenericId.tableName(id.ast)).toEqual(Option.some("items"));
+    expect(
+      Result.getOrThrow(
+        Schema.decodeUnknownResult(Schema.Record(id, Schema.Finite))({
+          item: 1,
+        }),
+      ),
+    ).toEqual({ item: 1 });
+    expect(() => id.make("")).toThrow();
+  });
+
   it("preserves the table-specific decoded and encoded types", () => {
     const id = GenericId.GenericId("users");
 
@@ -94,5 +120,84 @@ describe("tableName", () => {
     const actualTableName = GenericId.tableName(id.ast);
 
     expect(actualTableName).toStrictEqual(Option.some(expectedTableName));
+  });
+});
+
+describe("rebase", () => {
+  it("keeps application brands on rebased IDs", () => {
+    const definition = IdScope.component("counter");
+    const installation = IdScope.instance(IdScope.app, "first");
+    const input = GenericId.GenericId("items", definition).pipe(
+      Schema.brand("Reviewed"),
+    );
+    const bound = GenericId.rebase(input, definition, installation);
+    type InstalledId = GenericId.GenericId<"items", typeof installation>;
+    expectTypeOf<typeof bound.Type>().toEqualTypeOf<
+      InstalledId & Brand.Brand<"Reviewed">
+    >();
+    expectTypeOf<InstalledId>().not.toExtend<typeof bound.Type>();
+    expectTypeOf<typeof bound.Encoded>().toEqualTypeOf<InstalledId>();
+  });
+
+  it("rebinds ID-keyed records in both directions", () => {
+    const definition = IdScope.component("counter");
+    const installation = IdScope.instance(IdScope.app, "first");
+    const counts = Schema.Record(
+      GenericId.GenericId("items", definition),
+      Schema.FiniteFromString,
+    );
+    const bound = GenericId.rebase(counts, definition, installation);
+    const id = GenericId.GenericId("items", installation).make("item");
+    const decoded = Result.getOrThrow(
+      Schema.decodeUnknownResult(bound)({ item: "2" }),
+    );
+    expectTypeOf<keyof typeof decoded>().toEqualTypeOf<typeof id>();
+    expectTypeOf<keyof typeof bound.Encoded>().toEqualTypeOf<typeof id>();
+    expect(decoded[id]).toBe(2);
+    expect(Result.getOrThrow(Schema.encodeResult(bound)(decoded))).toEqual({
+      item: "2",
+    });
+  });
+
+  it("rebinds checked IDs without changing their source scope or checks", () => {
+    const definition = IdScope.component("counter");
+    const installation = IdScope.instance(IdScope.app, "first");
+    const input = GenericId.GenericId("items", definition)
+      .check(Schema.isMinLength(1))
+      .annotate({ title: "Component item ID" });
+    const bound = GenericId.rebase(input, definition, installation);
+
+    expectTypeOf<typeof bound.Type>().toEqualTypeOf<
+      GenericId.GenericId<"items", typeof installation>
+    >();
+    expectTypeOf<typeof bound.Encoded>().toEqualTypeOf<typeof bound.Type>();
+    expect(GenericId.scope(input.ast)).toBe(definition);
+    expect(GenericId.scope(bound.ast)).toBe(installation);
+    expect(GenericId.tableName(bound.ast)).toEqual(Option.some("items"));
+    expect(Result.getOrThrow(Schema.decodeUnknownResult(bound)("item"))).toBe(
+      "item",
+    );
+    expect(() =>
+      Result.getOrThrow(Schema.decodeUnknownResult(bound)("")),
+    ).toThrow();
+  });
+
+  it("preserves exclusive union validation while rebasing IDs", () => {
+    const definition = IdScope.component("counter");
+    const installation = IdScope.instance(IdScope.app, "first");
+    const input = Schema.Union(
+      [GenericId.GenericId("items", definition), Schema.Literal("overlap")],
+      { mode: "oneOf" },
+    );
+    const bound = GenericId.rebase(input, definition, installation);
+
+    expect(Schema.is(input)("overlap")).toBe(false);
+    expect(Schema.is(bound)("overlap")).toBe(false);
+    expect(Result.getOrThrow(Schema.decodeUnknownResult(bound)("item"))).toBe(
+      "item",
+    );
+    expect(() =>
+      Result.getOrThrow(Schema.decodeResult(bound)("overlap")),
+    ).toThrow();
   });
 });

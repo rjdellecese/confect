@@ -70,13 +70,18 @@ export type TestConfectWithoutIdentity<
 };
 
 export type TestConfect<DatabaseSchema_ extends DatabaseSchema.AnyWithProps> = {
+  registerComponent: <ComponentApi = unknown>(
+    componentPath: string,
+    schema: SchemaDefinition<GenericSchema, boolean>,
+    modules: Record<string, () => Promise<any>>,
+  ) => Effect.Effect<ComponentApi>;
   withIdentity: (
     userIdentity: Partial<UserIdentity>,
   ) => TestConfectWithoutIdentity<DatabaseSchema_>;
 } & TestConfectWithoutIdentity<DatabaseSchema_>;
 
 export const TestConfect = <
-  DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
+  DatabaseSchema_ extends DatabaseSchema.AnyWithProps = DatabaseSchema.AnyApp,
 >() =>
   Context.Service<TestConfect<DatabaseSchema_>>("@confect/test/TestConfect");
 
@@ -89,6 +94,9 @@ class TestConfectImplWithoutIdentity<
     >,
     private testConvex: TestConvexForDataModel<
       DataModel.ToConvexDataModel<DataModel.FromDatabaseSchema<DatabaseSchema_>>
+    >,
+    private readonly targetArgs: DatabaseSchema.TargetArgs<
+      DatabaseSchema_["target"]
     >,
   ) {}
 
@@ -156,6 +164,7 @@ class TestConfectImplWithoutIdentity<
       RegisteredConvexFunction.mutationLayer<DatabaseSchema_>(
         this.tableNames,
         mutationCtx,
+        ...this.targetArgs,
       );
 
     return returns === undefined
@@ -207,10 +216,14 @@ class TestConfectImpl<
     private testConvex: TestConvexForDataModelAndIdentity<
       DataModel.ToConvexDataModel<DataModel.FromDatabaseSchema<DatabaseSchema_>>
     >,
+    private readonly targetArgs: DatabaseSchema.TargetArgs<
+      DatabaseSchema_["target"]
+    >,
   ) {
     this.testConfectImplWithoutIdentity = new TestConfectImplWithoutIdentity(
       tableNames,
       testConvex,
+      targetArgs,
     );
   }
 
@@ -218,8 +231,15 @@ class TestConfectImpl<
     new TestConfectImplWithoutIdentity(
       this.tableNames,
       this.testConvex.withIdentity(userIdentity),
+      this.targetArgs,
     );
 
+  readonly registerComponent = <ComponentApi = unknown>(
+    ...args: Parameters<TestConfect<DatabaseSchema_>["registerComponent"]>
+  ) =>
+    Effect.sync(() =>
+      this.testConvex.registerComponent<ComponentApi>(...args),
+    ).pipe(Effect.withSpan("TestConfect.registerComponent"));
   readonly jwks = () => this.testConfectImplWithoutIdentity.jwks();
 
   readonly query = <QueryRef extends Ref.AnyQuery>(
@@ -260,13 +280,16 @@ class TestConfectImpl<
     );
 }
 
-export const layer = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
+export const layer = <
+  DatabaseSchema_ extends DatabaseSchema.AnyWithProps = DatabaseSchema.AnyApp,
+>(
   tableNames: ReadonlyArray<DatabaseSchema.TableNames<DatabaseSchema_>>,
   convexSchemaDefinition: SchemaDefinition<
     Record<DatabaseSchema.TableNames<DatabaseSchema_>, GenericSchema[string]>,
     true
   >,
   modules: Record<string, () => Promise<any>>,
+  ...targetArgs: DatabaseSchema.TargetArgs<DatabaseSchema_["target"]>
 ): Layer.Layer<TestConfect<DatabaseSchema_>> =>
   Layer.sync(
     TestConfect<DatabaseSchema_>(),
@@ -274,5 +297,6 @@ export const layer = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
       new TestConfectImpl<DatabaseSchema_>(
         tableNames,
         convexTest(convexSchemaDefinition, modules) as any,
+        targetArgs,
       ),
   );

@@ -8,6 +8,7 @@ import type { LeafModule } from "@confect/cli/LeafModule";
 import { assemblyNodesFromLeaves } from "@confect/cli/SpecAssemblyNode";
 import * as templates from "@confect/cli/templates";
 import { FunctionSpec, GroupSpec, Refs, Spec } from "@confect/core";
+import * as IdScope from "@confect/core/IdScope";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, expect, it, layer } from "@effect/vitest";
 import * as Array from "effect/Array";
@@ -67,6 +68,7 @@ it.effect.each([false, true])(
       });
       expect(code).toContain('import groupLayer from "../../notes.impl";');
       expect(code).toContain('typeof import("../../notes.spec")["default"]');
+      expect(code).not.toContain("target");
       if (useNode) {
         expect(code).toContain("RegisteredNodeFunction.buildForGroup");
         expect(code).not.toContain(
@@ -87,6 +89,32 @@ it.effect.each([false, true])(
         expect(code).not.toContain("const register =");
         expect(code).not.toContain("RegisteredNodeFunction");
       }
+    }),
+);
+
+it.effect.each([
+  { spec: GroupSpec.makeNode(), args: "groupLayer, target" },
+  { spec: GroupSpec.make(), args: "[], groupLayer, target" },
+  {
+    spec: GroupSpec.make().addFunction(
+      FunctionSpec.publicQuery({ name: "get", returns: () => Schema.String }),
+    ),
+    args: "tableNames, groupLayer, target",
+  },
+])(
+  "passes the component target to the group builder: $args",
+  ({ spec, args }) =>
+    Effect.gen(function* () {
+      const code = yield* templates.registeredFunctionsForGroup({
+        spec,
+        tableNamesImportPath: "../../tableNames",
+        targetImportPath: "../../id",
+        specImportPath: "../../../groups/notes.spec",
+        implImportPath: "../../../groups/notes.impl",
+      });
+      expect(code).toContain('import { target } from "../../id";');
+      expect(code).toContain(`>(${args});`);
+      expect(code).not.toContain("schema");
     }),
 );
 
@@ -367,12 +395,25 @@ export { reads } from "./reads";
 
 layer(NodeServices.layer)("id", (test) => {
   test.effect.each([
-    { tableNames: [], moduleResolution: "Bundler" },
-    { tableNames: ["notes", "users"], moduleResolution: "Bundler" },
-    { tableNames: ["notes", "users"], moduleResolution: "NodeNext" },
+    { tableNames: [], moduleResolution: "Bundler", component: false },
+    {
+      tableNames: ["notes", "users"],
+      moduleResolution: "Bundler",
+      component: false,
+    },
+    {
+      tableNames: ["notes", "users"],
+      moduleResolution: "NodeNext",
+      component: false,
+    },
+    {
+      tableNames: ["notes", "users"],
+      moduleResolution: "NodeNext",
+      component: true,
+    },
   ])(
-    "exports matching ID types and schemas for $tableNames and system tables with $moduleResolution resolution",
-    ({ tableNames, moduleResolution }) =>
+    "exports matching ID types and schemas for $tableNames and system tables with $moduleResolution resolution (component=$component)",
+    ({ tableNames, moduleResolution, component }) =>
       Effect.gen(function* () {
         const fs = yield* FileSystem.FileSystem;
         const path = yield* Path.Path;
@@ -385,7 +426,9 @@ layer(NodeServices.layer)("id", (test) => {
           path.join(directory, "package.json"),
           '{"type":"module"}',
         );
-        const contents = templates.id;
+        const contents = yield* templates.id(
+          component ? IdScope.component("fixture") : undefined,
+        );
         yield* fs.writeFileString(
           path.join(directory, "tableNames.ts"),
           templates.tableNames(tableNames),
@@ -397,7 +440,7 @@ layer(NodeServices.layer)("id", (test) => {
         yield* fs.writeFileString(
           path.join(directory, "consumer.ts"),
           `import { expectTypeOf } from "vitest";
-import type { GenericId } from "convex/values";
+${component ? 'import type * as CoreId from "@confect/core/GenericId";\nimport type { scope } from "./id.js";\ntype GenericId<T extends string> = CoreId.GenericId<T, typeof scope>;' : 'import type { GenericId } from "convex/values";'}
 import type { SystemTableNames } from "convex/server";
 import { Id } from "./id.js";
 import type { Id as IdType, TableNames } from "./id.js";

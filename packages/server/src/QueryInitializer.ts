@@ -54,7 +54,7 @@ export interface QueryInitializer<
 > {
   readonly get: {
     (
-      id: GenericId<TableName>,
+      id: DataModel.Id<DataModel_, TableName>,
     ): Effect.Effect<Doc, Document.DocumentDecodeError | GetByIdFailure>;
     <
       IndexName extends keyof Indexes<

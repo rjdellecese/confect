@@ -37,10 +37,13 @@ describe("Registered functions", () => {
 });
 
 describe("buildForGroup", () => {
-  it("accepts only table names and the finalized group layer", () => {
+  it("accepts table names, the finalized group layer, and an optional target", () => {
     expectTypeOf<
       Parameters<typeof RegisteredFunctions.buildForGroup>["length"]
-    >().toEqualTypeOf<2>();
+    >().toEqualTypeOf<2 | 3>();
+    expectTypeOf<[typeof tableNames, typeof notes, string]>().not.toExtend<
+      Parameters<typeof RegisteredFunctions.buildForGroup>
+    >();
   });
   it("rejects an implementation registered for a different same-key spec", () => {
     class Policy extends MiddlewareSpec.MiddlewareSpec<Policy>()("Policy", {

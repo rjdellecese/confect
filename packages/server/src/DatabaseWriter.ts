@@ -8,11 +8,13 @@ import type {
 } from "convex/server";
 import type { GenericId } from "convex/values";
 import type { BaseDatabaseReader } from "@confect/core/Types";
+import type * as IdScope from "@confect/core/IdScope";
 import { pipe } from "effect/Function";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Record from "effect/Record";
+import type * as Types from "effect/Types";
 import type * as DatabaseSchema from "./DatabaseSchema";
 import type * as DataModel from "./DataModel";
 import type { DocumentByName as DocumentByName_ } from "./DataModel";
@@ -38,9 +40,12 @@ export interface DatabaseWriterTableAccessor<
 > {
   readonly insert: (
     document: Document.WithoutSystemFields<Doc>,
-  ) => Effect.Effect<GenericId<TableName>, Document.DocumentEncodeError>;
+  ) => Effect.Effect<
+    DataModel.Id<DataModel_, TableName>,
+    Document.DocumentEncodeError
+  >;
   readonly patch: (
-    id: GenericId<TableName>,
+    id: DataModel.Id<DataModel_, TableName>,
     patchedValues: PatchValue<Doc>,
   ) => Effect.Effect<
     void,
@@ -49,10 +54,12 @@ export interface DatabaseWriterTableAccessor<
     | Document.DocumentEncodeError
   >;
   readonly replace: (
-    id: GenericId<TableName>,
+    id: DataModel.Id<DataModel_, TableName>,
     value: Document.WithoutSystemFields<Doc>,
   ) => Effect.Effect<void, Document.DocumentEncodeError>;
-  readonly delete: (id: GenericId<TableName>) => Effect.Effect<void>;
+  readonly delete: (
+    id: DataModel.Id<DataModel_, TableName>,
+  ) => Effect.Effect<void>;
 }
 
 /**
@@ -93,13 +100,17 @@ export type DatabaseWriterTag<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
   Docs = {},
 > = Context.Service<
-  DatabaseWriterService<DatabaseSchema_>,
+  DatabaseWriter<DatabaseSchema_>,
   DatabaseWriterService<DatabaseSchema_, Docs>
 >;
 
-export const make = <Model extends GenericDataModel>(
+export const make = <
+  Model extends GenericDataModel,
+  const Scope extends IdScope.IdScope = IdScope.App,
+>(
   convexDatabaseWriter: GenericDatabaseWriter<Model>,
-): DatabaseWriterService<DatabaseSchema.FromConvexDataModel<Model>> => {
+  ..._scope: IdScope.Args<Scope>
+): DatabaseWriterService<DatabaseSchema.FromConvexDataModel<Model, Scope>> => {
   const reader: BaseDatabaseReader<any> = convexDatabaseWriter;
   const table = <TableName extends TableNamesInDataModel<Model>>(
     tableDef: Table.AnyWithProps & { readonly tableName: TableName },
@@ -179,7 +190,7 @@ export const make = <Model extends GenericDataModel>(
 
   return {
     table,
-  } as DatabaseWriterService<DatabaseSchema.FromConvexDataModel<Model>>;
+  } as DatabaseWriterService<DatabaseSchema.FromConvexDataModel<Model, Scope>>;
 };
 
 export const DatabaseWriter = <
@@ -187,17 +198,25 @@ export const DatabaseWriter = <
   Docs = {},
 >(): DatabaseWriterTag<DatabaseSchema_, Docs> =>
   Context.Service<
-    DatabaseWriterService<DatabaseSchema_>,
+    DatabaseWriter<DatabaseSchema_>,
     DatabaseWriterService<DatabaseSchema_, Docs>
   >("@confect/server/DatabaseWriter");
 
 export type DatabaseWriter<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
-> = DatabaseWriterService<DatabaseSchema_>;
+> = [DatabaseSchema_["target"]] extends [DatabaseSchema.AppTarget]
+  ? DatabaseWriterService<DatabaseSchema_>
+  : {
+      readonly "~@confect/server/ScopedDatabaseWriter": Types.Invariant<DatabaseSchema_>;
+    };
 
 export const layer = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
   convexDatabaseWriter: GenericDatabaseWriter<
     DataModel.ToConvexDataModel<DataModel.FromDatabaseSchema<DatabaseSchema_>>
   >,
+  ...scope: IdScope.Args<DatabaseSchema.Scope<DatabaseSchema_>>
 ) =>
-  Layer.succeed(DatabaseWriter<DatabaseSchema_>(), make(convexDatabaseWriter));
+  Layer.succeed(
+    DatabaseWriter<DatabaseSchema_>(),
+    make(convexDatabaseWriter, ...scope),
+  );

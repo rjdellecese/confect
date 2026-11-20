@@ -7,5 +7,6 @@
     "noEmit": true,
     "target": "ESNext"
   },
-  "include": ["src", "fixtures"]
+  "include": ["src", "fixtures"],
+  "exclude": ["fixtures/components/*/convex/_generated"]
 }

@@ -1,5 +1,9 @@
 import * as Record from "effect/Record";
-import { compileTableSchema } from "@confect/core/SchemaToValidator";
+import * as IdScope from "@confect/core/IdScope";
+import {
+  compileTableSchema,
+  type EmittedTableValidator,
+} from "@confect/core/SchemaToValidator";
 import * as Table_ from "@confect/core/Table";
 import * as Schema from "effect/Schema";
 import { defineTable, type TableDefinition } from "convex/server";
@@ -23,6 +27,7 @@ export {
   type VectorIndexes,
   type Doc,
   type Fields,
+  type Scope,
   type WithName,
   type TablesRecord,
 } from "@confect/core/Table";
@@ -41,27 +46,34 @@ const tableDefinitionCache = new WeakMap<
   TableDefinition<any, any, any, any>
 >();
 
+type CompiledTable<Table extends Table_.AnyWithProps> =
+  Table extends Table_.Table<
+    string,
+    infer Fields,
+    any,
+    infer Indexes,
+    infer SearchIndexes,
+    infer VectorIndexes,
+    infer Scope
+  >
+    ? TableDefinition<
+        EmittedTableValidator<Fields, Scope>,
+        Indexes,
+        SearchIndexes,
+        VectorIndexes
+      >
+    : never;
+
 export const tableDefinition = <Table extends Table_.AnyWithProps>(
   table: Table,
-): TableDefinition<
-  Table_.TableValidator<Table>,
-  Table_.Indexes<Table>,
-  Table_.SearchIndexes<Table>,
-  Table_.VectorIndexes<Table>
-> => {
+): CompiledTable<Table> => {
   const cached = tableDefinitionCache.get(table);
   if (cached !== undefined) {
-    return cached as TableDefinition<
-      Table_.TableValidator<Table>,
-      Table_.Indexes<Table>,
-      Table_.SearchIndexes<Table>,
-      Table_.VectorIndexes<Table>
-    >;
+    return cached as CompiledTable<Table>;
   }
 
-  let definition: TableDefinition<any, any, any, any> = table.Fields.pipe(
-    compileTableSchema,
-    defineTable,
+  let definition: TableDefinition<any, any, any, any> = defineTable(
+    compileTableSchema(table.Fields, table.scope),
   );
   for (const [name, indexFields] of Record.toEntries(
     table.indexes as Record<string, any>,
@@ -80,19 +92,14 @@ export const tableDefinition = <Table extends Table_.AnyWithProps>(
   }
 
   tableDefinitionCache.set(table, definition);
-  return definition as TableDefinition<
-    Table_.TableValidator<Table>,
-    Table_.Indexes<Table>,
-    Table_.SearchIndexes<Table>,
-    Table_.VectorIndexes<Table>
-  >;
+  return definition as CompiledTable<Table>;
 };
 
 // -----------------------------------------------------------------------------
 // System tables
 // -----------------------------------------------------------------------------
 
-export const _scheduled_functions = Table_.make(() =>
+const scheduledFunctions = Table_.make(() =>
   Schema.Struct({
     name: Schema.String,
     args: Schema.Array(Schema.Any),
@@ -109,19 +116,31 @@ export const _scheduled_functions = Table_.make(() =>
       Schema.Struct({ kind: Schema.Literal("canceled") }),
     ]),
   }),
-)("_scheduled_functions");
+);
 
-export const _storage = Table_.make(() =>
+const storage = Table_.make(() =>
   Schema.Struct({
     sha256: Schema.String,
     size: Schema.Finite,
     contentType: Schema.optionalKey(Schema.String),
   }),
-)("_storage");
+);
 
-export const systemTables = {
-  _scheduled_functions,
-  _storage,
-} as const;
+/**
+ * In a component, pass `systemTablesForScope(componentScope)._storage` or
+ * `._scheduled_functions` to the database reader. Applications can use the
+ * exported `_storage` and `_scheduled_functions` handles directly.
+ */
+export const systemTablesForScope = <const Scope_ extends IdScope.IdScope>(
+  scope: Scope_,
+) =>
+  ({
+    _scheduled_functions: scheduledFunctions("_scheduled_functions", scope),
+    _storage: storage("_storage", scope),
+  }) as const;
 
-export type SystemTables = typeof _scheduled_functions | typeof _storage;
+export const systemTables = systemTablesForScope(IdScope.app);
+export const { _scheduled_functions, _storage } = systemTables;
+
+export type SystemTables<Scope_ extends IdScope.IdScope = IdScope.App> =
+  ReturnType<typeof systemTablesForScope<Scope_>>[keyof typeof systemTables];

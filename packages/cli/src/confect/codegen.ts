@@ -44,6 +44,7 @@ import { ProjectRoot } from "../ProjectRoot";
 import { assemblyNodesFromLeaves } from "../SpecAssemblyNode";
 import * as TableModule from "../TableModule";
 import * as templates from "../templates";
+import * as DirectoryOptions from "../DirectoryOptions";
 import {
   generateAuthConfig,
   generateCrons,
@@ -96,7 +97,7 @@ const LEGACY_PATHS = Effect.gen(function* () {
 /**
  * @internal
  */
-export const codegen = Command.make("codegen", {}, () =>
+export const codegen = Command.make("codegen", DirectoryOptions.flags, () =>
   Effect.gen(function* () {
     yield* logPending("Performing initial sync…");
     yield* codegenHandler.pipe(
@@ -106,13 +107,19 @@ export const codegen = Command.make("codegen", {}, () =>
     );
   }),
 ).pipe(
+  Command.provide(DirectoryOptions.layer),
   Command.withDescription(
     "Generate `confect/_generated` files and the contents of the `convex` directory (except `convex.config.ts` and `tsconfig.json`)",
   ),
 );
 
 const runCodegen = Effect.gen(function* () {
+  yield* validateComponentConfiguration;
   yield* generateConfectGeneratedDirectory;
+  const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+  const confectDirectory = yield* ConfectDirectory.get;
+  const generated = path.join(confectDirectory, GENERATED_DIRNAME);
   // Reject a legacy `confect/schema.ts` up front so the user-facing
   // migration message surfaces before bundling user code.
   yield* rejectLegacySchemaFile;
@@ -122,6 +129,19 @@ const runCodegen = Effect.gen(function* () {
   // cross-table id refs, so it must exist on disk first.
   const tableModules = yield* TableModule.discover;
   yield* warnIfNoTables(tableModules);
+  const component = (yield* ConvexDirectory.target).kind === "component";
+  const switchingTarget =
+    (yield* fs.exists(path.join(generated, "id.ts"))) &&
+    (yield* fs.exists(path.join(generated, "component.ts"))) !== component;
+  if (switchingTarget) {
+    yield* generateComponents;
+  } else {
+    const registry = path.join(generated, "components.ts");
+    if (!(yield* fs.exists(registry))) {
+      const contents = yield* templates.components({ components: [] });
+      yield* writeFileStringAndLog(registry, contents);
+    }
+  }
   yield* generateTableNamesAndIds(tableModules);
   // Now that `_generated/id.ts` is on disk, bundle each table module and
   // check its default export is an `UnnamedTable`. Surface diagnostics
@@ -141,17 +161,16 @@ const runCodegen = Effect.gen(function* () {
     [
       removeGeneratedApi,
       generateRefs,
+      generateComponentContract(tableModules),
       removeGeneratedNodeApi,
       generateDocs(tableModules),
       generateServices,
       generateServerBuilders,
       generateConvexSchema(tableModules),
-      // Must land before impl validation: impls may import the generated
-      // components registry, so it has to exist when their bundles are built.
-      generateComponents,
     ],
     { concurrency: "unbounded" },
   );
+  if (!switchingTarget) yield* generateComponents;
   yield* validateAllImpls(leaves);
   yield* generateGroupRegisteredFunctions(leaves);
   yield* removeObsoleteRegisteredFunctions(leaves);
@@ -165,9 +184,6 @@ const runCodegen = Effect.gen(function* () {
     ],
     { concurrency: "unbounded" },
   );
-  const fs = yield* FileSystem.FileSystem;
-  const path = yield* Path.Path;
-  const confectDirectory = yield* ConfectDirectory.get;
   const optionalFiles = yield* Effect.filter(
     ["http.ts", "crons.ts", "auth.ts"],
     (file) => fs.exists(path.join(confectDirectory, file)),
@@ -189,6 +205,49 @@ const runCodegen = Effect.gen(function* () {
   };
 });
 
+const validateComponentConfiguration = Effect.gen(function* () {
+  return yield* Match.value((yield* ConvexDirectory.target).kind).pipe(
+    Match.when("app", () => Effect.void),
+    Match.when("component", () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const confectDirectory = yield* ConfectDirectory.get;
+        const authPath = path.join(confectDirectory, "auth.ts");
+        if (yield* fs.exists(authPath)) {
+          return yield* CodegenError.InvalidConvexConfigError.make({
+            configPath: authPath,
+            reason:
+              "Components cannot configure application authentication. Pass identity explicitly through function arguments.",
+          });
+        }
+      }),
+    ),
+    Match.exhaustive,
+  );
+});
+
+const generateComponentContract = Effect.fnUntraced(function* (
+  tables: ReadonlyArray<TableModule.TableModule>,
+) {
+  return yield* Match.value((yield* ConvexDirectory.target).kind).pipe(
+    Match.when("app", () => removeObsoleteGeneratedFile("component.ts")),
+    Match.when("component", () =>
+      Effect.gen(function* () {
+        const path = yield* Path.Path;
+        const directory = yield* ConfectDirectory.get;
+        const contents = yield* templates.componentContract({
+          tableNames: Array.map(tables, (table) => table.tableName),
+        });
+        yield* writeFileStringAndLog(
+          path.join(directory, "_generated", "component.ts"),
+          contents,
+        );
+      }),
+    ),
+    Match.exhaustive,
+  );
+});
 /**
  * @internal
  */
@@ -292,6 +351,7 @@ const generateGroupRegisteredFunctions = Effect.fnUntraced(function* (
 ) {
   const path = yield* Path.Path;
   const confectDirectory = yield* ConfectDirectory.get;
+  const component = (yield* ConvexDirectory.target).kind === "component";
 
   yield* Effect.forEach(
     leaves,
@@ -333,6 +393,14 @@ const generateGroupRegisteredFunctions = Effect.fnUntraced(function* (
       const contents = yield* templates.registeredFunctionsForGroup({
         spec: leaf.spec,
         tableNamesImportPath,
+        targetImportPath: component
+          ? yield* toModuleImportPath(
+              path.relative(
+                registryDir,
+                path.join(confectDirectory, "_generated", "id.ts"),
+              ),
+            )
+          : undefined,
         specImportPath,
         implImportPath,
       });
@@ -536,7 +604,11 @@ const generateTableNamesAndIds = Effect.fnUntraced(function* (
     path.join(confectDirectory, GENERATED_DIRNAME, "tableNames.ts"),
     templates.tableNames(tableNames),
   );
-  yield* writeFileStringAndLog(idPath, templates.id);
+  const target = yield* ConvexDirectory.target;
+  const id = yield* templates.id(
+    target.kind === "component" ? target.scope : undefined,
+  );
+  yield* writeFileStringAndLog(idPath, id);
 });
 
 const generateTableWrappers = Effect.fnUntraced(function* (
@@ -570,6 +642,11 @@ const generateTableWrappers = Effect.fnUntraced(function* (
       const contents = yield* templates.tableWrapper({
         tableName: tableModule.tableName,
         unnamedImportPath,
+        component: Match.value((yield* ConvexDirectory.target).kind).pipe(
+          Match.when("app", () => false),
+          Match.when("component", () => true),
+          Match.exhaustive,
+        ),
       });
       yield* writeFileStringAndLog(wrapperPath, contents);
     }),
@@ -629,7 +706,14 @@ const generateRuntimeSchema = Effect.fnUntraced(function* (
   const schemaPath = path.join(confectDirectory, generatedSchemaPath);
 
   const bindings = yield* tableModuleBindings(tableModules, schemaPath);
-  const contents = yield* templates.runtimeSchema({ tableModules: bindings });
+  const contents = yield* templates.runtimeSchema({
+    tableModules: bindings,
+    component: Match.value((yield* ConvexDirectory.target).kind).pipe(
+      Match.when("app", () => false),
+      Match.when("component", () => true),
+      Match.exhaustive,
+    ),
+  });
 
   yield* writeFileStringAndLog(schemaPath, contents);
 });
@@ -691,6 +775,11 @@ const generateServices = Effect.gen(function* () {
 
   const servicesContentsString = yield* templates.services({
     schemaImportPath,
+    component: Match.value((yield* ConvexDirectory.target).kind).pipe(
+      Match.when("app", () => false),
+      Match.when("component", () => true),
+      Match.exhaustive,
+    ),
   });
 
   yield* writeFileStringAndLog(servicesPath, servicesContentsString);
@@ -781,9 +870,10 @@ const generateRefs = Effect.gen(function* () {
 /**
  * Generate `confect/_generated/components.ts`—the typed registry of Convex
  * components installed in `convex/convex.config.ts` (see
- * {@link templates.components}). The file is emitted even when there is no
- * `convex.config.ts` (as an empty registry) so the import surface stays stable.
- * It must exist before impl validation because impl modules may import it.
+ * {@link templates.components}). An application without `convex.config.ts` gets
+ * an empty registry; an authored component must have a definition. Tables and
+ * specs only need the registry's runtime proxy while they load; its
+ * installation types may depend on config imports of their generated modules.
  *
  * @internal
  */
@@ -806,10 +896,19 @@ export const generateComponents = Effect.gen(function* () {
     ConvexConfig.CONVEX_CONFIG_FILENAME,
   );
 
-  const installedComponents = (yield* fs.exists(convexConfigPath))
+  const kind = (yield* ConvexDirectory.target).kind;
+  const hasConfig = yield* fs.exists(convexConfigPath);
+  if (!hasConfig && kind === "component") {
+    return yield* CodegenError.InvalidConvexConfigError.make({
+      configPath: path.relative(projectRoot, convexConfigPath),
+      reason: "a component definition is required for --component-dir.",
+    });
+  }
+  const installedComponents = hasConfig
     ? yield* ConvexConfig.discoverInstalledComponents(
         convexConfigPath,
         path.relative(projectRoot, convexConfigPath),
+        kind,
       )
     : [];
 
@@ -839,6 +938,7 @@ const logGenerated = (effect: typeof generateHttp) =>
           Match.value(change).pipe(
             Match.when("Added", () => logFileAdded(convexFilePath)),
             Match.when("Modified", () => logFileModified(convexFilePath)),
+            Match.when("Removed", () => logFileRemoved(convexFilePath)),
             Match.when("Unchanged", () => Effect.void),
             Match.exhaustive,
           ),

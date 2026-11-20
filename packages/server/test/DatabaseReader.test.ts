@@ -1,3 +1,5 @@
+import type { GenericId as ScopedId } from "@confect/core/GenericId";
+import * as IdScope from "@confect/core/IdScope";
 import * as DatabaseReader from "@confect/server/DatabaseReader";
 import * as DatabaseSchema from "@confect/server/DatabaseSchema";
 import type * as DataModel from "@confect/server/DataModel";
@@ -98,6 +100,53 @@ it("infers named documents, indexes and IDs only for app and system handles", ()
     }
     // @ts-expect-error A note ID is not a user ID.
     expectTypeOf(reader.table(users).get(noteId));
+  };
+  expectTypeOf(check).toBeFunction();
+});
+
+it("reads scoped system handles without accepting another namespace's handle or ID", () => {
+  const scope = IdScope.component("notes");
+  const sibling = IdScope.component("other");
+  const component = DatabaseSchema.make({}, { kind: "component", scope });
+  const app = DatabaseSchema.make({});
+  expectTypeOf<DatabaseReader.DatabaseReader<typeof app>>().not.toExtend<
+    DatabaseReader.DatabaseReader<typeof component>
+  >();
+  expectTypeOf<
+    DatabaseReader.DatabaseReader<DatabaseSchema.AnyWithProps>
+  >().not.toExtend<DatabaseReader.DatabaseReader<typeof component>>();
+  const { _storage, _scheduled_functions } = Table.systemTablesForScope(scope);
+  const check = (
+    reader: DatabaseReader.DatabaseReaderService<typeof component>,
+    native: GenericDatabaseReader<{}>,
+    storageId: ScopedId<"_storage", typeof scope>,
+    scheduledId: ScopedId<"_scheduled_functions", typeof scope>,
+    appStorageId: GenericId<"_storage">,
+  ) => {
+    const stored = reader.table(_storage).get(storageId);
+    expectTypeOf<Effect.Success<typeof stored>["_id"]>().toEqualTypeOf<
+      typeof storageId
+    >();
+    const scheduled = reader.table(_scheduled_functions).get(scheduledId);
+    expectTypeOf<Effect.Success<typeof scheduled>["_id"]>().toEqualTypeOf<
+      typeof scheduledId
+    >();
+    expectTypeOf(Table._storage).not.toExtend<
+      Parameters<typeof reader.table>[0]
+    >();
+    expectTypeOf(Table.systemTablesForScope(sibling)._storage).not.toExtend<
+      Parameters<typeof reader.table>[0]
+    >();
+    // @ts-expect-error An app storage ID does not identify a component file.
+    expectTypeOf(reader.table(_storage).get(appStorageId));
+    const scoped = DatabaseReader.make(native, scope);
+    expectTypeOf(scoped.table(_storage).get(storageId)).toEqualTypeOf<
+      typeof stored
+    >();
+    // @ts-expect-error A native adapter defaults to the app namespace.
+    DatabaseReader.make(native).table(_storage);
+    // @ts-expect-error A component layer must supply its scope, even without application tables.
+    DatabaseReader.layer<typeof component>(native);
   };
   expectTypeOf(check).toBeFunction();
 });

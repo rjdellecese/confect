@@ -1,3 +1,4 @@
+import type * as DatabaseSchema from "./DatabaseSchema";
 import type * as Layer from "effect/Layer";
 import * as Match from "effect/Match";
 import * as Record from "effect/Record";
@@ -61,6 +62,7 @@ export const register = <Group extends GroupSpec.AnyWithProps>(
 export const buildForGroup = <Group extends GroupSpec.AnyWithProps>(
   tableNames: ReadonlyArray<string>,
   groupLayer: Layer.Layer<GroupImpl.GroupImpl<"Finalized">>,
+  target?: DatabaseSchema.Target,
 ): ForGroup<Group> => {
   const { functionRegistryItems, middlewareRegistryItems } =
     GroupRegistry.make(groupLayer);
@@ -82,6 +84,7 @@ export const buildForGroup = <Group extends GroupSpec.AnyWithProps>(
             tableNames,
             confect,
             ResolvedMiddleware.resolve(confect, middlewareRegistryItems),
+            target,
           ),
         ),
         Match.exhaustive,

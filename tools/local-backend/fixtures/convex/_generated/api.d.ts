@@ -81,6 +81,63 @@ export declare const api: {
       confectWithSnapshot: FunctionReference<"query", "public", {}, bigint>;
       confectWithSpan: FunctionReference<"query", "public", {}, number>;
     };
+    components: {
+      exercise: FunctionReference<
+        "mutation",
+        "public",
+        { run: string },
+        {
+          first: Array<number>;
+          left: Array<number>;
+          rejectedId: string;
+          right: Array<number>;
+          second: Array<number>;
+        }
+      >;
+      hasAuth: FunctionReference<"query", "public", {}, boolean>;
+      list: FunctionReference<
+        "query",
+        "public",
+        { run: string },
+        { first: Array<number>; second: Array<number> }
+      >;
+      paginate: FunctionReference<
+        "query",
+        "public",
+        {
+          paginationOpts: {
+            cursor: string | null;
+            endCursor?: string | null;
+            id?: number;
+            maximumBytesRead?: number;
+            maximumRowsRead?: number;
+            numItems: number;
+          };
+          run: string;
+        },
+        {
+          continueCursor: string;
+          isDone: boolean;
+          page: Array<{ count: number; id: string }>;
+          pageStatus?: "SplitRecommended" | "SplitRequired" | null;
+          splitCursor?: string | null;
+        }
+      >;
+      schedule: FunctionReference<
+        "mutation",
+        "public",
+        { run: string },
+        string
+      >;
+      seedPagination: FunctionReference<
+        "mutation",
+        "public",
+        { run: string },
+        { first: Array<string> }
+      >;
+      storageUrl: FunctionReference<"query", "public", { id: string }, string>;
+      uploadUrl: FunctionReference<"mutation", "public", {}, string>;
+    };
     contextReuse: {
       read: FunctionReference<
         "query",
@@ -202,6 +259,53 @@ export declare const api: {
           snapshotTs: bigint;
         }
       >;
+    };
+    nativeComponents: {
+      paginate: FunctionReference<
+        "query",
+        "public",
+        {
+          paginationOpts: {
+            cursor: string | null;
+            endCursor?: string | null;
+            id?: number;
+            maximumBytesRead?: number;
+            maximumRowsRead?: number;
+            numItems: number;
+          };
+          run: string;
+          second: boolean;
+        },
+        {
+          continueCursor: string;
+          isDone: boolean;
+          page: Array<{
+            _creationTime: number;
+            _id: string;
+            count: string;
+            run: string;
+          }>;
+          pageStatus?: "SplitRecommended" | "SplitRequired" | null;
+          splitCursor?: string | null;
+        }
+      >;
+      paginateTwice: FunctionReference<
+        "query",
+        "public",
+        {
+          paginationOpts: {
+            cursor: string | null;
+            endCursor?: string | null;
+            id?: number;
+            maximumBytesRead?: number;
+            maximumRowsRead?: number;
+            numItems: number;
+          };
+          run: string;
+        },
+        any
+      >;
+      roundTrip: FunctionReference<"mutation", "public", { run: string }, any>;
     };
     scheduling: {
       manyOpsMutation: FunctionReference<"mutation", "public", {}, number>;
@@ -417,4 +521,9 @@ export declare const internal: {
   };
 };
 
-export declare const components: {};
+export declare const components: {
+  first: import("../../components/counter/convex/_generated/component.js").ComponentApi<"first">;
+  second: import("../../components/counter/convex/_generated/component.js").ComponentApi<"second">;
+  left: import("../../components/parent/convex/_generated/component.js").ComponentApi<"left">;
+  right: import("../../components/parent/convex/_generated/component.js").ComponentApi<"right">;
+};
