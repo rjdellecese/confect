@@ -2,6 +2,7 @@ import * as Record from "effect/Record";
 import type {
   GenericDatabaseReader,
   GenericDataModel,
+  GenericDocument,
   SystemDataModel,
 } from "convex/server";
 import * as Context from "effect/Context";
@@ -75,7 +76,13 @@ type NativeTable<
   Model extends GenericDataModel,
   Table_ extends Table.AnyWithProps,
 > = Table_ extends { readonly tableName: infer Name extends keyof Model }
-  ? Table_ & {
+  ? (GenericDocument extends Model[Name]["document"]
+      ? Table_
+      : Model[Name]["document"] extends TableInfo<Table_>[
+            | "convexDocument"
+            | "encodedDocument"]
+        ? Table_
+        : never) & {
       readonly [K in "indexes" | "searchIndexes"]: {
         [Index in keyof Table_[K]]: Index extends keyof Model[Name][K]
           ? Model[Name][K][Index]
