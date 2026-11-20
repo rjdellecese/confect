@@ -1,5 +1,12 @@
 # @confect/js
 
+## 11.0.0
+
+### Patch Changes
+
+- Updated dependencies [4aa2d12]
+  - @confect/core@11.0.0
+
 ## 10.6.0
 
 ### Minor Changes
