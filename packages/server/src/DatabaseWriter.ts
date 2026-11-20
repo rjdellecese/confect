@@ -2,17 +2,19 @@ import type {
   DocumentByName,
   GenericDatabaseWriter,
   GenericDataModel,
+  GenericDocument,
   TableNamesInDataModel,
   WithOptionalSystemFields,
   WithoutSystemFields,
 } from "convex/server";
 import type { GenericId } from "convex/values";
-import type { BaseDatabaseReader, DeepMutable } from "@confect/core/Types";
+import type { BaseDatabaseReader, IsOptional } from "@confect/core/Types";
 import { pipe } from "effect/Function";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Record from "effect/Record";
+import type * as Schema from "effect/Schema";
 import type * as DatabaseSchema from "./DatabaseSchema";
 import type * as DataModel from "./DataModel";
 import type { DocumentByName as DocumentByName_ } from "./DataModel";
@@ -55,19 +57,6 @@ export interface DatabaseWriterTableAccessor<
   readonly delete: (id: GenericId<TableName>) => Effect.Effect<void>;
 }
 
-type TableWriter<
-  Table_ extends Table.AnyWithProps,
-  Docs,
-> = Table_ extends unknown
-  ? DatabaseWriterTableAccessor<
-      DataModel.FromTables<Table_>,
-      Table.Name<Table_>,
-      Table.Name<Table_> extends keyof Docs
-        ? Docs[Table.Name<Table_>]
-        : DocumentByName_<DataModel.FromTables<Table_>, Table.Name<Table_>>
-    >
-  : never;
-
 /**
  * The service shape backing the `DatabaseWriter` tag. Named (rather than an
  * inferred anonymous object) so declaration emit prints
@@ -86,33 +75,42 @@ export interface DatabaseWriterService<
         DatabaseSchema.SystemTableNames
       >;
     },
-  ) => TableWriter<Table_, Docs>;
+  ) => Table_ extends unknown
+    ? DatabaseWriterTableAccessor<
+        DataModel.FromTables<Table_>,
+        Table.Name<Table_>,
+        Table.Name<Table_> extends keyof Docs
+          ? Docs[Table.Name<Table_>]
+          : DocumentByName_<DataModel.FromTables<Table_>, Table.Name<Table_>>
+      >
+    : never;
 }
 
-type NativeTable<
-  Model extends GenericDataModel,
-  Table_ extends Table.AnyWithProps,
-> = Table_ extends {
-  readonly tableName: infer Name extends TableNamesInDataModel<Model>;
-}
-  ? DeepMutable<Table.Fields<Table_>["Encoded"]> extends WithoutSystemFields<
-      DocumentByName<Model, Name>
-    >
-    ? Table_ & {
-        readonly tableName: Exclude<Name, DatabaseSchema.SystemTableNames>;
-      }
-    : never
-  : never;
+type EncodedInput<T> = T extends string | ArrayBuffer
+  ? T
+  : {
+      readonly [K in keyof T]: IsOptional<T, K> extends true
+        ? EncodedInput<T[K]> | undefined
+        : EncodedInput<T[K]>;
+    };
 
-export interface NativeWriter<Model extends GenericDataModel> {
-  readonly table: <
-    Table_ extends DatabaseSchema.Tables<
-      DatabaseSchema.FromConvexDataModel<Model>
-    >,
-  >(
-    table: Table_ & NativeTable<Model, Table_>,
-  ) => TableWriter<Table_, {}>;
-}
+export type NativeWriter<Model extends GenericDataModel> =
+  DatabaseWriterService<
+    DatabaseSchema.DatabaseSchema<{
+      readonly [Name in TableNamesInDataModel<Model>]: Omit<
+        Table.AnyWithProps,
+        "tableName" | "Fields"
+      > & {
+        readonly tableName: Name;
+        readonly Fields: Schema.Codec<
+          unknown,
+          GenericDocument extends Model[Name]["document"]
+            ? unknown
+            : EncodedInput<WithoutSystemFields<Model[Name]["document"]>>
+        >;
+      };
+    }>
+  >;
 
 /**
  * The tag's _Identifier_ is `Docs`-independent (see `DatabaseReaderTag`); only
@@ -230,7 +228,4 @@ export const layer = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
     DataModel.ToConvexDataModel<DataModel.FromDatabaseSchema<DatabaseSchema_>>
   >,
 ) =>
-  Layer.succeed(
-    DatabaseWriter<DatabaseSchema_>(),
-    make(convexDatabaseWriter) as DatabaseWriterService<DatabaseSchema_>,
-  );
+  Layer.succeed(DatabaseWriter<DatabaseSchema_>(), make(convexDatabaseWriter));

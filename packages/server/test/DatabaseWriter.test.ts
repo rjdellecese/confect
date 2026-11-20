@@ -81,6 +81,16 @@ it("accepts only documents and IDs for the selected application handle", () => {
     expectTypeOf(foreign).not.toExtend<Parameters<typeof writer.table>[0]>();
     expectTypeOf<"notes">().not.toExtend<Parameters<typeof writer.table>[0]>();
     const raw = DatabaseWriter.make(native);
+    expectTypeOf(raw).toExtend<
+      DatabaseWriter.DatabaseWriterService<typeof schema>
+    >();
+    const selectNote = <T extends typeof notes>(table: T) => raw.table(table);
+    expectTypeOf(selectNote(notes).insert({ score: 42 })).toBeObject();
+    const uncertain = Table.make(() => Schema.Struct({ score: Schema.String }))(
+      selected.tableName,
+    );
+    // @ts-expect-error The selected table may require a user name rather than a score.
+    raw.table(uncertain);
     expectTypeOf(foreign).not.toExtend<Parameters<typeof raw.table>[0]>();
     const incompatible = Table.make(() =>
       Schema.Struct({ field: Schema.String }),
