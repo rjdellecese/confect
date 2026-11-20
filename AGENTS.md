@@ -31,10 +31,13 @@ Confect is a library that integrates Effect with the Convex backend platform. It
 - `@confect/core` - Shared specs, schemas, and types (no workspace deps)
 - `@confect/server` - Backend bindings to Convex (depends on core)
 - `@confect/js` - Runtime-agnostic JavaScript client (depends on core)
+- `@confect/platform` - Effect clients for the Convex management and deployment APIs (no workspace deps)
 - `@confect/foldkit` - Client-side bindings for Foldkit apps (depends on core, js)
 - `@confect/react` - Client-side React hooks (depends on core)
 - `@confect/cli` - CLI tooling for codegen and dev-mode watching (depends on core, server)
 - `@confect/test` - Testing utilities via convex-test (depends on core, server)
+
+`@confect/platform` pins the Convex Platform SDK because it validates responses against that release's OpenAPI documents. When upgrading it, review changes to operations, success schemas, and documented error statuses. Update the upstream commit and document hashes in `scripts/platformResponseSchemas.mjs`, regenerate with `bun scripts/platformResponseSchemas.mjs`, and use `--check` to verify the checked-in schemas. Both commands fetch the pinned documents from GitHub; builds and tests use the checked-in schemas. Do not infer new error variants from examples of unversioned server responses.
 
 ## Apps
 
