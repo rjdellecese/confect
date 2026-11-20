@@ -8,6 +8,7 @@
     { "path": "packages/platform/tsconfig.src.json" },
     { "path": "packages/foldkit/tsconfig.src.json" },
     { "path": "packages/react/tsconfig.src.json" },
-    { "path": "packages/test/tsconfig.src.json" }
+    { "path": "packages/test/tsconfig.src.json" },
+    { "path": "packages/alchemy/tsconfig.src.json" }
   ]
 }

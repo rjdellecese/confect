@@ -1,0 +1,198 @@
+---
+icon: "cloud-upload"
+title: "Deploy with Alchemy"
+description: "Provision Convex cloud resources and deploy a Confect backend as part of an Alchemy stack."
+---
+
+`@confect/alchemy` integrates Convex cloud deployments with [Alchemy](https://alchemy.run). Use `Convex` resources for plain Convex applications, or `Confect.Backend` to run Confect codegen before pushing your backend. Your existing tables, specs, impls, and client code do not change.
+
+This integration supports Alchemy `2.0.0-beta.85` and Effect v4.1 or later. It does not start a local Convex backend or infer infrastructure from your function implementations. Resources remain cloud-backed when used with `alchemy dev`.
+
+## Install
+
+Install the integration and Alchemy in the workspace that contains your stack:
+
+```sh
+pnpm add -D @confect/alchemy alchemy@2.0.0-beta.85 effect@^4.1.0 @effect/platform-node@^4.1.0
+```
+
+The Node.js CLI loads `@effect/platform-node` from the stack workspace. Use Node.js 24.11.1 or later on 24.x, or Node.js 25.1.0 or later. The backend workspace must also have `convex` and, for `Confect.Backend`, `@confect/cli` installed. Deployment uses these installed binaries; it does not download a CLI.
+
+## Deploy to an existing backend
+
+Set `CONVEX_DEPLOY_KEY` in your shell or CI secret store to a deployment-specific key. Do not use a project-level preview key: the deployment must already exist.
+
+Create `alchemy.run.ts`:
+
+```ts
+import { Confect, Convex } from "@confect/alchemy";
+import * as Alchemy from "alchemy";
+import * as Config from "effect/Config";
+import * as Effect from "effect/Effect";
+
+export default Alchemy.Stack(
+  "Notes",
+  {
+    providers: Convex.providers(),
+    state: Alchemy.localState(),
+  },
+  Effect.gen(function* () {
+    const backend = yield* Confect.Backend("Backend", {
+      deployment: {
+        name: "happy-animal-123",
+        url: "https://happy-animal-123.convex.cloud",
+      },
+      deployKey: yield* Config.Redacted("CONVEX_DEPLOY_KEY"),
+      cwd: "apps/backend",
+    });
+
+    return { url: backend.url };
+  }),
+);
+```
+
+Replace the name, URL, and working directory with your deployment's values. Regional Convex cloud URLs are supported. This stack does not take ownership of the existing project or deployment, and it does not require a management token.
+
+Run the stack from the directory containing `alchemy.run.ts`:
+
+```sh
+pnpm alchemy deploy
+```
+
+`Confect.Backend` runs `confect codegen`, then `convex deploy`. A codegen failure prevents the push. The deploy key selects the target explicitly, independently of the backend directory's environment files.
+
+<Warning>
+  You can load deploy keys and environment values from a CI secret store or an
+  [Alchemy secret provider](https://alchemy.run/environments/secret-providers/).
+  When you pass them to a resource, Alchemy can persist their values in state.
+  `Redacted` hides values in logs; it does not encrypt local state.
+
+Keep `.alchemy/` out of Git and never return credentials as stack outputs.
+For shared deployments, use an access-controlled, encrypted
+[state backend](https://alchemy.run/state-store/) and protect its backups.
+
+</Warning>
+
+## Provision a project and deployment
+
+To manage infrastructure too, set `CONVEX_ACCESS_TOKEN` to a team access token and `CONVEX_TEAM_ID` to your team ID. Convex recommends a service account for long-lived automation; see [Platform APIs](https://docs.convex.dev/platform-apis).
+
+Replace the stack body with:
+
+```ts
+Effect.gen(function* () {
+  const project = yield* Convex.Project("Project", {
+    teamId: yield* Config.Number("CONVEX_TEAM_ID"),
+    name: "notes-production",
+  });
+
+  const deployment = yield* Convex.Deployment("Deployment", {
+    projectId: project.projectId,
+    type: "prod",
+    reference: "notes-production",
+  });
+
+  const key = yield* Convex.DeployKey("DeployKey", {
+    deploymentName: deployment.name,
+    allowedActions: ["deployment:deploy", "deployment:env:write"],
+  });
+
+  const token = yield* Convex.AuthoritativeEnvironmentVariable("ServiceToken", {
+    deployment,
+    deployKey: key.deployKey,
+    name: "SERVICE_TOKEN",
+    value: yield* Config.Redacted("SERVICE_TOKEN"),
+  });
+
+  const backend = yield* Confect.Backend("Backend", {
+    deployment: { name: deployment.name, url: token.url },
+    deployKey: key.deployKey,
+    cwd: "apps/backend",
+  });
+
+  return { url: backend.url };
+});
+```
+
+Using `token.url` makes the code push wait for the variable write. Pass `backend.url` to your frontend resource's build environment, such as `VITE_CONVEX_URL`, to make the frontend wait for the backend. Never pass the deploy key to the frontend.
+
+Pass resource outputs such as `deployment.name` directly to other resources. If a field comes from an ordinary Effect, `yield*` it in the stack first; Alchemy does not run a bare Effect nested inside a props object. For a lookup that must run at plan time and cannot fail, use `Output.fromEffect` from `alchemy/Output`.
+
+One stack should own each project and deployment. For a project shared by several stages, pass its project ID to each stage's deployment rather than declaring the same project in every stage. Deployment references must be unique within the project.
+
+## Choose who owns an environment value
+
+**To create or overwrite a name**, use `Convex.AuthoritativeEnvironmentVariable`, as above. Each deploy writes the declared value to that one name, even if it already holds a write-only secret. The resource needs `deployment:env:write`, but not `deployment:env:view` or `--adopt`. It never reads or restores the old value. Passing a `Redacted` value does **not** make the variable write-only in Convex.
+
+Removing the resource leaves the value in Convex. To unset it instead, apply `RemovalPolicy.destroy()` to the declaration. Don't let another resource or stack manage the same name: Convex does not offer a conditional environment write.
+
+**To borrow and later restore existing values**, use `Confect.Backend`'s `env` map or a standalone `Convex.EnvironmentVariables`. The deploy key needs both `deployment:env:view` and `deployment:env:write`. For example, if `PUBLIC_ORIGIN` already exists and is readable, authorize adoption on this declaration:
+
+```ts
+import { adopt } from "alchemy/AdoptPolicy";
+
+Effect.gen(function* () {
+  return yield* Confect.Backend("Backend", {
+    deployment,
+    deployKey: key.deployKey,
+    env: { PUBLIC_ORIGIN: "https://example.com" },
+  }).pipe(adopt(true));
+});
+```
+
+The map restores the original values when you release them. To adopt another readable name after the first deploy, use a separate `Convex.EnvironmentVariables` declaration; adoption applies to a new resource, not to names added to a resource the stack already owns.
+
+If a requested or previously managed name is missing from the [Convex list API](https://docs.convex.dev/deployment-api/list-environment-variables), it may be absent or it may be a hidden secret. The map refuses the entire batch, even with `adopt(true)` or `--adopt`. Use the per-name writer when you intend to overwrite either way.
+
+## Use plain Convex
+
+`Convex.Code` runs the Convex deploy command without Confect codegen:
+
+```ts
+Effect.gen(function* () {
+  const code = yield* Convex.Code("Backend", {
+    deployment,
+    deployKey: key.deployKey,
+    cwd: "apps/backend",
+  });
+
+  return { url: code.url };
+});
+```
+
+To run a command before the push, pass `prepare` to `Convex.Code`. Give a reusable command the type `Convex.PrepareCommand` (also exported from `@confect/alchemy/Code`):
+
+```ts
+import type { Convex } from "@confect/alchemy";
+
+const prepare = {
+  command: "node",
+  args: ["scripts/generate.mjs"],
+} satisfies Convex.PrepareCommand;
+```
+
+You can also declare `Convex.EnvironmentVariables` separately. A standalone code resource must depend on its outputs if those variables need to be applied first; declaring resources in source order alone does not establish a dependency. `Confect.Backend` handles this ordering for its `env` option.
+
+## Understand updates and deletion
+
+Code is pushed on every Alchemy deployment, including when resource props have not changed. This deliberately catches source-only edits, workspace dependency changes, and out-of-band code pushes without relying on an incomplete file hash. Convex still performs its normal validation and deployment checks. Removing `Code` or `Backend` does not erase deployed functions or data.
+
+`alchemy drift` skips code and authoritative environment variables: the providers cannot verify the deployed code or a write-only value. Run `alchemy deploy` to reapply both.
+
+Projects and deployments **retain their cloud objects by default** when removed or destroyed. Alchemy drops the state entry, so managing a retained object again requires explicit adoption. To authorize deletion, use Alchemy's `RemovalPolicy.destroy()` on the resource. Deleting a project also deletes its deployments and data, even if an individual deployment was retained. Back up data before opting into deletion.
+
+The provider refuses project-team changes and deployment identity changes that could move or replace data. Create a separate resource and plan a migration instead. Existing resources found by name or reference require explicit Alchemy adoption; ambiguous matches fail. Project discovery stops at the second project with the same team and name: `AmbiguousProject.projectIds` identifies those two matches, not every project with that name.
+
+If your deployment uses variables named both `Type` and `FQN`, put them in separate `Convex.EnvironmentVariables` resources. Alchemy interprets a map with both keys as a resource reference. The map also rejects `__proto__`, `__redacted__`, `__date__`, and `__bytes__` because Alchemy cannot reliably preserve those keys in state. For one of those names, manage it directly in Convex or use `Convex.AuthoritativeEnvironmentVariable` if you intend to overwrite it without restoring the old value.
+
+Set `env: {}` to release all adopted variables and restore their original values before the next code push. Removing the `env` option removes the environment resource instead, so its cleanup follows Alchemy's resource-deletion ordering.
+
+If the deployed `convex.config.ts` declares a variable as required, drop the requirement in a code deployment before unsetting that variable. Otherwise Convex rejects the unset.
+
+Deploy-key secrets are only available when created. If deployment stops with `DeployKeyRecoveryRequired`, use its `reason` and matching `keyIds` to decide what to do. For `"missing saved secret"`, restore protected state; for `"key not found"`, verify the deployment and key ID before provisioning a replacement. If `reason` is `"issuance uncertain"`, inspect the deployment's keys before creating another: Convex may have issued one even though its response was lost. The resource never silently rotates the credential. Deploy keys are revoked when their resource is destroyed.
+
+## Troubleshoot a failed push
+
+Command failures identify the phase and exit status. Child-process output is suppressed to avoid exposing credentials through CLI diagnostics. Run `confect codegen` or the Convex deploy command directly in a trusted terminal to inspect the underlying error. Keep deploy keys out of command arguments and terminal recordings.
+
+The integration does not bypass Convex's schema checks or large-index safeguards. Code and environment updates are separate operations, not a transaction: an environment update may have succeeded even if the subsequent code push fails.
