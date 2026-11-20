@@ -102,6 +102,14 @@ it("accepts only documents and IDs for the selected application handle", () => {
     );
     // @ts-expect-error The deployed score is a string, not the decoded number.
     raw.table(numeric);
+    const maybeAlias = Table.make(() =>
+      Schema.Struct({
+        score: Schema.String,
+        aliases: Schema.String.pipe(Schema.UndefinedOr, Schema.Array),
+      }),
+    )("notes");
+    // @ts-expect-error Optional fields can be omitted, but array elements cannot be undefined.
+    raw.table(maybeAlias);
     const literal = Table.make(() =>
       Schema.Struct({ score: Schema.Literal("42") }),
     )("notes");

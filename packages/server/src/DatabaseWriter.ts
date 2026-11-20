@@ -88,11 +88,13 @@ export interface DatabaseWriterService<
 
 type EncodedInput<T> = T extends string | ArrayBuffer
   ? T
-  : {
-      readonly [K in keyof T]: IsOptional<T, K> extends true
-        ? EncodedInput<T[K]> | undefined
-        : EncodedInput<T[K]>;
-    };
+  : T extends readonly unknown[]
+    ? { readonly [K in keyof T]: EncodedInput<T[K]> }
+    : {
+        readonly [K in keyof T]: IsOptional<T, K> extends true
+          ? EncodedInput<T[K]> | undefined
+          : EncodedInput<T[K]>;
+      };
 
 export type NativeWriter<Model extends GenericDataModel> =
   DatabaseWriterService<
