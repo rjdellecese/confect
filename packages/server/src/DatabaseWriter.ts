@@ -2,17 +2,19 @@ import type {
   DocumentByName,
   GenericDatabaseWriter,
   GenericDataModel,
+  GenericDocument,
   TableNamesInDataModel,
   WithOptionalSystemFields,
   WithoutSystemFields,
 } from "convex/server";
 import type { GenericId } from "convex/values";
-import type { BaseDatabaseReader } from "@confect/core/Types";
+import type { BaseDatabaseReader, IsOptional } from "@confect/core/Types";
 import { pipe } from "effect/Function";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Record from "effect/Record";
+import type * as Schema from "effect/Schema";
 import type * as DatabaseSchema from "./DatabaseSchema";
 import type * as DataModel from "./DataModel";
 import type { DocumentByName as DocumentByName_ } from "./DataModel";
@@ -84,6 +86,34 @@ export interface DatabaseWriterService<
     : never;
 }
 
+type EncodedInput<T> = T extends string | ArrayBuffer
+  ? T
+  : T extends readonly unknown[]
+    ? { readonly [K in keyof T]: EncodedInput<T[K]> }
+    : {
+        readonly [K in keyof T]: IsOptional<T, K> extends true
+          ? EncodedInput<T[K]> | undefined
+          : EncodedInput<T[K]>;
+      };
+
+export type NativeWriter<Model extends GenericDataModel> =
+  DatabaseWriterService<
+    DatabaseSchema.DatabaseSchema<{
+      readonly [Name in TableNamesInDataModel<Model>]: Omit<
+        Table.AnyWithProps,
+        "tableName" | "Fields"
+      > & {
+        readonly tableName: Name;
+        readonly Fields: Schema.Codec<
+          unknown,
+          GenericDocument extends Model[Name]["document"]
+            ? unknown
+            : EncodedInput<WithoutSystemFields<Model[Name]["document"]>>
+        >;
+      };
+    }>
+  >;
+
 /**
  * The tag's _Identifier_ is `Docs`-independent (see `DatabaseReaderTag`); only
  * the _Service_ carries `Docs` so writer inputs print the named doc
@@ -99,7 +129,7 @@ export type DatabaseWriterTag<
 
 export const make = <Model extends GenericDataModel>(
   convexDatabaseWriter: GenericDatabaseWriter<Model>,
-): DatabaseWriterService<DatabaseSchema.FromConvexDataModel<Model>> => {
+): NativeWriter<Model> => {
   const reader: BaseDatabaseReader<any> = convexDatabaseWriter;
   const table = <TableName extends TableNamesInDataModel<Model>>(
     tableDef: Table.AnyWithProps & { readonly tableName: TableName },
@@ -179,7 +209,7 @@ export const make = <Model extends GenericDataModel>(
 
   return {
     table,
-  } as DatabaseWriterService<DatabaseSchema.FromConvexDataModel<Model>>;
+  } as NativeWriter<Model>;
 };
 
 export const DatabaseWriter = <

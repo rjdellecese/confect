@@ -5,7 +5,7 @@ import type * as Document from "@confect/server/Document";
 import type * as QueryStreamKeyLabels from "@confect/server/QueryStreamKeyLabels";
 import * as Table from "@confect/server/Table";
 import { expect, expectTypeOf, it } from "@effect/vitest";
-import type { GenericDatabaseReader } from "convex/server";
+import type { GenericDatabaseReader, GenericDataModel } from "convex/server";
 import type { GenericId } from "convex/values";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
@@ -14,7 +14,10 @@ import type * as Types from "effect/Types";
 import { vi } from "vitest";
 
 const notes = Table.make(() =>
-  Schema.Struct({ score: Schema.FiniteFromString }),
+  Schema.Struct({
+    score: Schema.FiniteFromString,
+    aliases: Schema.optional(Schema.Tuple([Schema.String, Schema.String])),
+  }),
 ).index("by_score", ["score"])("notes");
 const users = Table.make(() => Schema.Struct({ name: Schema.String }))("users");
 const schema = DatabaseSchema.make({ notes, users });
@@ -63,6 +66,7 @@ it("infers named documents, indexes and IDs only for app and system handles", ()
       { notes: NoteDoc }
     >,
     native: NativeReader,
+    untyped: GenericDatabaseReader<GenericDataModel>,
     selected: typeof notes | typeof users,
   ) => {
     const read = reader
@@ -88,6 +92,21 @@ it("infers named documents, indexes and IDs only for app and system handles", ()
     expectTypeOf<"notes">().not.toExtend<Parameters<typeof reader.table>[0]>();
     const raw = DatabaseReader.make(native);
     expectTypeOf(foreign).not.toExtend<Parameters<typeof raw.table>[0]>();
+    // @ts-expect-error The deployed notes do not have the handle's required field.
+    raw.table(incompatible);
+    const numeric = Table.make(() => Schema.Struct({ score: Schema.Finite }))(
+      "notes",
+    );
+    // @ts-expect-error The native score is a string, not the decoded number.
+    raw.table(numeric);
+    const optional = Table.make(() =>
+      Schema.Struct({ score: Schema.optionalKey(Schema.String) }),
+    )("notes");
+    expectTypeOf(raw.table(optional).get(noteId)).toBeObject();
+    expectTypeOf(raw.table(selected).index("by_creation_time")).toBeObject();
+    expectTypeOf(
+      DatabaseReader.make(untyped).table(notes).get(noteId),
+    ).toBeObject();
     // @ts-expect-error The users table has no score index.
     reader.table(users).index("by_score");
     // @ts-expect-error The selected table may be users.

@@ -52,7 +52,10 @@ it("preserves union members when omitting system fields", () => {
 
 it("accepts only documents and IDs for the selected application handle", () => {
   const notes = Table.make(() =>
-    Schema.Struct({ score: Schema.FiniteFromString }),
+    Schema.Struct({
+      score: Schema.FiniteFromString,
+      aliases: Schema.String.pipe(Schema.Array, Schema.optional),
+    }),
   )("notes");
   const users = Table.make(() => Schema.Struct({ name: Schema.String }))(
     "users",
@@ -78,7 +81,43 @@ it("accepts only documents and IDs for the selected application handle", () => {
     expectTypeOf(foreign).not.toExtend<Parameters<typeof writer.table>[0]>();
     expectTypeOf<"notes">().not.toExtend<Parameters<typeof writer.table>[0]>();
     const raw = DatabaseWriter.make(native);
+    expectTypeOf(raw).toExtend<
+      DatabaseWriter.DatabaseWriterService<typeof schema>
+    >();
+    const selectNote = <T extends typeof notes>(table: T) => raw.table(table);
+    expectTypeOf(selectNote(notes).insert({ score: 42 })).toBeObject();
+    const uncertain = Table.make(() => Schema.Struct({ score: Schema.String }))(
+      selected.tableName,
+    );
+    // @ts-expect-error The selected table may require a user name rather than a score.
+    raw.table(uncertain);
     expectTypeOf(foreign).not.toExtend<Parameters<typeof raw.table>[0]>();
+    const incompatible = Table.make(() =>
+      Schema.Struct({ field: Schema.String }),
+    )("notes");
+    // @ts-expect-error The handle does not encode the required score.
+    raw.table(incompatible);
+    const numeric = Table.make(() => Schema.Struct({ score: Schema.Finite }))(
+      "notes",
+    );
+    // @ts-expect-error The deployed score is a string, not the decoded number.
+    raw.table(numeric);
+    const maybeAlias = Table.make(() =>
+      Schema.Struct({
+        score: Schema.String,
+        aliases: Schema.String.pipe(Schema.UndefinedOr, Schema.Array),
+      }),
+    )("notes");
+    // @ts-expect-error Optional fields can be omitted, but array elements cannot be undefined.
+    raw.table(maybeAlias);
+    const literal = Table.make(() =>
+      Schema.Struct({ score: Schema.Literal("42") }),
+    )("notes");
+    expectTypeOf(raw.table(literal).insert({ score: "42" })).toBeObject();
+    expectTypeOf(raw.table(notes).insert({ score: 42 })).toBeObject();
+    expectTypeOf(
+      DatabaseWriter.make(untyped).table(notes).insert({ score: 42 }),
+    ).toBeObject();
     expectTypeOf(Table._storage).not.toExtend<
       Parameters<typeof writer.table>[0]
     >();
