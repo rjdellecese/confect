@@ -38,12 +38,18 @@ export interface VectorSearchService<
   ): Effect.Effect<Array<{ _id: GenericId<TableName>; _score: number }>>;
 }
 
+/**
+ * @internal
+ */
 export type VectorSearchTag<DataModel_ extends DataModel.AnyWithProps> =
   Context.Service<
     VectorSearchService<DataModel_>,
     VectorSearchService<DataModel_>
   >;
 
+/**
+ * @internal
+ */
 export const make =
   <DataModel_ extends DataModel.AnyWithProps>(
     vectorSearch: ConvexVectorSearch<DataModel_>,
@@ -51,6 +57,9 @@ export const make =
   (tableName, indexName, query) =>
     Effect.promise(() => vectorSearch(tableName, indexName, query));
 
+/**
+ * @internal
+ */
 export const VectorSearch = <
   DataModel_ extends DataModel.AnyWithProps,
 >(): VectorSearchTag<DataModel_> =>
@@ -61,6 +70,9 @@ export const VectorSearch = <
 export type VectorSearch<DataModel_ extends DataModel.AnyWithProps> =
   VectorSearchService<DataModel_>;
 
+/**
+ * @internal
+ */
 export const layer = <DataModel_ extends DataModel.AnyWithProps>(
   vectorSearch: ConvexVectorSearch<DataModel_>,
 ) => Layer.succeed(VectorSearch<DataModel_>(), make(vectorSearch));

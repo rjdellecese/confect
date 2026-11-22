@@ -49,6 +49,9 @@ export interface Failure<A, E = never> extends QueryResult.Proto<A, E> {
   readonly error: E;
 }
 
+/**
+ * @internal
+ */
 export const isQueryResult = (u: unknown): u is QueryResult<unknown, unknown> =>
   Predicate.hasProperty(u, TypeId);
 
@@ -98,18 +101,27 @@ const QueryResultProto = {
   },
 };
 
+/**
+ * @internal
+ */
 export const load = <A = never, E = never>(skipped: boolean): Loading<A, E> =>
   Object.assign(Object.create(QueryResultProto), {
     _tag: "Loading" as const,
     skipped,
   });
 
+/**
+ * @internal
+ */
 export const succeed = <A, E = never>(value: A): Success<A, E> =>
   Object.assign(Object.create(QueryResultProto), {
     _tag: "Success" as const,
     value,
   });
 
+/**
+ * @internal
+ */
 export const fail = <E, A = never>(error: E): Failure<A, E> =>
   Object.assign(Object.create(QueryResultProto), {
     _tag: "Failure" as const,

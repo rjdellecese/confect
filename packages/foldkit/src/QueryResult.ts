@@ -48,6 +48,8 @@ export type QueryResult<A, E = never> = Loading | Success<A> | Failure<E>;
 
 /**
  * Identifies values constructed by this module, including decoded results.
+ *
+ * @internal
  */
 export const isQueryResult = (
   input: unknown,

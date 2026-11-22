@@ -3,6 +3,9 @@ import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 import type * as MiddlewareSpec from "./MiddlewareSpec";
 
+/**
+ * @internal
+ */
 export type MiddlewareAttachment<
   MiddlewareSpec_ extends MiddlewareSpec.AnyMiddlewareSpec =
     MiddlewareSpec.AnyMiddlewareSpec,
@@ -15,12 +18,18 @@ export type MiddlewareAttachment<
     }
   : never;
 
+/**
+ * @internal
+ */
 export type Args<MiddlewareSpec_ extends MiddlewareSpec.AnyMiddlewareSpec> = [
   MiddlewareSpec_["~Options"],
 ] extends [never]
   ? []
   : [options: MiddlewareSpec.Options<MiddlewareSpec_>];
 
+/**
+ * @internal
+ */
 export type ValidationError = Data.TaggedEnum<{
   InvalidOptions: {
     readonly middlewareKey: string;
@@ -41,8 +50,14 @@ export type ValidationError = Data.TaggedEnum<{
   };
 }>;
 
+/**
+ * @internal
+ */
 export const ValidationError = Data.taggedEnum<ValidationError>();
 
+/**
+ * @internal
+ */
 export const formatValidationError = ValidationError.$match({
   InvalidOptions: ({ middlewareKey, location, attachmentIndex }) =>
     `Middleware "${middlewareKey}" has invalid options at attachment ${attachmentIndex + 1} on ${location}`,
@@ -57,6 +72,9 @@ export const formatValidationError = ValidationError.$match({
     `Middleware "${middlewareKey}" has equivalent options at attachments ${previousIndex + 1} and ${attachmentIndex + 1} on ${location}`,
 });
 
+/**
+ * @internal
+ */
 export const validateAll = (
   attachments: ReadonlyArray<MiddlewareAttachment>,
   location: string,

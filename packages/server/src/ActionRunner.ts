@@ -32,5 +32,8 @@ export const ActionRunner =
   Context.Service<ReturnType<typeof make>>("@confect/server/ActionRunner");
 export type ActionRunner = typeof ActionRunner.Identifier;
 
+/**
+ * @internal
+ */
 export const layer = (runAction: GenericActionCtx<any>["runAction"]) =>
   Layer.succeed(ActionRunner, make(runAction));

@@ -42,6 +42,8 @@ export class EmptyInitialPageError extends Schema.TaggedError<
 
 /**
  * @experimental
+ *
+ * @internal
  */
 export type Range = Data.TaggedEnum<{
   Unpinned: {};
@@ -50,11 +52,15 @@ export type Range = Data.TaggedEnum<{
 }>;
 /**
  * @experimental
+ *
+ * @internal
  */
 export const Range = Data.taggedEnum<Range>();
 
 /**
  * @experimental
+ *
+ * @internal
  */
 export type Start = Data.TaggedEnum<{
   Beginning: {};
@@ -65,11 +71,15 @@ export type Start = Data.TaggedEnum<{
 }>;
 /**
  * @experimental
+ *
+ * @internal
  */
 export const Start = Data.taggedEnum<Start>();
 
 /**
  * @experimental
+ *
+ * @internal
  */
 export interface ScanRequest {
   readonly numItems: PageSize;
@@ -79,6 +89,8 @@ export interface ScanRequest {
 
 /**
  * @experimental
+ *
+ * @internal
  */
 export type Request = Data.TaggedEnum<{
   Unchanged: { readonly cursor: string };
@@ -88,6 +100,8 @@ const Request = Data.taggedEnum<Request>();
 
 /**
  * @experimental
+ *
+ * @internal
  */
 export const parseRequest = (
   numItems: number,
@@ -142,6 +156,8 @@ interface Stopped<Doc> {
 
 /**
  * @experimental
+ *
+ * @internal
  */
 export type QueryStreamPagination<Doc> = Data.TaggedEnum<{
   Reading: {
@@ -158,6 +174,8 @@ const QueryStreamPagination = Data.taggedEnum<PaginationDefinition>();
 
 /**
  * @experimental
+ *
+ * @internal
  */
 export const initial = <Doc>(): QueryStreamPagination<Doc> =>
   QueryStreamPagination.Reading({
@@ -167,6 +185,8 @@ export const initial = <Doc>(): QueryStreamPagination<Doc> =>
 
 /**
  * @experimental
+ *
+ * @internal
  */
 export const record = <Doc>(
   request: ScanRequest,
@@ -206,6 +226,8 @@ export const record = <Doc>(
 
 /**
  * @experimental
+ *
+ * @internal
  */
 export type Continuation = Data.TaggedEnum<{
   End: {};
@@ -221,6 +243,8 @@ interface Split<Doc> {
 
 /**
  * @experimental
+ *
+ * @internal
  */
 export type Outcome<Doc> = Data.TaggedEnum<{
   Done: { readonly page: ReadonlyArray<Doc> };
@@ -234,6 +258,8 @@ export type Outcome<Doc> = Data.TaggedEnum<{
 
 /**
  * @experimental
+ *
+ * @internal
  */
 export class UnsafePageBoundaryError extends Schema.TaggedError<
   UnsafePageBoundaryError,
@@ -262,6 +288,8 @@ const SOFT_MAX_SCAN_LENGTH = 16000;
  * Decide the page result without reading a stream or serializing a cursor.
  *
  * @experimental
+ *
+ * @internal
  */
 export const finish = <Doc>(
   request: ScanRequest,

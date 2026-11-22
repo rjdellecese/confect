@@ -95,6 +95,9 @@ type Any =
     }
   | Ref.Any;
 
+/**
+ * @internal
+ */
 export const make = <Spec_ extends Spec.AnyWithProps>(
   spec: Spec_,
 ): FromSpec<Spec_> => {

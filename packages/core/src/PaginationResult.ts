@@ -4,6 +4,9 @@ export type PaginationResult<Doc extends Schema.Codec<any, any>> = ReturnType<
   typeof PaginationResult<Doc>
 >;
 
+/**
+ * @internal
+ */
 export const PaginationResult = <Doc extends Schema.Codec<any, any>>(
   Doc: Doc,
 ) =>

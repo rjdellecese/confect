@@ -87,5 +87,8 @@ export const QueryRunner =
   Context.Service<ReturnType<typeof make>>("@confect/server/QueryRunner");
 export type QueryRunner = typeof QueryRunner.Identifier;
 
+/**
+ * @internal
+ */
 export const layer = (runQuery: GenericActionCtx<any>["runQuery"]) =>
   Layer.succeed(QueryRunner, make(runQuery));

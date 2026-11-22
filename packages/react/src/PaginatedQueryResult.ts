@@ -125,6 +125,9 @@ export interface Failure<Item, E = never> extends PaginatedQueryResult.Proto<
   readonly results: ReadonlyArray<Item>;
 }
 
+/**
+ * @internal
+ */
 export const isPaginatedQueryResult = (
   u: unknown,
 ): u is Variants<unknown, unknown> => Predicate.hasProperty(u, TypeId);
@@ -184,6 +187,9 @@ const PaginatedQueryResultProto = {
 
 const noResults: ReadonlyArray<never> = [];
 
+/**
+ * @internal
+ */
 export const loadingFirstPage = <Item = never, E = never>(options: {
   skipped: boolean;
 }): LoadingFirstPage<Item, E> =>
@@ -194,6 +200,9 @@ export const loadingFirstPage = <Item = never, E = never>(options: {
     isLoading: true as const,
   });
 
+/**
+ * @internal
+ */
 export const loadingMore = <Item, E = never>(options: {
   results: ReadonlyArray<Item>;
 }): LoadingMore<Item, E> =>
@@ -203,6 +212,9 @@ export const loadingMore = <Item, E = never>(options: {
     isLoading: true as const,
   });
 
+/**
+ * @internal
+ */
 export const canLoadMore = <Item, E = never>(options: {
   results: ReadonlyArray<Item>;
   loadMore: (numItems: number) => void;
@@ -214,6 +226,9 @@ export const canLoadMore = <Item, E = never>(options: {
     loadMore: options.loadMore,
   });
 
+/**
+ * @internal
+ */
 export const exhausted = <Item, E = never>(options: {
   results: ReadonlyArray<Item>;
 }): Exhausted<Item, E> =>
@@ -223,6 +238,9 @@ export const exhausted = <Item, E = never>(options: {
     isLoading: false as const,
   });
 
+/**
+ * @internal
+ */
 export const failure = <E, Item = never>(options: {
   error: E;
   results: ReadonlyArray<Item>;

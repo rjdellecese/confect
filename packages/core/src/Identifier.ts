@@ -74,6 +74,9 @@ const matchesJsIdentifierPattern = (identifier: string) =>
 const matchesTableNamePattern = (identifier: string) =>
   tableNameRegex.test(identifier);
 
+/**
+ * @internal
+ */
 export const validateConfectFunctionIdentifier = (identifier: string) => {
   if (!matchesJsIdentifierPattern(identifier)) {
     throw new Error(
@@ -105,6 +108,8 @@ export const validateConfectFunctionIdentifier = (identifier: string) => {
  *   `_` (Convex reserves `_<name>` for its system tables).
  * - Must not be a reserved JavaScript identifier, so the name can also be used as
  *   a binding name in generated code without escaping.
+ *
+ * @internal
  */
 export const validateConfectTableIdentifier = (identifier: string) => {
   if (!matchesTableNamePattern(identifier)) {

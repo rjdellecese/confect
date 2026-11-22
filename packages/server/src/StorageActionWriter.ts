@@ -29,6 +29,9 @@ export class StorageActionWriter extends Context.Service<
   StorageActionWriter,
   ReturnType<typeof make>
 >()("@confect/server/StorageActionWriter") {
+  /**
+   * @internal
+   */
   static readonly layer = (storageActionWriter: ConvexStorageActionWriter) =>
     Layer.succeed(this, make(storageActionWriter));
 }

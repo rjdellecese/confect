@@ -8,6 +8,8 @@ import * as Brand from "effect/Brand";
  * field paths; implicit ID positions have no visible label.
  *
  * @experimental
+ *
+ * @internal
  */
 export type QueryStreamKeyLabels<
   Names extends ReadonlyArray<string> = ReadonlyArray<string>,
@@ -19,6 +21,8 @@ export type QueryStreamKeyLabels<
 // expanding unresolved tuple types while checking generic stream operations.
 /**
  * @experimental
+ *
+ * @internal
  */
 export type Concat<
   LeftKeyLabels extends QueryStreamKeyLabels,
@@ -32,6 +36,8 @@ export type Concat<
 
 /**
  * @experimental
+ *
+ * @internal
  */
 export const QueryStreamKeyLabels = Schema.declare<QueryStreamKeyLabels>(
   (value): value is QueryStreamKeyLabels =>
@@ -45,10 +51,15 @@ const LabelsBrand = Brand.nominal<QueryStreamKeyLabels>();
  * Mark a tuple of names as labels without changing its runtime representation.
  *
  * @experimental
+ *
+ * @internal
  */
 export function make<const Names extends ReadonlyArray<string>>(
   names: Names,
 ): QueryStreamKeyLabels<Names>;
+/**
+ * @internal
+ */
 export function make(names: ReadonlyArray<string>): QueryStreamKeyLabels {
   return LabelsBrand(names);
 }
@@ -58,6 +69,8 @@ export function make(names: ReadonlyArray<string>): QueryStreamKeyLabels {
  * multiplicity. The empty prefix always matches.
  *
  * @experimental
+ *
+ * @internal
  */
 export const hasPrefix = (
   self: QueryStreamKeyLabels,

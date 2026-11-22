@@ -28,6 +28,8 @@ import * as Record from "effect/Record";
 
 /**
  * The `paginationOpts` one subscribed page queries with.
+ *
+ * @internal
  */
 export interface PageRequest {
   readonly numItems: number;
@@ -46,6 +48,8 @@ export interface PageRequest {
 
 /**
  * The per-page read budgets every growing page is requested with.
+ *
+ * @internal
  */
 export interface ReadBudget {
   readonly maximumRowsRead?: number | undefined;
@@ -70,6 +74,9 @@ const growingRequest = (
     : { maximumBytesRead: budget.maximumBytesRead }),
 });
 
+/**
+ * @internal
+ */
 export interface State {
   readonly nextPageKey: number;
   /**
@@ -90,6 +97,8 @@ export interface State {
 
 /**
  * The skipped state: nothing subscribed.
+ *
+ * @internal
  */
 export const empty: State = {
   nextPageKey: 0,
@@ -100,6 +109,8 @@ export const empty: State = {
 
 /**
  * One growing (unpinned) page from the start of the stream.
+ *
+ * @internal
  */
 export const initial = (
   initialNumItems: number,
@@ -117,6 +128,8 @@ export const initial = (
  * window: a pinned page grows and shrinks with the data in its range but never
  * sheds items past its edges. Modeled as a one-replacement split so the
  * original keeps rendering until the pinned twin has a result.
+ *
+ * @internal
  */
 export const pin =
   (key: string, endCursor: string): ((state: State) => State) =>
@@ -144,6 +157,8 @@ export const pin =
  * Pin the growing last page at `continueCursor` and start a new growing page
  * from there. Modeled as a split of the last page into its pinned replacement
  * and the new page, so the swap waits for both.
+ *
+ * @internal
  */
 export const loadMore =
   (
@@ -203,6 +218,8 @@ export const loadMore =
  * at the split point; the second keeps the page's own `endCursor`—for a pinned
  * page its original end (so a truncated `SplitRequired` page loses none of its
  * range), and for a growing page no end at all (it keeps growing).
+ *
+ * @internal
  */
 export const split =
   (key: string, splitCursor: string): ((state: State) => State) =>
@@ -230,6 +247,8 @@ export const split =
 
 /**
  * Swap a completed split's replacements in for the original page.
+ *
+ * @internal
  */
 export const completeSplit =
   (key: string): ((state: State) => State) =>
@@ -248,6 +267,8 @@ export const completeSplit =
 
 /**
  * Whether the last (rendered) page is currently being split or pinned.
+ *
+ * @internal
  */
 export const isLastPageSplitting = (state: State): boolean =>
   Option.exists(Array.last(state.pageKeys), (lastKey) =>
@@ -256,6 +277,8 @@ export const isLastPageSplitting = (state: State): boolean =>
 
 /**
  * Build one subscription request per subscribed page.
+ *
+ * @internal
  */
 export const pageRequests = <A>(
   state: State,
@@ -264,6 +287,8 @@ export const pageRequests = <A>(
 
 /**
  * The per-page results a render observes, keyed like {@link pageRequests}.
+ *
+ * @internal
  */
 export type Results = Record.ReadonlyRecord<
   string,
@@ -277,6 +302,8 @@ export type Results = Record.ReadonlyRecord<
 /**
  * The wire shape of one loaded page—`PaginationResult` from `convex/server`, so
  * the protocol has a single source of truth.
+ *
+ * @internal
  */
 export type PageResult = PaginationResult<unknown>;
 
@@ -285,6 +312,8 @@ export type PageResult = PaginationResult<unknown>;
  * show, the trailing complete result (absent while the tail is loading or
  * force-splitting), state transitions to apply, and whether a failure or an
  * invalid cursor was hit.
+ *
+ * @internal
  */
 export type Interpretation =
   | { readonly _tag: "ResetRequired" }
@@ -325,6 +354,8 @@ const interpreted = (
  *
  * `isInvalidCursorError` marks errors that call for a full pagination reset
  * rather than a failure (the cursor no longer matches the query).
+ *
+ * @internal
  */
 export const interpret = (
   state: State,

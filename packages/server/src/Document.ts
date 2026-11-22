@@ -21,9 +21,18 @@ export type WithoutSystemFields<Doc> = Doc extends unknown
   ? Omit<Doc, "_creationTime" | "_id">
   : never;
 
+/**
+ * @internal
+ */
 export type Any = any;
+/**
+ * @internal
+ */
 export type AnyEncoded = ReadonlyRecord<string, ReadonlyValue>;
 
+/**
+ * @internal
+ */
 export const decode = Function.dual<
   <Table_ extends Table.AnyWithProps>(
     table: Table_,
@@ -64,6 +73,9 @@ export const decode = Function.dual<
     ),
 );
 
+/**
+ * @internal
+ */
 export const encode = Function.dual<
   <Table_ extends Table.AnyWithProps>(
     table: Table_,
@@ -138,6 +150,9 @@ export class DocumentEncodeError extends Schema.TaggedError<
   }
 }
 
+/**
+ * @internal
+ */
 export const documentErrorMessage = ({
   id,
   tableName,

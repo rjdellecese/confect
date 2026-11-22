@@ -1,5 +1,8 @@
 import * as Schema from "effect/Schema";
 
+/**
+ * @internal
+ */
 export const UserIdentity = <CustomClaimsFields extends Schema.Struct.Fields>(
   customClaimsFields: CustomClaimsFields,
 ) =>

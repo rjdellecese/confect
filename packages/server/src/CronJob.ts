@@ -3,10 +3,19 @@ import type { Cron, Duration } from "effect";
 import * as Predicate from "effect/Predicate";
 import type * as CronWindow from "./CronWindow";
 
+/**
+ * @internal
+ */
 export const TypeId = "~@confect/server/CronJob";
+/**
+ * @internal
+ */
 export type TypeId = typeof TypeId;
 
 export interface CronJob {
+  /**
+   * @internal
+   */
   readonly [TypeId]: TypeId;
 
   readonly identifier: string;
@@ -15,6 +24,9 @@ export interface CronJob {
   readonly args: Record<string, unknown>;
 }
 
+/**
+ * @internal
+ */
 export const isCronJob = (u: unknown): u is CronJob =>
   Predicate.hasProperty(u, TypeId);
 
