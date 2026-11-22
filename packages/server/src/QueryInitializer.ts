@@ -48,9 +48,9 @@ type TableInfoFor<
 > = DataModel.TableInfoWithName_<DataModel_, TableName>;
 
 /**
- * Lookup and query builders for one table, returned by the generated database
- * reader's `table(handle)` method. Values are decoded using the table codec;
- * index and search callbacks operate on Convex's stored field values.
+ * Lookup and query builders for the table selected by `reader.table(handle)`.
+ * Lookups return decoded documents; index and search callbacks compare the
+ * stored field values.
  *
  * @category Models
  */
@@ -60,14 +60,21 @@ export interface QueryInitializer<
   Doc = DataModel.DocumentWithName<DataModel_, TableName>,
 > {
   /**
-   * Retrieve one decoded document by ID or indexed field values. Missing
-   * documents are typed failures, not Options. Native failures, including
-   * multiple matches for an index lookup, remain defects.
+   * Reads one decoded document by ID or by its unique combination of index
+   * field values. A missing document is a typed failure, not `None`.
+   *
+   * **Gotchas**
+   *
+   * A call with a single argument always looks up a document ID, even if the
+   * argument is a built-in index name. Use `get(id)` for an ID and
+   * `index("by_creation_time", range)` to query by creation time.
    *
    * @category Reading
    */
   readonly get: {
     /**
+     * Reads the document with the supplied ID.
+     *
      * @category Reading
      *
      * @param id - Table-typed document ID.
@@ -80,6 +87,8 @@ export interface QueryInitializer<
       id: GenericId<TableName>,
     ): Effect.Effect<Doc, Document.DocumentDecodeError | GetByIdFailure>;
     /**
+     * Reads the unique document matching the supplied index values.
+     *
      * @category Reading
      *
      * @param indexName - Standard index used for an exact lookup.
@@ -103,15 +112,19 @@ export interface QueryInitializer<
     ): Effect.Effect<Doc, Document.DocumentDecodeError | GetByIndexFailure>;
   };
   /**
-   * Build an ordered standard-index query without fetching documents. Call
-   * `index(name)` for a full ascending scan or `index(name, "desc")` for a full
-   * descending scan. The built-in `by_creation_time` and `by_id` indexes are
-   * available on every table.
+   * Creates an ordered standard-index query without fetching documents. Use
+   * `index(name)` to scan the whole index ascending or `index(name, "desc")` to
+   * scan descending. Every table has `by_creation_time` and `by_id` indexes.
    *
    * @category Reading
+   *
+   * @see {@link QueryInitializer.stream} for queries that need ordered composition.
    */
   readonly index: {
     /**
+     * Creates an ordered query over the index entries selected by a native
+     * Convex range callback.
+     *
      * @category Reading
      *
      * @param indexName - Standard index name.
@@ -140,7 +153,7 @@ export interface QueryInitializer<
     ): OrderedQuery.OrderedQuery<TableInfoFor<DataModel_, TableName>, Doc>;
   } & FullIndexScan<TableInfoFor<DataModel_, TableName>, Doc>["index"];
   /**
-   * Build a full-text query sorted by descending relevance.
+   * Creates a full-text search query ordered by descending relevance.
    *
    * @category Reading
    *
@@ -165,27 +178,23 @@ export interface QueryInitializer<
     ) => SearchFilter,
   ) => OrderedQuery.OrderedQuery<TableInfoFor<DataModel_, TableName>, Doc>;
   /**
-   * Build a composable stream over a standard index without reading documents.
+   * Creates a reusable {@link QueryStream.QueryStream} over a standard index.
+   * Each run reads and decodes documents in index order; constructing or
+   * composing the stream does not read them.
    *
-   * Like `index`, but returns a {@link QueryStream.QueryStream}: a genuine
-   * Effect `Stream` of documents in index order that stays mergeable and
-   * paginable.
+   * **When to use**
    *
-   * In SQL terms: an index range scan—`SELECT * FROM table WHERE <range> ORDER
-   * BY <index fields> [DESC]`; `eq` calls are the equality predicates, the
-   * bound calls are the range predicates. The value is a reusable description
-   * of a query: each run re-runs the index query. The typed range builder
-   * consumes `eq`-pinned fields from the index's field tuple at the type level,
-   * so the stream's visible label type is exactly the fields that still vary
-   * (the `ORDER BY` columns left after the equality predicates). The order
-   * direction is part of the type too: omitted, it is `"asc"`; a literal is
-   * tracked as that literal, and a value known only at runtime as the union.
-   * The order parameter is either absent or a direction—never `undefined`—so
-   * the type can't claim a literal the runtime default would contradict.
+   * Use to merge index ranges, join documents, or paginate the result after
+   * filtering or mapping it.
    *
-   * The callback's `eq` consumes the next field; `gt`, `gte`, `lt`, and `lte`
-   * bound it without consuming it. Bounds come last, except a lower bound may
-   * precede an upper bound on the same field. Values are stored field values.
+   * **Details**
+   *
+   * Apply `eq` to successive leading index fields. Each equality removes that
+   * field from the stream's visible ordering labels. Finish with `gt` or `gte`,
+   * `lt` or `lte`, or a lower then an upper bound on the same field; these
+   * bounds keep the field in the key. The arguments are stored field values,
+   * not decoded values. The type tracks the remaining labels and the order
+   * (`"asc"` by default).
    *
    * @category Reading
    *
@@ -201,6 +210,8 @@ export interface QueryInitializer<
    *   composing.
    *
    * @experimental
+   *
+   * @see {@link QueryInitializer.index} for a native ordered query.
    */
   readonly stream: {
     <
@@ -502,8 +513,9 @@ export const getById =
     );
 
 /**
- * No document exists for an ID lookup. A typed failure from `get(id)` and from
- * patch's initial read, even when DocumentIds previously validated the ID.
+ * Typed failure from `get(id)` or the initial read in `patch` when the selected
+ * table contains no document with that ID. Validating the ID's format does not
+ * establish that the document exists.
  *
  * @category Errors
  */
@@ -525,7 +537,7 @@ export class GetByIdFailure extends Schema.TaggedError<GetByIdFailure, {}>()(
   },
 ) {
   /**
-   * Human-readable absence diagnostic including the table and requested ID.
+   * Returns a message identifying the table and missing document ID.
    *
    * @category Getters
    */
@@ -539,9 +551,9 @@ export class GetByIdFailure extends Schema.TaggedError<GetByIdFailure, {}>()(
 }
 
 /**
- * No document matched an exact index lookup. This is a typed failure from
- * `get(indexName, ...indexFieldValues)`, not the error for multiple matches;
- * multiple matches cause a native uniqueness defect instead.
+ * Typed failure from `get(indexName, ...indexFieldValues)` when no document
+ * matches the indexed values. If several documents match, the native uniqueness
+ * check produces a defect instead.
  *
  * @category Errors
  */
@@ -569,8 +581,8 @@ export class GetByIndexFailure extends Schema.TaggedError<
   indexFieldValues: Schema.Array(Schema.Unknown),
 }) {
   /**
-   * Human-readable diagnostic identifying the table, index, and requested
-   * values.
+   * Returns a message identifying the table, index, and values that had no
+   * match.
    *
    * @category Getters
    */

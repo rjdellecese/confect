@@ -18,14 +18,14 @@ export const isSpec = (u: unknown): u is AnyWithProps =>
   Predicate.hasProperty(u, TypeId);
 
 /**
- * A Confect spec: a flat container of function groups. Groups may be of any
- * runtime—a group built with `GroupSpec.makeNode()` (a Node action group) sits
- * alongside `GroupSpec.make()` groups in the same namespace. The runtime of a
- * group lives on the group itself (`GroupSpec.runtime`) and on each function's
- * `RuntimeAndFunctionType`; the spec does not carry a runtime of its own.
+ * The generated project spec that describes function groups and their
+ * middleware. Import the codegen-assembled spec rather than constructing it by
+ * hand; it does not describe the database schema.
  *
- * Use the codegen-assembled project spec rather than assembling this container
- * manually. It describes functions and middleware, not the database schema.
+ * **Details**
+ *
+ * A spec can contain both Convex groups and Node.js action groups. The runtime
+ * belongs to each group and its functions, not to the project spec.
  *
  * @category Models
  */

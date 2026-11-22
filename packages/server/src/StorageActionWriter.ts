@@ -9,14 +9,15 @@ import { BlobNotFoundError } from "./BlobNotFoundError";
 
 const make = (storageActionWriter: ConvexStorageActionWriter) => ({
   /**
-   * Read stored contents in a mutation, action or HTTP handler.
+   * Reads a stored blob's contents in a mutation, action, or HTTP handler.
    *
    * @category Reading
    *
-   * @param storageId - ID of the blob.
+   * @param storageId - ID of the blob to read.
    *
-   * @returns An Effect producing a Blob, failing with BlobNotFoundError when
-   *   absent. Native rejections are defects.
+   * @returns An Effect producing a `Blob`, or failing with
+   *   {@link BlobNotFoundError} if none exists. A Convex rejection is a
+   *   defect.
    */
   get: (storageId: GenericId<"_storage">) =>
     Effect.promise(() => storageActionWriter.get(storageId)).pipe(
@@ -32,25 +33,27 @@ const make = (storageActionWriter: ConvexStorageActionWriter) => ({
       ),
     ),
   /**
-   * Store contents in a mutation, action or HTTP handler.
+   * Stores a blob in a mutation, action, or HTTP handler and returns its
+   * storage ID.
    *
    * @category Writing
    *
-   * @param blob - Contents and media type.
-   * @param options - Optional `sha256` checksum checked by Convex.
+   * @param blob - Contents and media type to store.
+   * @param options - Optional `sha256` checksum for Convex to verify.
    *
-   * @returns An Effect producing the `_storage` ID; native rejections are
-   *   defects.
+   * @returns An Effect producing an ID in `_storage`. A Convex rejection is a
+   *   defect.
    */
   store: (blob: Blob, options?: { sha256?: string }) =>
     Effect.promise(() => storageActionWriter.store(blob, options)),
 });
 
 /**
- * Compatibility blob-content service supplied in mutations, actions and HTTP
- * handlers despite its historical name. Prefer the generated `Storage` tag.
+ * Compatibility tag for reading and storing blob contents. Despite the name,
+ * Confect supplies the service in mutations as well as actions and HTTP
+ * handlers. Use the generated `Storage` tag in new code.
  *
- * @category Services
+ * @category Tags
  */
 export class StorageActionWriter extends Context.Service<
   StorageActionWriter,

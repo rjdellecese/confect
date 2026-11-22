@@ -15,27 +15,33 @@ type ConvexVectorSearch<DataModel_ extends DataModel.AnyWithProps> =
   GenericActionCtx<DataModel.ToConvexDataModel<DataModel_>>["vectorSearch"];
 
 /**
- * The service shape backing the `VectorSearch` tag. Named so declaration emit
- * references it instead of expanding the call signature at every usage. Acquire
- * the generated tag in an action and call the resulting function.
+ * Callable service for finding similar vectors in an application table. Yield
+ * the generated `VectorSearch` tag in an action or a schema-typed HTTP router
+ * to obtain the search function.
  *
- * @category Models
+ * @category Services
  */
 export interface VectorSearchService<
   in out DataModel_ extends DataModel.AnyWithProps,
 > {
   /**
-   * Query a vector index for nearest neighbors.
+   * Searches a vector index for nearest neighbors and returns their document
+   * IDs and similarity scores.
    *
-   * @category Models
+   * **Gotchas**
    *
-   * @param tableName - Declared table containing the index.
+   * The search does not return decoded documents. Fetch the documents in a
+   * query if you need their fields.
+   *
+   * @category Searching
+   *
+   * @param tableName - Table containing the vector index.
    * @param indexName - Vector index defined on that table.
-   * @param query - Convex vector-search options: vector, optional limit and
-   *   index-filter callback. Filters use Convex's encoded field values.
+   * @param query - Search vector, optional result limit, and optional filter
+   *   over the index's encoded field values.
    *
-   * @returns An Effect producing ranked {_id, _score} matches, not decoded
-   *   documents. Native failures are defects; use a query to fetch documents.
+   * @returns An Effect producing ranked `{ _id, _score }` matches. A Convex
+   *   rejection is a defect.
    */
   <
     TableName extends DataModel.TableNames<DataModel_>,
@@ -84,9 +90,12 @@ export const VectorSearch = <
   );
 
 /**
- * Callable vector-search service shape specialized to the application's schema.
+ * Callable vector search service specialized to the application's data model.
+ * Its table names, index names, and filter fields come from that model.
  *
- * @category Models
+ * @category Services
+ *
+ * @see {@link VectorSearchService} for the search signature and ranked result shape.
  */
 export type VectorSearch<DataModel_ extends DataModel.AnyWithProps> =
   VectorSearchService<DataModel_>;

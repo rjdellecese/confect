@@ -1,8 +1,9 @@
 import crons from "../confect/crons";
 
 /**
- * Recurring jobs exposed to Convex from the application's cron definitions.
+ * Cron jobs that Convex runs according to the application's recurring
+ * schedules.
  *
- * @category Deployment
+ * @category Configuration
  */
 export default crons.convexCronJobs;

@@ -7,10 +7,15 @@ import type * as Schema from "effect/Schema";
 import * as MutationTransactionContext from "./MutationTransactionContext";
 
 /**
- * Transaction limits for a nested mutation. Only mutation handlers may supply
- * these options; actions and HTTP handlers must omit the options argument.
+ * Resource limits for a mutation invoked from another mutation. They apply to
+ * the nested call rather than the whole handler.
  *
- * @category Options
+ * **Gotchas**
+ *
+ * Actions and HTTP handlers must omit the options object, even when it is
+ * empty.
+ *
+ * @category Configuration
  */
 export type Options = MutationTransactionContext.MutationOptions;
 
@@ -20,15 +25,17 @@ const run = Effect.fn("MutationRunner.runMutation")(
 
 const make = (nativeRunMutation: GenericActionCtx<any>["runMutation"]) => {
   /**
-   * Invoke a mutation with decoded arguments and no transaction overrides.
+   * Runs a mutation with decoded arguments and no transaction overrides,
+   * including from an action or HTTP handler.
    *
-   * @category Invocation
+   * @category Running
    *
    * @param mutation - Generated public or internal mutation ref.
-   * @param args - Decoded arguments, optional for an argument-free ref.
+   * @param args - Decoded arguments; omit for an argument-free ref.
    *
-   * @returns An Effect with decoded results and declared failures or
-   *   SchemaError. Native/undeclared failures become defects.
+   * @returns An Effect producing the decoded result. Declared errors and
+   *   `SchemaError` are typed failures; unexpected Convex failures are
+   *   defects.
    */
   function runMutation<Mutation extends Ref.AnyMutation>(
     mutation: Mutation,
@@ -38,15 +45,18 @@ const make = (nativeRunMutation: GenericActionCtx<any>["runMutation"]) => {
     Ref.Error<Mutation> | Schema.SchemaError
   >;
   /**
-   * Invoke a nested mutation with transaction limits from a mutation context.
+   * Runs a nested mutation with resource limits set by the enclosing mutation.
    *
-   * @category Invocation
+   * @category Running
    *
-   * @param mutation - Generated mutation ref.
-   * @param args - Decoded arguments; pass {} when no arguments are declared.
-   * @param options - Limits for the nested call, capped by Convex's limits.
+   * @param mutation - Generated public or internal mutation ref.
+   * @param args - Decoded arguments; pass `{}` for an argument-free ref.
+   * @param options - Limits for this call, capped by Convex's transaction
+   *   limits.
    *
-   * @returns An Effect with decoded results and declared/schema failures.
+   * @returns An Effect producing the decoded result. Declared errors and
+   *   `SchemaError` are typed failures; unexpected Convex failures are
+   *   defects.
    */
   function runMutation<Mutation extends Ref.AnyMutation>(
     mutation: Mutation,
@@ -84,18 +94,24 @@ const make = (nativeRunMutation: GenericActionCtx<any>["runMutation"]) => {
   }
   return {
     /**
-     * Invoke a generated mutation ref with decoded arguments.
+     * Runs a generated mutation with decoded arguments and returns its decoded
+     * result. Inside a mutation, pass `transactionLimits` to bound the nested
+     * call.
      *
-     * @category Invocation
+     * **Gotchas**
      *
-     * @param mutation - Public or internal mutation ref.
+     * In an action or HTTP handler, omit the options object rather than passing
+     * `{}`.
+     *
+     * @category Running
+     *
+     * @param mutation - Generated public or internal mutation ref.
      * @param args - Decoded arguments; omit for an argument-free ref, or pass
-     *   {} before an options argument.
-     * @param options - Nested transactionLimits, available only in mutations.
-     *   Omit options when invoking from actions or HTTP handlers.
+     *   `{}` before options.
+     * @param options - Resource limits for this nested mutation.
      *
      * @returns An Effect producing the decoded result. Declared errors and
-     *   SchemaError are typed failures; native/undeclared failures are
+     *   `SchemaError` are typed failures; unexpected Convex failures are
      *   defects.
      */
     runMutation,
@@ -103,19 +119,19 @@ const make = (nativeRunMutation: GenericActionCtx<any>["runMutation"]) => {
 };
 
 /**
- * Mutation invocation service available in mutations, actions and HTTP
- * handlers. Yield the generated `MutationRunner` tag and use its `runMutation`
- * method.
+ * Tag for running mutations from mutations, actions, and HTTP handlers. Yield
+ * the generated `MutationRunner` tag and pass a mutation ref to `runMutation`.
  *
- * @category Services
+ * @category Tags
  */
 export const MutationRunner =
   // oxlint-disable-next-line effecttsgo/service-not-as-class -- Preserve the public structural Identifier and Effect requirement types; class identifiers would change those contracts.
   Context.Service<ReturnType<typeof make>>("@confect/server/MutationRunner");
 /**
- * Effect requirement identifier for the generated mutation invocation service.
+ * Effect environment requirement for an operation that calls a mutation through
+ * the generated `MutationRunner` service.
  *
- * @category Services
+ * @category Context
  */
 export type MutationRunner = typeof MutationRunner.Identifier;
 

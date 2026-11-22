@@ -33,20 +33,23 @@ export const make = (webSocketClient: WebSocketClient.WebSocketClient) =>
   });
 
 /**
- * The application-scoped Confect client used by Foldkit Commands and
- * Subscriptions. It combines the WebSocket API with the pagination-session id
- * allocator required by Convex's query cache.
+ * Service tag for the application-scoped Confect client that Foldkit commands
+ * and subscriptions share.
  *
- * Acquire this service to use the inherited `url`, `query`, `mutation`,
- * `action`, `reactiveQuery`, `reactiveQueryResult` and `setAuth` contracts from
- * {@link WebSocketClient.WebSocketClient}. Arguments and results are decoded
- * values. Calls and reactiveQuery fail with declared errors,
- * `WebSocketClientError` or `Schema.SchemaError`; reactiveQueryResult instead
- * emits Result values so a query failure need not close its listener. `setAuth`
- * accepts an effectful token supplier and an optional effectful authentication
- * callback.
+ * **Details**
  *
- * @category Services
+ * The service exposes `url`, `query`, `mutation`, `action`, `reactiveQuery`,
+ * `reactiveQueryResult`, and `setAuth` from
+ * {@link WebSocketClient.WebSocketClient}. Calls accept decoded arguments and
+ * return decoded results. One-shot calls and `reactiveQuery` can fail with a
+ * declared error, `WebSocketClientError`, or `Schema.SchemaError`;
+ * `reactiveQueryResult` emits those failures as values so a listener can
+ * recover. `setAuth` takes an effectful token supplier and an optional
+ * effectful authentication callback.
+ *
+ * @category Tags
+ *
+ * @see {@link layer} provides this service for the application's resources.
  */
 export const Client =
   // oxlint-disable-next-line effecttsgo/service-not-as-class -- Preserve the public structural Identifier and Effect requirement types; class identifiers would change those contracts.
@@ -55,23 +58,27 @@ export const Client =
   );
 
 /**
- * Effect requirement and acquired service shape for the application resource.
+ * Service type required by Foldkit commands and subscriptions that call
+ * Confect.
  *
  * @category Services
  */
 export type Client = typeof Client.Identifier;
 
 /**
- * Constructs one scoped client for a Foldkit application's `resources`. The
- * connection closes when the resource scope ends. Commands and subscriptions
- * sharing this layer share authentication and pagination ids.
+ * Creates a layer for the Foldkit application's `resources`. Commands and
+ * subscriptions that use the same client share its connection, authentication,
+ * and pagination IDs. The connection closes when the resource scope ends.
+ *
+ * **Example** (Sharing a client through Foldkit resources)
+ *
+ * ```ts
+ * import * as Client from "@confect/foldkit/Client";
+ *
+ * export const resources = Client.layer("https://example.convex.cloud");
+ * ```
  *
  * @category Layers
- *
- * @example
- *   import * as Client from "@confect/foldkit/Client";
- *
- *   const resources = Client.layer("https://example.convex.cloud");
  *
  * @param address - Convex deployment URL.
  * @param options - Options forwarded unchanged to Convex's `ConvexClient`.

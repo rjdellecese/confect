@@ -17,9 +17,9 @@ export const GenericId = <TableName extends string>(
   );
 
 /**
- * A Convex document identifier branded with its table name. The generated
- * `Id<TableName>` type aliases this contract. The brand distinguishes IDs from
- * different tables at compile time; it does not prove that a document exists.
+ * A Convex document ID branded with its table name. The generated
+ * `Id<TableName>` helper uses this type to keep IDs from different tables
+ * distinct at compile time. The brand does not prove that a document exists.
  *
  * @category Models
  */

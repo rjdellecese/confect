@@ -20,31 +20,37 @@ type IdentifiedId<Name extends string> = Name extends unknown
   : never;
 
 /**
- * Validate an untrusted string as a Convex document ID. Acquire the generated
- * `DocumentIds` service in queries, mutations, or middleware restricted to
- * those contexts. Actions and HTTP handlers can call a query to check an ID.
+ * Service for checking untrusted ID strings against application and system
+ * table names without reading documents. Yield the generated `DocumentIds` tag
+ * in a query, mutation, or middleware restricted to those contexts. Actions and
+ * HTTP handlers can call a query to check an ID.
  *
- * Validation uses table names, not table handles or document reads. A valid ID
- * does not prove existence, authorization, or origin in this deployment. Native
- * runtime failures remain defects rather than returning `None`.
+ * **Gotchas**
+ *
+ * A valid ID does not prove the document exists, the caller can read it, or it
+ * came from this deployment. Native runtime failures are defects, not `None`.
+ *
+ * **Example** (Checking an untrusted note ID)
+ *
+ * ```ts
+ * import * as Effect from "effect/Effect";
+ * import { DocumentIds } from "confect/_generated/services";
+ *
+ * export const parseNoteId = (input: string) =>
+ *   Effect.gen(function* () {
+ *     const ids = yield* DocumentIds;
+ *     return yield* ids.parse("notes", input);
+ *   });
+ * ```
  *
  * @category Services
- *
- * @example
- *   import * as Effect from "effect/Effect";
- *   import { DocumentIds } from "./confect/_generated/services";
- *
- *   const parseNoteId = (input: string) =>
- *     Effect.gen(function* () {
- *       const ids = yield* DocumentIds;
- *       return yield* ids.parse("notes", input);
- *     });
  */
 export interface DocumentIdsService<AppTableName extends string> {
   /**
-   * Validate a string as an ID for one known table.
+   * Checks whether the input is already a current-format ID for the named
+   * table. A string that would normalize to a different ID is not accepted.
    *
-   * @category Reading
+   * @category Decoding
    *
    * @param table - An application table name, `"_storage"`, or
    *   `"_scheduled_functions"`. Unlike `reader.table`, this takes a string, not
@@ -53,6 +59,8 @@ export interface DocumentIdsService<AppTableName extends string> {
    *
    * @returns An effect yielding `Some(id)` if Convex normalizes the input for
    *   this table to exactly the same string, or `None` otherwise.
+   *
+   * @see {@link DocumentIdsService.identify} when the table name is unknown.
    */
   readonly parse: <
     const Name extends AppTableName | DatabaseSchema.SystemTableNames,
@@ -61,11 +69,11 @@ export interface DocumentIdsService<AppTableName extends string> {
     input: string,
   ) => Effect.Effect<Option.Option<GenericId<Name>>>;
   /**
-   * Identify which known table a current-format ID belongs to. Checks the
-   * generated list of application table names, then the two system table names,
-   * without loading application table codecs.
+   * Identifies the first known table for which the input is a current-format
+   * ID. It checks the application's generated table names, then the system
+   * tables, without loading codecs or fetching documents.
    *
-   * @category Reading
+   * @category Decoding
    *
    * @param input - Untrusted ID string to check against application and system
    *   tables.
@@ -75,6 +83,8 @@ export interface DocumentIdsService<AppTableName extends string> {
    *   correlated: narrowing `table` also narrows the ID's table type. This uses
    *   runtime ID lookups, not document scans, and cannot discover other
    *   components' tables.
+   *
+   * @see {@link DocumentIdsService.parse} when the table name is known.
    */
   readonly identify: (
     input: string,
@@ -84,8 +94,9 @@ export interface DocumentIdsService<AppTableName extends string> {
 }
 
 /**
- * The service requirement and shape for a particular database schema. Use the
- * generated `DocumentIds` tag to acquire the {@link DocumentIdsService}.
+ * Service requirement for validating IDs against the tables of a particular
+ * database schema. Yield the generated `DocumentIds` tag to acquire the
+ * {@link DocumentIdsService}.
  *
  * @category Services
  */

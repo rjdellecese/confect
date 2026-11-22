@@ -4,7 +4,8 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
 /**
- * Native Convex metadata returned by getDeployment and getFunction.
+ * Native Convex metadata describing the running function and its deployment,
+ * returned by `getFunction` and `getDeployment` respectively.
  *
  * @category Models
  */
@@ -14,23 +15,23 @@ const make = (
   meta: Pick<QueryMeta, "getFunctionMetadata" | "getDeploymentMetadata">,
 ) => ({
   /**
-   * Read metadata for the current function, including its name and component.
+   * Reads the current function's name, component path, type, and visibility.
    *
    * @category Getters
    *
-   * @returns An Effect producing native FunctionMetadata; native rejection is a
-   *   defect.
+   * @returns An Effect producing native `FunctionMetadata`. A Convex rejection
+   *   is a defect.
    */
   getFunction: Effect.fn("ExecutionMetadata.getFunction")(() =>
     Effect.promise(() => meta.getFunctionMetadata()),
   ),
   /**
-   * Read metadata for the deployment executing this invocation.
+   * Reads the name, region, and class of the deployment running the function.
    *
    * @category Getters
    *
-   * @returns An Effect producing native DeploymentMetadata; native rejection is
-   *   a defect.
+   * @returns An Effect producing native `DeploymentMetadata`. A Convex
+   *   rejection is a defect.
    */
   getDeployment: Effect.fn("ExecutionMetadata.getDeployment")(() =>
     Effect.promise(() => meta.getDeploymentMetadata()),
@@ -38,11 +39,11 @@ const make = (
 });
 
 /**
- * Function/deployment metadata service available in every function context.
- * Acquire the generated `ExecutionMetadata` tag; metadata remains
- * Convex-owned.
+ * Tag for the service that identifies the running function and deployment.
+ * Yield the generated `ExecutionMetadata` tag in a query, mutation, action, or
+ * HTTP handler to read the native metadata.
  *
- * @category Services
+ * @category Tags
  */
 export class ExecutionMetadata extends Context.Service<
   ExecutionMetadata,

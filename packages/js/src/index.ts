@@ -1,12 +1,14 @@
 /**
- * Scoped Effect client for one-shot calls and reactive query streams.
+ * Client service, layer, and error type for scoped WebSocket calls and reactive
+ * queries.
  *
- * @category Services
+ * @category Re-exports
  */
 export * as WebSocketClient from "./WebSocketClient";
 /**
- * Effect client for one-shot HTTP calls, with explicit token management.
+ * Client service, layer, and error type for one-shot HTTP calls with explicit
+ * token management.
  *
- * @category Services
+ * @category Re-exports
  */
 export * as HttpClient from "./HttpClient";

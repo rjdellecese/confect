@@ -76,12 +76,19 @@ export interface Base<
 }
 
 /**
- * A reference to a single Convex function, as callers see it: the wire name
- * plus the data needed to encode args, decode returns, and decode typed errors.
- * A ref is one of two shapes, keyed by the spec's provenance. Import refs from
- * your generated `refs` module and pass a leaf to a client, function runner, or
- * scheduler; do not treat it as a callable function. The generic args and
- * returns describe decoded values, not wire encodings.
+ * A generated reference that identifies one Convex function by its wire name.
+ * Its type parameters describe the arguments callers supply, the result they
+ * receive, and any declared failures.
+ *
+ * **When to use**
+ *
+ * Use with a client, function runner, or scheduler: pass a leaf from the
+ * generated `refs` module rather than calling the ref as a function.
+ *
+ * **Details**
+ *
+ * A `Confect` ref carries codecs for its arguments, result, and declared
+ * failures. A `Convex` ref passes arguments and results through unchanged.
  *
  * @category Models
  */
@@ -109,16 +116,19 @@ export type Ref<
     >;
 
 /**
- * A generated ref for a function declared with Effect codecs. Arguments are
- * derived from the declared field map, and return/error types from their
- * codecs. The failure type also includes errors from covering middleware. Use
- * the generated refs rather than constructing this shape yourself.
+ * A generated reference to a function declared with Effect codecs. Its argument
+ * type comes from the field map, its result type from the return codec, and its
+ * failure type from both the function and its middleware.
  *
- * The `args`, `returns`, and optional function `error` codecs are lazy. The
- * `error` field does not include middleware errors; those are tracked
- * separately in the ref's middleware metadata.
+ * **Details**
+ *
+ * The `args`, `returns`, and optional `error` codecs are lazy. The `error`
+ * field contains only the function's own failure codec; the middleware
+ * declarations carry their failure codecs separately.
  *
  * @category Models
+ *
+ * @see {@link ConvexRef} for a registered Convex function without Confect codecs.
  */
 export type ConfectRef<
   RuntimeAndFunctionType_ extends RuntimeAndFunctionType.RuntimeAndFunctionType,
@@ -212,6 +222,8 @@ interface ConfectRefWithTypes<
  * callers pass its args and results through without codec conversion.
  *
  * @category Models
+ *
+ * @see {@link ConfectRef} for a function declared with Effect codecs.
  */
 export interface ConvexRef<
   RuntimeAndFunctionType_ extends RuntimeAndFunctionType.RuntimeAndFunctionType,

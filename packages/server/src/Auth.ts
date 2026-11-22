@@ -8,11 +8,13 @@ import * as Schema from "effect/Schema";
 
 const make = (auth: ConvexAuth) => ({
   /**
-   * Read the invocation's authenticated Convex identity.
+   * Effect that reads the caller's Convex identity. Yield
+   * `auth.getUserIdentity` without calling it.
    *
-   * This is an Effect property, not a function. It fails with
-   * {@link NoUserIdentityFoundError} when no identity is present; unexpected
-   * native failures are defects.
+   * **Gotchas**
+   *
+   * An unauthenticated invocation fails with {@link NoUserIdentityFoundError}
+   * rather than returning `null`. An unexpected Convex failure is a defect.
    *
    * @category Authentication
    */
@@ -30,11 +32,11 @@ const make = (auth: ConvexAuth) => ({
 });
 
 /**
- * Authentication service available in queries, mutations, actions and HTTP
- * handlers. Import the application's generated `Auth` tag and yield it to
- * obtain `getUserIdentity`; Confect supplies the invocation-local service.
+ * Tag for the current invocation's authentication service. Yield the
+ * application's generated `Auth` tag in a query, mutation, action, or HTTP
+ * handler to access `getUserIdentity`.
  *
- * @category Services
+ * @category Tags
  */
 export class Auth extends Context.Service<Auth, ReturnType<typeof make>>()(
   "@confect/server/Auth",
@@ -46,8 +48,8 @@ export class Auth extends Context.Service<Auth, ReturnType<typeof make>>()(
 export const layer = (auth: ConvexAuth) => Layer.succeed(Auth, make(auth));
 
 /**
- * Typed failure of `Auth.getUserIdentity` when the invocation is
- * unauthenticated. Catch the `NoUserIdentityFoundError` tag; there is no
+ * Tagged failure of `getUserIdentity` when the caller is unauthenticated. Match
+ * `NoUserIdentityFoundError` to handle a missing identity; the error carries no
  * additional payload.
  *
  * @category Errors
@@ -57,9 +59,10 @@ export class NoUserIdentityFoundError extends Schema.TaggedError<
   {}
 >()("NoUserIdentityFoundError", {}) {
   /**
-   * Describe the missing identity without exposing authentication data.
+   * Returns a message describing the missing identity without exposing
+   * authentication data.
    *
-   * @category Errors
+   * @category Getters
    */
   override get message(): string {
     return "No user identity found";

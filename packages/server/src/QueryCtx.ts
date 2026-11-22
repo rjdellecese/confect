@@ -18,8 +18,13 @@ export const QueryCtx = <
   Context.Service<GenericQueryCtx<DataModel>>("@confect/server/QueryCtx");
 
 /**
- * Native Convex query context exposed by the generated `QueryCtx` service. Its
- * methods return Convex values/Promises, not Confect's decoded Effects.
+ * Native Convex context obtained by yielding the generated `QueryCtx` tag
+ * inside a query.
+ *
+ * **When to use**
+ *
+ * Use with code that expects a Convex query context. Database reads expose
+ * encoded values rather than Confect's decoded documents.
  *
  * @category Services
  */

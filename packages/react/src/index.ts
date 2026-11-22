@@ -36,16 +36,16 @@ import type {
 
 export type {
   /**
-   * Decoded user arguments for a paginated query, excluding the hook-managed
-   * `paginationOpts`.
+   * Decoded argument type for a paginated query, excluding the `paginationOpts`
+   * supplied by the hook.
    *
-   * @category Models
+   * @category Re-exports
    */
   PaginatedArgs as PaginatedQueryArgs,
   /**
-   * One decoded item from a paginated query's page schema.
+   * Decoded item type for one element of a paginated query's `page`.
    *
-   * @category Models
+   * @category Re-exports
    */
   PaginatedItem as PaginatedQueryItem,
 } from "@confect/core/Ref";
@@ -57,21 +57,23 @@ const encodeJson = Schema.Unknown.pipe(
 
 export {
   /**
-   * Decoded optimistic cache access and helpers for paginated updates.
+   * Cache interface and pagination helpers for applying optimistic mutation
+   * updates to decoded query values.
    *
-   * @category Optimistic updates
+   * @category Re-exports
    */
   OptimisticLocalStore,
   /**
-   * Paginated result variants, narrowing predicates, and exhaustive matching.
+   * States, type guards, and matching helpers for a list loaded one page at a
+   * time.
    *
-   * @category Models
+   * @category Re-exports
    */
   PaginatedQueryResult,
   /**
-   * Query result variants, narrowing predicates, and exhaustive matching.
+   * States, type guards, and matching helpers for a reactive query result.
    *
-   * @category Models
+   * @category Re-exports
    */
   QueryResult,
   /**
@@ -81,34 +83,51 @@ export {
 };
 
 /**
- * @category Optimistic updates
+ * Helpers for updating locally cached pages during an optimistic mutation.
+ *
+ * @category Re-exports
  */
 export {
   /**
-   * @category Optimistic updates
+   * Updates decoded items across all loaded pages matching the query and its
+   * user arguments.
+   *
+   * @category Re-exports
    */
   optimisticallyUpdateValueInPaginatedQuery,
   /**
-   * @category Optimistic updates
+   * Prepends a decoded item to the first matching initial page if it is loaded.
+   *
+   * @category Re-exports
    */
   insertAtTop,
   /**
-   * @category Optimistic updates
+   * Appends a decoded item to a matching loaded page only if that page reaches
+   * the end of the query.
+   *
+   * @category Re-exports
    */
   insertAtBottomIfLoaded,
   /**
-   * @category Optimistic updates
+   * Inserts a decoded item into each matching pagination instance according to
+   * the server's sort order.
+   *
+   * @category Re-exports
    */
   insertAtPosition,
 } from "./OptimisticLocalStore";
 
 /**
- * The promise returned by a mutation or action handle: a decoded value when the
- * ref has no typed error, otherwise an Effect `Result` of the decoded value or
- * declared error. Codec failures and undeclared failures reject the promise;
- * they are never added to the `Result`'s error type.
+ * The promise returned by a mutation or action handle. It resolves directly to
+ * the decoded value for a ref without a typed error, or to an Effect `Result`
+ * when the function or its middleware declares an error.
  *
- * @category Models
+ * **Gotchas**
+ *
+ * Argument encoding, result decoding, and undeclared failures reject the
+ * promise rather than producing a failed `Result`.
+ *
+ * @category Utility types
  */
 export type InvokeReturn<Ref_ extends Ref.Any> = [Ref.Error<Ref_>] extends [
   never,
@@ -123,9 +142,13 @@ type UseQueryArgs<Query extends Ref.AnyPublicQuery> =
 
 /**
  * Subscribes to a public query through the surrounding Convex React provider.
- * Arguments are encoded and results decoded with the ref's schemas. The result
- * identity is stable across renders while the ref, query result, and skipped
- * state are unchanged.
+ * The result distinguishes a pending or skipped query from a decoded value or a
+ * declared failure.
+ *
+ * **Details**
+ *
+ * The result keeps its identity across renders while the ref, underlying value
+ * or error, and skipped state stay unchanged.
  *
  * @category Hooks
  *
@@ -191,22 +214,21 @@ export const useQuery = <Query extends Ref.AnyPublicQuery>(
 };
 
 /**
- * The args parameter of {@link usePaginatedQuery}: the ref's args without
- * `paginationOpts`, or `"skip"` to skip the query.
+ * Decoded user arguments for {@link usePaginatedQuery}, or `"skip"` to leave the
+ * query unsubscribed. The hook supplies `paginationOpts`.
  *
- * @category Models
+ * @category Utility types
  */
 export type UsePaginatedQueryArgs<Query extends Ref.AnyPublicPaginatedQuery> =
   | PaginatedQueryArgs<Query>
   | "skip";
 
 /**
- * Convex's options for {@link usePaginatedQuery}. `initialNumItems` is the
- * requested number of items in the first page; choose a positive page size.
- * Later pages are requested through the result's `loadMore(numItems)`
- * callback.
+ * Options for {@link usePaginatedQuery}. Set `initialNumItems` to the number of
+ * items to request for the first page; `loadMore(numItems)` sets the target for
+ * each later page.
  *
- * @category Options
+ * @category Configuration
  */
 export type PaginatedQueryOptions = Parameters<
   typeof useConvexPaginatedQuery
@@ -283,20 +305,20 @@ const supportsErrorsAsValues = ((): boolean => {
 })();
 
 /**
- * Load data reactively from a paginated query defined with
- * `FunctionSpec.publicPaginatedQuery`, mirroring the ergonomics of
- * `usePaginatedQuery` from `convex/react`.
+ * Subscribes to a paginated query through the Convex React provider and returns
+ * its decoded items and loading state as a
+ * {@link PaginatedQueryResult.PaginatedQueryResult}.
  *
- * Args are encoded via the ref's user-args schema (`paginationOpts` is managed
- * by the Convex hook, not the caller), and each loaded page is decoded via the
- * ref's item schema.
+ * **Details**
  *
- * Returns a {@link PaginatedQueryResult.PaginatedQueryResult}: the loaded
- * variants carry `results` and `isLoading`, and `CanLoadMore` additionally
- * carries `loadMore`; if the `Ref` declares an `error` schema and the query
- * fails with that typed error, the decoded error is returned as the `Failure`
- * variant, which also carries the pages loaded before the failure. Unknown
- * errors are thrown, to be caught by an error boundary.
+ * The hook manages `paginationOpts` and decodes each item with the ref. Only
+ * `CanLoadMore` exposes `loadMore`. A declared failure retains the items loaded
+ * before the error.
+ *
+ * **Gotchas**
+ *
+ * This hook requires Convex 1.36.0 or newer, including when the query is
+ * skipped.
  *
  * @category Hooks
  *
@@ -312,6 +334,8 @@ const supportsErrorsAsValues = ((): boolean => {
  * @throws During render for codec failures, undeclared query failures, invalid
  *   pagination options/refs, a missing Convex provider, or Convex older than
  *   1.36.0.
+ *
+ * @see {@link useStreamPaginatedQuery} for queries that use `QueryStream.paginate`.
  */
 export const usePaginatedQuery = <Query extends Ref.AnyPublicPaginatedQuery>(
   ref: Query,
@@ -440,25 +464,27 @@ const isInvalidCursorError = (error: Error): boolean =>
 const NO_ITEMS: ReadonlyArray<unknown> = [];
 
 /**
- * EXPERIMENTAL—endCursor-pinned reactive pagination (see
- * `notes/stream-based-querying.md`). Use it with paginated queries whose
- * handlers paginate via `QueryStream.paginate`: those don't write the query
- * journal that {@link usePaginatedQuery}'s built-in reactivity relies on, so
- * gap-free pages must be maintained by the client instead. (It works with any
- * paginated query honoring the `endCursor` protocol field, including the
- * built-in `paginate`.)
+ * Subscribes to a paginated query using fixed cursor ranges so adjacent pages
+ * stay contiguous as their contents change. This hook is experimental.
  *
- * Each loaded page is pinned to a fixed index range by re-subscribing it with
- * its `continueCursor` echoed back as `endCursor`—pages then grow and shrink
- * reactively but always meet exactly, and a page that outgrows
- * `initialNumItems` is split in two. This is the mechanism of
- * `convex-helpers/react`'s `usePaginatedQuery`, re-expressed over the pure
- * {@link StreamPagination} state machine, with args/items/errors codec'd through
- * the ref's schemas exactly like {@link usePaginatedQuery}.
+ * **When to use**
+ *
+ * Use with `QueryStream.paginate`, which does not write Convex's pagination
+ * journal, or another query that honors `paginationOpts.endCursor`.
+ *
+ * **Details**
+ *
+ * The hook pins a loaded page by passing its `continueCursor` back as the end
+ * of its range. It can split a page when the server supplies a split cursor and
+ * the page exceeds the target size or the server requests a split.
+ *
+ * **Gotchas**
  *
  * Changing the query, encoded arguments, skipped state, initial page size, or
- * read budgets restarts pagination. An `InvalidCursor` response also restarts
- * at the first page instead of producing a failure result.
+ * read budgets restarts at the first page. An `InvalidCursor` response also
+ * restarts pagination instead of returning `Failure`. A server
+ * `ReadBudgetExceededError` cannot be resolved by splitting; increase the
+ * budget or reduce the reads.
  *
  * @category Hooks
  *
@@ -474,9 +500,9 @@ const NO_ITEMS: ReadonlyArray<unknown> = [];
  *   longer used.
  *
  * @throws During render for codec failures, undeclared query failures, invalid
- *   refs, or missing Convex provider context. A server
- *   `ReadBudgetExceededError` cannot be fixed by splitting; increase the budget
- *   or reduce server reads.
+ *   refs, or a missing Convex provider.
+ *
+ * @see {@link usePaginatedQuery} for Convex's journal-backed pagination.
  */
 export const useStreamPaginatedQuery = <
   Query extends Ref.AnyPublicPaginatedQuery,
@@ -488,17 +514,16 @@ export const useStreamPaginatedQuery = <
      * Target item count for the first page and threshold for splitting growing
      * pages.
      *
-     * @category Options
+     * @category Configuration
      */
     readonly initialNumItems: number;
     /**
-     * Per-page row-read budget forwarded as `paginationOpts.maximumRowsRead`.
-     * At a safe boundary the server can return `SplitRequired` for the hook to
-     * split; if safe progress is impossible, it fails with
-     * `ReadBudgetExceededError`. This does not bound arbitrary reads inside
-     * server callbacks.
+     * Per-page row budget sent as `paginationOpts.maximumRowsRead`. A stream
+     * query can return `SplitRequired` at a safe boundary or fail with
+     * `ReadBudgetExceededError` if it cannot make progress. The budget does not
+     * bound arbitrary reads in server callbacks.
      *
-     * @category Options
+     * @category Configuration
      */
     readonly maximumRowsRead?: number;
     /**
@@ -507,7 +532,7 @@ export const useStreamPaginatedQuery = <
      * `ReadBudgetExceededError`; it does not guarantee that all Convex
      * execution limits are respected.
      *
-     * @category Options
+     * @category Configuration
      */
     readonly maximumBytesRead?: number;
   },
@@ -729,9 +754,15 @@ export const useStreamPaginatedQuery = <
 };
 
 /**
- * An optimistic update for a Confect mutation. Mirrors Convex's
- * `OptimisticUpdate`, but receives a Confect {@link OptimisticLocalStore} and
- * the decoded mutation `args`.
+ * Callback that applies temporary changes to an
+ * {@link OptimisticLocalStore.OptimisticLocalStore} using the mutation's
+ * decoded arguments.
+ *
+ * **Gotchas**
+ *
+ * The callback must be synchronous. Convex may replay it when new query data
+ * arrives, so avoid external side effects and do not retain the store for later
+ * use.
  *
  * @category Optimistic updates
  *
@@ -739,10 +770,8 @@ export const useStreamPaginatedQuery = <
  *   write replacements rather than mutating values obtained from the store.
  * @param args - The mutation's decoded arguments, not its wire representation.
  *
- * @returns Nothing. The callback must be synchronous and may be replayed when
- *   new query data arrives while the mutation is pending. Convex rolls back the
- *   temporary updates once the mutation completes. Do not perform external side
- *   effects or retain the store for asynchronous use.
+ * @returns Nothing. Convex rolls back temporary changes once the mutation
+ *   completes.
  */
 export type OptimisticUpdate<Mutation extends Ref.AnyPublicMutation> = (
   localStore: OptimisticLocalStore.OptimisticLocalStore,
@@ -750,26 +779,24 @@ export type OptimisticUpdate<Mutation extends Ref.AnyPublicMutation> = (
 ) => void;
 
 /**
- * The handle returned by {@link useMutation}. It is callable like the function
- * returned by Convex's `useMutation`, and additionally exposes
- * `withOptimisticUpdate` for attaching an optimistic update. Mirrors the
- * `ReactMutation` type from `convex/react`.
+ * Callable mutation handle returned by {@link useMutation}. Call it with decoded
+ * arguments, or use `withOptimisticUpdate` to create a handle that also changes
+ * the local cache.
  *
- * @category Invocation
+ * @category Models
  */
 export interface ReactMutation<Mutation extends Ref.AnyPublicMutation> {
   /**
-   * Invokes the mutation with decoded arguments, omitted only for an
-   * argument-free ref. Resolves to the decoded value without a typed error
-   * schema, or `Result<value, error>` with one. Codec and undeclared failures
-   * reject the promise rather than becoming a failed `Result`.
+   * Invokes the mutation with decoded arguments. Omit them only for an
+   * argument-free ref. The promise follows {@link InvokeReturn}: undeclared and
+   * codec failures reject it.
    *
-   * @category Invocation
+   * @category Running
    */
   (...args: Ref.OptionalArgs<Mutation>): InvokeReturn<Mutation>;
   /**
-   * Returns a new mutation handle with a synchronous optimistic callback; the
-   * original handle is unchanged. Call the new handle to apply the update.
+   * Returns a new mutation handle with a synchronous optimistic callback. Call
+   * the new handle to apply the update; the original handle stays unchanged.
    *
    * @category Optimistic updates
    *
@@ -827,20 +854,19 @@ const makeReactMutation = <Mutation extends Ref.AnyPublicMutation>(
 };
 
 /**
- * Returns a {@link ReactMutation} handle for the provided `Ref`'s mutation. The
- * handle is callable to invoke the mutation, and exposes `withOptimisticUpdate`
- * for attaching an optimistic update, mirroring `useMutation` from
- * `convex/react`.
+ * Returns a memoized {@link ReactMutation} for invoking a public mutation with
+ * decoded arguments and optionally applying an optimistic update.
  *
- * If the `Ref` declares an `error` schema, the returned promise resolves to a
- * `Result` with the decoded `returns` value in the `Success` and the decoded
- * error in the `Failure`.
+ * **Details**
  *
- * If the `Ref` does not declare an `error` schema, the promise resolves
- * directly to the decoded `returns` value, matching the behavior of
- * `useMutation` from `convex/react`.
+ * Calling the handle resolves to a decoded value if the ref has no declared
+ * error. If the function or its middleware declares an error, the promise
+ * resolves to a `Result` containing the decoded value or declared failure.
  *
- * Any other failure rejects the promise.
+ * **Gotchas**
+ *
+ * Codec failures and undeclared failures reject the promise. They do not become
+ * `Result` values.
  *
  * @category Hooks
  *
@@ -848,10 +874,12 @@ const makeReactMutation = <Mutation extends Ref.AnyPublicMutation>(
  *   provider. The returned handle accepts decoded arguments; omit them only for
  *   an argument-free mutation.
  *
- * @returns A memoized callable handle, stable while the ref and underlying
- *   Convex handle are unchanged. Codec failures reject its invocation promise.
+ * @returns A callable handle, stable while the ref and underlying Convex handle
+ *   are unchanged.
  *
  * @throws During render if the Convex provider is missing.
+ *
+ * @see {@link OptimisticUpdate} for the synchronous cache callback accepted by the handle.
  */
 export const useMutation = <Mutation extends Ref.AnyPublicMutation>(
   ref: Mutation,
@@ -872,17 +900,19 @@ export const useMutation = <Mutation extends Ref.AnyPublicMutation>(
 };
 
 /**
- * Returns a function that invokes the provided `Ref`'s action.
+ * Returns a memoized function that invokes a public action with decoded
+ * arguments through the surrounding Convex React provider.
  *
- * If the `Ref` declares an `error` schema, the returned promise resolves to a
- * `Result` with the decoded `returns` value in the `Success` and the decoded
- * error in the `Failure`.
+ * **Details**
  *
- * If the `Ref` does not declare an `error` schema, the promise resolves
- * directly to the decoded `returns` value, matching the behavior of `useAction`
- * from `convex/react`.
+ * Calling the function resolves to a decoded value if the ref has no declared
+ * error. If the action or its middleware declares an error, the promise
+ * resolves to a `Result` containing the decoded value or declared failure.
  *
- * Any other failure rejects the promise.
+ * **Gotchas**
+ *
+ * Codec failures and undeclared failures reject the promise. Actions cannot
+ * attach optimistic updates.
  *
  * @category Hooks
  *
@@ -890,11 +920,11 @@ export const useMutation = <Mutation extends Ref.AnyPublicMutation>(
  *   provider. The returned function accepts decoded arguments; omit them only
  *   for an argument-free action.
  *
- * @returns A memoized invocation function. Argument encoding and result
- *   decoding failures reject its promise, and actions do not expose optimistic
- *   updates.
+ * @returns An invocation function that follows {@link InvokeReturn}.
  *
  * @throws During render if the Convex provider is missing.
+ *
+ * @see {@link useMutation} to invoke a mutation with an optimistic update.
  */
 export const useAction = <Action extends Ref.AnyPublicAction>(
   ref: Action,

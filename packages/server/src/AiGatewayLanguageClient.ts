@@ -6,11 +6,9 @@ import * as InternalAiGatewayLanguageClient from "./internal/AiGatewayLanguageCl
 import * as AiGatewayServiceToken from "./internal/AiGatewayServiceToken";
 
 /**
- * Public gateway availability failures and their schema/union.
- * AiGatewayDisabled means the plan or gateway setting disallows access;
- * AiGatewayUnavailable means this deployment cannot use the gateway. Neither
- * failure has extra payload fields. These aliases remain public although their
- * definitions live in an internal file.
+ * Tagged errors for a disabled gateway or an unsupported deployment, and the
+ * schema that accepts either error. Both gateway clients expose the same
+ * errors; neither error carries additional payload fields.
  *
  * @category Errors
  */
@@ -21,13 +19,15 @@ export {
 } from "./internal/AiGatewayServiceToken";
 
 /**
- * The client service configured for Convex AI gateway language models.
+ * Service tag for the OpenAI-compatible client used by gateway language models.
+ * Provide {@link layer} to authenticate requests with the current Convex
+ * deployment.
  *
- * @category Services
+ * @category Tags
  */
 export const AiGatewayLanguageClient = OpenAiClient.OpenAiClient;
 /**
- * Effect requirement of a language model using the gateway client layer.
+ * Client requirement of a gateway language model, satisfied by {@link layer}.
  *
  * @category Services
  */
@@ -50,16 +50,21 @@ export const make: Effect.Effect<
 );
 
 /**
- * Provide the AI gateway language model client using the current Effect HTTP
- * client.
+ * Layer that provides the OpenAI-compatible client for `AiGatewayLanguageModel`
+ * using an Effect `HttpClient` in a running Convex action.
  *
- * Requires an Effect HttpClient (for example FetchHttpClient.layer) and a
- * running Convex action. Layer construction can fail with AiGatewayDisabled or
- * AiGatewayUnavailable. Credentials are obtained again for outgoing requests;
- * later failures surface through the model/HTTP client's error contract.
+ * **Details**
  *
- * This layer supplies the gateway language client and can be provided to
- * AiGatewayLanguageModel.model(...); it is a value, not a layer factory.
+ * The layer checks gateway access when built and obtains a bearer token for
+ * each outgoing request. Provide an HTTP client such as `FetchHttpClient.layer`
+ * for transport.
+ *
+ * **Gotchas**
+ *
+ * Building the layer can fail with `AiGatewayDisabled` or
+ * `AiGatewayUnavailable`. If token acquisition fails with either error later,
+ * the request is not sent: the HTTP client reports a transport error, and model
+ * operations report an AI network error.
  *
  * @category Layers
  */

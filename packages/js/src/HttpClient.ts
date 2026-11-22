@@ -6,9 +6,14 @@ import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 
 /**
- * A transport or backend failure that could not be decoded as the ref's typed
- * error. Recover with `Effect.catchTag("HttpClientError", ...)`; schema
- * failures from encoding arguments or decoding results use `Schema.SchemaError`
+ * An HTTP request failure that could not be decoded as one of the ref's
+ * declared errors. Handle it with `Effect.catchTag("HttpClientError", ...)` and
+ * inspect `cause` for the original rejection.
+ *
+ * **Details**
+ *
+ * A matching declared error appears directly in the Effect's error channel.
+ * Argument encoding and result decoding failures use `Schema.SchemaError`
  * instead.
  *
  * @category Errors
@@ -121,9 +126,12 @@ const make = (
      */
     url: client.url,
     /**
-     * Sets the JWT used by subsequent requests when the returned Effect runs.
-     * The token is shared by all users of this service instance; use separate
-     * layers for callers that must not share authentication state.
+     * Sets the JWT for subsequent requests when the returned Effect runs.
+     *
+     * **Gotchas**
+     *
+     * All callers using this client share the token. Provide separate client
+     * instances for independent sessions.
      *
      * @category Authentication
      *
@@ -133,9 +141,13 @@ const make = (
      */
     setAuth,
     /**
-     * Clears the shared authentication token when this Effect runs. Yield the
-     * Effect itself (`yield* client.clearAuth`), rather than calling a method.
-     * Subsequent requests are unauthenticated; there is no typed failure.
+     * Effect that clears the client's shared token so subsequent requests are
+     * unauthenticated. It has no typed failure.
+     *
+     * **Gotchas**
+     *
+     * Yield the Effect itself (`yield* client.clearAuth`); this property is not
+     * a method.
      *
      * @category Authentication
      */
@@ -143,7 +155,7 @@ const make = (
     /**
      * Runs a public query once, encoding its arguments and decoding its result.
      *
-     * @category Invocation
+     * @category Running
      *
      * @param ref - The public query ref, usually from generated `refs`.
      * @param rest - Decoded arguments; omit them only for an argument-free ref.
@@ -154,15 +166,20 @@ const make = (
      */
     query,
     /**
-     * Runs a public mutation with decoded arguments. Mutations are queued by
-     * default on this HTTP client.
+     * Runs a public mutation with decoded arguments and queues it behind
+     * earlier mutations on the same HTTP client by default.
      *
-     * @category Invocation
+     * **Gotchas**
+     *
+     * To bypass the queue for one call, pass `{ skipQueue: true }` after the
+     * arguments. For an argument-free mutation, pass `{}` or `undefined` before
+     * the options.
+     *
+     * @category Running
      *
      * @param ref - The public mutation ref.
-     * @param rest - Decoded arguments followed by Convex `HttpMutationOptions`.
-     *   To pass options for an argument-free mutation, pass `{}` first. Set
-     *   `skipQueue: true` to bypass the client's mutation queue.
+     * @param rest - Decoded arguments followed by optional Convex
+     *   `HttpMutationOptions`.
      *
      * @returns An Effect of the decoded result, failing with the ref's typed
      *   error, `HttpClientError` for other request failures, or
@@ -172,7 +189,7 @@ const make = (
     /**
      * Runs a public action, encoding its arguments and decoding its result.
      *
-     * @category Invocation
+     * @category Running
      *
      * @param ref - The public action ref.
      * @param rest - Decoded arguments; omit them only for an argument-free ref.
@@ -186,48 +203,60 @@ const make = (
 };
 
 /**
- * A Confect client which uses HTTP to communicate with your Convex backend.
- * Works in any JS runtime that supports `fetch`. Wraps
- * [ConvexHttpClient](https://docs.convex.dev/api/classes/browser.ConvexHttpClient).
+ * Service tag for one-shot queries, mutations, and actions over HTTP. Provide
+ * {@link layer} to use Confect refs with
+ * [ConvexHttpClient](https://docs.convex.dev/api/classes/browser.ConvexHttpClient)
+ * in a runtime that supports `fetch`.
  *
- * @category Services
+ * @category Tags
  */
 export const HttpClient =
   // oxlint-disable-next-line effecttsgo/service-not-as-class -- Preserve the public structural Identifier and Effect requirement types; class identifiers would change those contracts.
   Context.Service<ReturnType<typeof make>>("@confect/js/HttpClient");
 
 /**
- * The Effect requirement supplied by {@link layer} and accessed with
- * {@link HttpClient}.
+ * Service requirement for Effects that use {@link HttpClient}; {@link layer}
+ * supplies the client.
  *
  * @category Services
  */
 export type HttpClient = typeof HttpClient.Identifier;
 
 /**
- * Provides an HTTP client service with its own authentication state and
- * mutation queue. Construction happens when the layer is built, not when it is
- * declared.
+ * Creates a layer that provides an HTTP client with its own authentication
+ * state and mutation queue.
+ *
+ * **Details**
+ *
+ * Building the layer constructs the client; declaring the layer makes no
+ * request and opens no WebSocket connection.
+ *
+ * **Gotchas**
+ *
+ * A constructor exception is a defect, not an `HttpClientError`.
+ *
+ * **Example** (Providing an HTTP client to read its deployment URL)
+ *
+ * ```ts
+ * import { HttpClient } from "@confect/js";
+ * import * as Effect from "effect/Effect";
+ *
+ * const deploymentUrl = Effect.gen(function* () {
+ *   const client = yield* HttpClient.HttpClient;
+ *   return client.url;
+ * }).pipe(
+ *   Effect.provide(HttpClient.layer("https://example.convex.cloud")),
+ * );
+ * ```
  *
  * @category Layers
- *
- * @example
- *   import { HttpClient } from "@confect/js";
- *   import * as Effect from "effect/Effect";
- *
- *   const deploymentUrl = Effect.gen(function* () {
- *     const client = yield* HttpClient.HttpClient;
- *     return client.url;
- *   }).pipe(Effect.provide(HttpClient.layer("https://example.convex.cloud")));
  *
  * @param address - The Convex deployment URL, such as
  *   `https://example.convex.cloud`.
  * @param options - Options forwarded to Convex's `ConvexHttpClient`
  *   constructor.
  *
- * @returns A layer providing {@link HttpClient}. Constructor exceptions are
- *   defects, not `HttpClientError` failures. No WebSocket or close finalizer is
- *   used.
+ * @returns A layer providing {@link HttpClient} without a connection finalizer.
  */
 export const layer = (
   address: string,

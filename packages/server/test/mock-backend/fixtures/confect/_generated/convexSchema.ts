@@ -7,10 +7,15 @@ import tagsTable from "./tables/tags";
 import usersTable from "./tables/users";
 
 /**
- * Convex validators and indexes for deployment and convex-test setup.
- * Importing this module constructs every table's deployment definition.
- * In function implementations, import individual handles from _generated/tables instead.
- * @category Deployment
+ * Convex schema containing the validators and indexes for every application table.
+ * Use it for deployment or pass it to the test backend.
+ *
+ * **Gotchas**
+ *
+ * Importing this module constructs every table's deployment definition. Import
+ * individual handles from `_generated/tables` in function implementations.
+ *
+ * @category schemas
  */
 export default defineSchema_({
   events: Table_.tableDefinition(eventsTable),

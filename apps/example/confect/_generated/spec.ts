@@ -7,6 +7,13 @@ import usersSpec from "../users.spec";
 import viewerSpec from "../viewer.spec";
 import workpoolSpec from "../workpool.spec";
 
+/**
+ * Function contract for the application, assembled from its group specs. Use it
+ * to inspect the complete function tree without loading handler implementations
+ * or evaluating the functions' schema factories.
+ *
+ * @category models
+ */
 const spec: Spec.Spec<{
   readonly email: GroupSpec_.NamedAt<typeof emailSpec, "email">;
   readonly env: GroupSpec_.NamedAt<typeof envSpec, "env">;

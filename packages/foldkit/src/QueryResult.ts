@@ -11,6 +11,8 @@ const TypeId = "~@confect/foldkit/QueryResult";
 
 interface Proto extends Pipeable.Pipeable, Equal.Equal {
   /**
+   * Brand shared by query results constructed or decoded by this module.
+   *
    * @category Models
    */
   readonly [TypeId]: typeof TypeId;
@@ -72,12 +74,15 @@ export interface Failure<E> extends Proto {
 }
 
 /**
- * The current result of a reactive query in a Foldkit Model. Subscription
- * eligibility belongs to the Model's subscription dependencies, not this value.
- * Subsequent results replace the previous success or failure without entering a
- * refreshing state. Values support piping and Effect equality and hashing.
- * Equality compares the variant and delegates payload comparison to Effect's
- * structural equality.
+ * The latest result of a reactive query in a Foldkit Model. Each success or
+ * failure replaces the previous result without an intermediate refreshing
+ * state. The Model's subscription dependencies, not this value, decide whether
+ * to listen.
+ *
+ * **Details**
+ *
+ * Results support piping, equality, and hashing. Equality compares the variant
+ * and delegates value or error comparison to Effect.
  *
  * @category Models
  */
@@ -135,8 +140,8 @@ const Proto = {
 };
 
 /**
- * Constructs a query awaiting its first result. This only creates Model state;
- * it does not open or restart a subscription.
+ * Creates a loading result for a Model field. It does not open or restart the
+ * query subscription.
  *
  * @category Constructors
  */
@@ -144,7 +149,7 @@ export const load = (): Loading =>
   Object.assign(Object.create(Proto), { _tag: "Loading" });
 
 /**
- * Stores a successful result without copying or modifying its value.
+ * Creates a success result that retains the supplied value unchanged.
  *
  * @category Constructors
  */
@@ -155,7 +160,7 @@ export const succeed = <A>(value: A): Success<A> =>
   });
 
 /**
- * Stores a failed result without copying or modifying its error.
+ * Creates a failure result that retains the supplied error unchanged.
  *
  * @category Constructors
  */
@@ -166,15 +171,29 @@ export const fail = <E>(error: E): Failure<E> =>
   });
 
 /**
- * Builds a Model field schema, preserving the supplied value and error codecs.
- * Encodes tagged records and restores piping, equality, and hashing on decode.
- * The error schema defaults to `Schema.Never` when omitted.
+ * Creates a codec for a query result stored in the Model. It encodes tagged
+ * records with the supplied payload codecs and restores piping, equality, and
+ * hashing when decoding.
+ *
+ * **Gotchas**
+ *
+ * The error codec defaults to `Schema.Never`. Supply an error codec if the
+ * Model stores failed results.
+ *
+ * **Example** (Initializing a Model field for a list of notes)
+ *
+ * ```ts
+ * import * as QueryResult from "@confect/foldkit/QueryResult";
+ * import * as Schema from "effect/Schema";
+ *
+ * const Notes = QueryResult.QueryResult(
+ *   Schema.Array(Schema.String),
+ *   Schema.String,
+ * );
+ * export const initial: typeof Notes.Type = QueryResult.load();
+ * ```
  *
  * @category Schemas
- *
- * @example
- *   const Notes = QueryResult(Schema.Array(Schema.String), Schema.String);
- *   const initial = load();
  *
  * @param valueSchema - Codec for Success.value, including its encoded form and
  *   services.
@@ -240,7 +259,7 @@ export const QueryResult = <
 /**
  * Narrows a query result to its loading variant.
  *
- * @category Refinements
+ * @category Guards
  */
 export const isLoading = <A, E>(self: QueryResult<A, E>): self is Loading =>
   self._tag === "Loading";
@@ -248,7 +267,7 @@ export const isLoading = <A, E>(self: QueryResult<A, E>): self is Loading =>
 /**
  * Narrows a query result to its success variant.
  *
- * @category Refinements
+ * @category Guards
  */
 export const isSuccess = <A, E>(self: QueryResult<A, E>): self is Success<A> =>
   self._tag === "Success";
@@ -256,35 +275,40 @@ export const isSuccess = <A, E>(self: QueryResult<A, E>): self is Success<A> =>
 /**
  * Narrows a query result to its failure variant.
  *
- * @category Refinements
+ * @category Guards
  */
 export const isFailure = <A, E>(self: QueryResult<A, E>): self is Failure<E> =>
   self._tag === "Failure";
 
 /**
- * Matches all three states, passing only the value or error to its handler.
- * Supports `match(self, handlers)` and pipeable `match(handlers)(self)`. All
- * handlers are required, including onFailure when E is never. Returns the
- * selected handler's value without wrapping it or catching thrown exceptions.
+ * Returns the result of the handler for the current variant. `onLoading` takes
+ * no arguments; `onSuccess` and `onFailure` receive the stored value and error
+ * respectively. Supports both `match(self, handlers)` and pipeable
+ * `match(handlers)(self)`.
+ *
+ * **Gotchas**
+ *
+ * All three handlers are required, even when the error type is `never`.
+ * Exceptions thrown by a handler propagate.
  *
  * @category Pattern matching
  */
 export const match: {
   <A, E, X, Y, Z>(handlers: {
     /**
-     * Handle Loading; no payload is supplied.
+     * Handles Loading; no payload is supplied.
      *
      * @category Pattern matching
      */
     readonly onLoading: () => X;
     /**
-     * Handle Success using its stored value.
+     * Handles Success using its stored value.
      *
      * @category Pattern matching
      */
     readonly onSuccess: (value: A) => Y;
     /**
-     * Handle Failure using its stored error.
+     * Handles Failure using its stored error.
      *
      * @category Pattern matching
      */
@@ -294,19 +318,19 @@ export const match: {
     self: QueryResult<A, E>,
     handlers: {
       /**
-       * Handle Loading; no payload is supplied.
+       * Handles Loading; no payload is supplied.
        *
        * @category Pattern matching
        */
       readonly onLoading: () => X;
       /**
-       * Handle Success using its stored value.
+       * Handles Success using its stored value.
        *
        * @category Pattern matching
        */
       readonly onSuccess: (value: A) => Y;
       /**
-       * Handle Failure using its stored error.
+       * Handles Failure using its stored error.
        *
        * @category Pattern matching
        */

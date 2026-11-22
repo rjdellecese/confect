@@ -2,19 +2,25 @@ import type { Document } from "@confect/server";
 import type schemaDefinition from "./schema";
 
 /**
- * Decoded httpVectors document, including _id and _creationTime.
- * @category Models
+ * Decoded document from `httpVectors`, including the system fields `_id` and
+ * `_creationTime`.
+ *
+ * @category models
  */
 export type HttpVectorsDoc = Document.Document<typeof schemaDefinition, "httpVectors">;
 /**
- * Decoded transactionNotes document, including _id and _creationTime.
- * @category Models
+ * Decoded document from `transactionNotes`, including the system fields `_id` and
+ * `_creationTime`.
+ *
+ * @category models
  */
 export type TransactionNotesDoc = Document.Document<typeof schemaDefinition, "transactionNotes">;
 
 /**
- * Application table names mapped to decoded document types used by database services; excludes system tables.
- * @category Models
+ * Map from application table names to the decoded document types returned by the
+ * database services. System tables are not included.
+ *
+ * @category models
  */
 export interface Docs {
   httpVectors: HttpVectorsDoc;

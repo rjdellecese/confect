@@ -10,14 +10,15 @@ import { BlobNotFoundError } from "./BlobNotFoundError";
 
 const make = (storageReader: ConvexStorageReader) => ({
   /**
-   * Resolve a stored blob's download URL.
+   * Reads a stored blob's download URL without fetching its contents.
    *
    * @category Reading
    *
-   * @param storageId - ID in `_storage`.
+   * @param storageId - ID in the `_storage` table.
    *
-   * @returns An Effect producing a URL or failing with BlobNotFoundError when
-   *   absent. Native failures and invalid returned URLs are defects.
+   * @returns An Effect producing a `URL`, or failing with
+   *   {@link BlobNotFoundError} if no URL exists. An invalid URL or Convex
+   *   rejection is a defect.
    */
   getUrl: (storageId: GenericId<"_storage">) =>
     Effect.promise(() => storageReader.getUrl(storageId)).pipe(
@@ -40,10 +41,10 @@ const make = (storageReader: ConvexStorageReader) => ({
 });
 
 /**
- * Compatibility storage reader supplied by Confect in all function contexts.
- * New code should use the generated unified `Storage` tag instead.
+ * Compatibility tag for reading blob download URLs in any function context. Use
+ * the generated `Storage` tag in new code.
  *
- * @category Services
+ * @category Tags
  */
 export class StorageReader extends Context.Service<
   StorageReader,

@@ -26,19 +26,26 @@ export interface Options {
 }
 
 /**
- * Create an Effect AI model backed by the Convex AI gateway.
+ * Creates an Effect AI model descriptor that provides `LanguageModel` through
+ * the Convex AI gateway.
  *
- * Model identifiers use Convex's `provider/model` format.
+ * **Details**
+ *
+ * Provide `AiGatewayLanguageClient.layer` and an Effect HTTP client to run the
+ * model. Request settings apply to both text generation and streaming; support
+ * for individual settings depends on the selected model.
  *
  * @category Constructors
  *
- * @param modelId - Gateway model identifier, for example "openai/gpt-4o-mini".
- * @param config - Upstream OpenAI-compatible request settings, such as
- *   temperature or max_output_tokens; support depends on the selected model.
+ * @param modelId - Gateway model identifier in `provider/model` format, such as
+ *   `"openai/gpt-4o-mini"`.
+ * @param config - OpenAI-compatible request defaults, such as `temperature` or
+ *   `max_output_tokens`.
  *
- * @returns An Effect AI model descriptor/layer. Provide
- *   AiGatewayLanguageClient.layer and an Effect HTTP client to run its
- *   operations.
+ * @returns A model descriptor that also serves as a layer requiring the gateway
+ *   language client.
+ *
+ * @see {@link withConfigOverride} to change request settings for one Effect.
  */
 export const model = (
   modelId: string,
@@ -78,9 +85,13 @@ export const layer = ({
 > => OpenAiLanguageModel.layer({ model: modelId, config });
 
 /**
- * Apply request configuration to an Effect AI operation within a local scope.
- * Pass upstream OpenAI-compatible overrides to this combinator and apply it to
- * the operation Effect. It retains the operation's success/error channels and
- * does not change the gateway model's supported capabilities.
+ * Applies OpenAI-compatible request settings to a single Effect. The supplied
+ * fields override inherited settings for that Effect without changing the
+ * model's defaults or capabilities.
+ *
+ * @category Configuration
+ *
+ * @returns An Effect with the same success and error types, or a function that
+ *   transforms the Effect when given only the overrides.
  */
 export const withConfigOverride = OpenAiLanguageModel.withConfigOverride;

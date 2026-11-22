@@ -16,9 +16,14 @@ export const MutationCtx = <
   Context.Service<GenericMutationCtx<DataModel>>("@confect/server/MutationCtx");
 
 /**
- * Native Convex mutation context exposed by the generated `MutationCtx`
- * service. Use Confect services instead when decoded schemas and Effect results
- * are needed.
+ * Native Convex context obtained by yielding the generated `MutationCtx` tag
+ * inside a mutation.
+ *
+ * **When to use**
+ *
+ * Use with code that expects a Convex mutation context. Its database methods
+ * work with encoded documents and native promises rather than Confect's decoded
+ * values and Effects.
  *
  * @category Services
  */

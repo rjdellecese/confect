@@ -1,7 +1,12 @@
 /**
- * Convex schema for deployment and convex-test setup. Do not import this module
- * from function runtime code; it constructs validators for every table.
+ * Deployment schema that the Convex CLI and `convex-test` read from
+ * `convex/schema.ts`.
  *
- * @category Deployment
+ * **Gotchas**
+ *
+ * Importing this schema constructs validators for every application table. Keep
+ * it out of function runtime code.
+ *
+ * @category Schemas
  */
 export { default } from "../confect/_generated/convexSchema";

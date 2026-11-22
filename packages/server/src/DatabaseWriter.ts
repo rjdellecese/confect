@@ -21,11 +21,11 @@ import * as QueryInitializer from "./QueryInitializer";
 import type * as Table from "./Table";
 
 /**
- * The argument accepted by `patch`: like `Partial<Doc>` without system fields,
- * but the fields that are already optional also accept `undefined`, since
- * setting a field to `undefined` unsets it.
+ * Partial update to a document's decoded user fields. Omit a field to leave it
+ * unchanged, or set an optional field to `undefined` to remove it. `_id` and
+ * `_creationTime` cannot be patched.
  *
- * @category Models
+ * @category Utility types
  */
 export type PatchValue<Doc> = {
   [
@@ -34,11 +34,10 @@ export type PatchValue<Doc> = {
 };
 
 /**
- * Writes to one application table, returned by `DatabaseWriterService.table`.
- * Inputs contain decoded user fields, not Convex's stored representation.
- * Signatures expose typed codec failures; native write failures are defects.
- * See DocumentEncodeError for the current limitation with inputs lacking
- * `_id`.
+ * Write operations for the application table selected by
+ * `DatabaseWriterService.table`. They accept decoded user fields and use the
+ * table's codec to produce the stored values. Native database failures are
+ * defects.
  *
  * @category Models
  */
@@ -48,24 +47,32 @@ export interface DatabaseWriterTableAccessor<
   Doc = DocumentByName_<DataModel_, TableName>,
 > {
   /**
-   * Encode and insert a new document.
+   * Encodes the user fields and inserts a document into the selected table.
+   *
+   * **Gotchas**
+   *
+   * The signature declares `DocumentEncodeError`, but constructing that error
+   * requires an input `_id`. If encoding fails on the usual input without
+   * `_id`, the effect dies instead.
    *
    * @category Writing
    *
    * @param document - Decoded user fields without `_id` or `_creationTime`.
    *
-   * @returns An effect yielding the new table-typed ID, or failing with
-   *   `DocumentEncodeError` if the fields cannot be encoded. Current
-   *   limitation: encoding failure on input without `_id` becomes a defect
-   *   while constructing that error, rather than the declared typed failure.
+   * @returns An effect yielding the new table-typed ID. Its declared failure
+   *   type is `DocumentEncodeError`.
    */
   readonly insert: (
     document: Document.WithoutSystemFields<Doc>,
   ) => Effect.Effect<GenericId<TableName>, Document.DocumentEncodeError>;
   /**
-   * Read, shallowly merge, encode, and replace a document within the mutation.
-   * Nested objects are replaced rather than recursively merged. Setting an
-   * optional field to `undefined` removes it; omitted fields remain unchanged.
+   * Reads the document, applies the patch to its decoded fields, and writes the
+   * encoded result in the same mutation.
+   *
+   * **Details**
+   *
+   * The merge is shallow: supplying a nested object replaces it. Omitted fields
+   * remain unchanged; `undefined` removes an optional field.
    *
    * @category Writing
    *
@@ -75,6 +82,8 @@ export interface DatabaseWriterTableAccessor<
    * @returns An effect completing with void. Missing documents fail with
    *   `GetByIdFailure`; reading or encoding can fail with `DocumentDecodeError`
    *   or `DocumentEncodeError`. Native database failures remain defects.
+   *
+   * @see {@link DatabaseWriterTableAccessor.replace} for a full replacement.
    */
   readonly patch: (
     id: GenericId<TableName>,
@@ -86,25 +95,31 @@ export interface DatabaseWriterTableAccessor<
     | Document.DocumentEncodeError
   >;
   /**
-   * Encode and replace all user fields, preserving Convex system fields.
+   * Replaces every user field with the encoded replacement, preserving `_id`
+   * and `_creationTime` without decoding the original document.
+   *
+   * **Gotchas**
+   *
+   * A missing target is a native database defect, not `GetByIdFailure`. If
+   * encoding fails on input without `_id`, constructing `DocumentEncodeError`
+   * also produces a defect.
    *
    * @category Writing
    *
    * @param id - ID of the document to replace.
    * @param value - Complete replacement in decoded form, without system fields.
    *
-   * @returns An effect completing with void or failing with
-   *   `DocumentEncodeError`. Native failures, including a missing target
-   *   document, are defects rather than `GetByIdFailure`; this operation does
-   *   not decode the old document. Current limitation: encoding failure without
-   *   an input `_id` becomes a defect while constructing DocumentEncodeError.
+   * @returns An effect completing with `void`, with `DocumentEncodeError` in
+   *   the declared error channel.
+   *
+   * @see {@link DatabaseWriterTableAccessor.patch} to update only selected fields.
    */
   readonly replace: (
     id: GenericId<TableName>,
     value: Document.WithoutSystemFields<Doc>,
   ) => Effect.Effect<void, Document.DocumentEncodeError>;
   /**
-   * Delete a document through Convex's native database writer.
+   * Deletes the document with the supplied ID from the selected table.
    *
    * @category Writing
    *
@@ -117,36 +132,42 @@ export interface DatabaseWriterTableAccessor<
 }
 
 /**
- * Write decoded documents through the generated `DatabaseWriter` service in a
- * mutation. The table handle supplies the codec for each write; `Docs`
- * optionally supplies the generated named document types.
+ * Service for writing decoded documents in a mutation. Yield the generated
+ * `DatabaseWriter` tag and select a bound application table to use its field
+ * codec. `Docs` optionally supplies the generated named document types.
+ *
+ * **Example** (Inserting a note with decoded fields)
+ *
+ * ```ts
+ * import * as Effect from "effect/Effect";
+ * import { DatabaseWriter } from "confect/_generated/services";
+ * import notesTable from "confect/_generated/tables/notes";
+ *
+ * export const insertNote = Effect.gen(function* () {
+ *   const writer = yield* DatabaseWriter;
+ *   return yield* writer.table(notesTable).insert({ text: "First note" });
+ * });
+ * ```
  *
  * @category Services
- *
- * @example
- *   import * as Effect from "effect/Effect";
- *   import { DatabaseWriter } from "./confect/_generated/services";
- *   import notesTable from "./confect/_generated/tables/notes";
- *
- *   const insertNote = Effect.gen(function* () {
- *     const writer = yield* DatabaseWriter;
- *     return yield* writer.table(notesTable).insert({ text: "First note" });
- *   });
  */
 export interface DatabaseWriterService<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
   Docs = {},
 > {
   /**
-   * Select an application table to insert, patch, replace, or delete documents.
+   * Selects an application table for writes without reading or changing any
+   * documents.
    *
    * @category Writing
    *
    * @param table - The table's bound handle from `_generated/tables/<name>`.
    *   System table handles are read-only.
    *
-   * @returns Write operations typed to the table's decoded fields and IDs.
-   *   Selecting the handle does not read or write documents.
+   * @returns Write operations typed to the selected table's decoded fields and
+   *   IDs.
+   *
+   * @see {@link DatabaseWriterTableAccessor} for the operations on the selected table.
    */
   readonly table: <Table_ extends DatabaseSchema.Tables<DatabaseSchema_>>(
     table: Table_ & {
@@ -282,9 +303,9 @@ export const DatabaseWriter = <
   >("@confect/server/DatabaseWriter");
 
 /**
- * The writer service requirement and uncustomized shape for a schema. Use the
- * generated `DatabaseWriter` tag to acquire it; {@link DatabaseWriterService}
- * additionally accepts the generated named-document registry.
+ * Service requirement for effects that write to this database schema. Yield the
+ * generated `DatabaseWriter` tag to acquire a {@link DatabaseWriterService} with
+ * the application's named document types.
  *
  * @category Services
  */

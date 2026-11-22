@@ -6,9 +6,15 @@ import tagsTable from "./tables/tags";
 import usersTable from "./tables/users";
 
 /**
- * Registry of all application table handles. A value import loads every table module.
- * Import the registry as a type for the full database model. In handlers, import only the table handles you use.
- * @category Schemas
+ * Registry of all application table handles. Import its type when a service or
+ * helper needs the full database model.
+ *
+ * **Gotchas**
+ *
+ * A value import loads every table module. In handlers, import individual handles
+ * from `_generated/tables` instead.
+ *
+ * @category schemas
  */
 const databaseSchema: DatabaseSchema_.DatabaseSchema<{
   readonly events: typeof eventsTable;

@@ -9,19 +9,19 @@ export {
   isTable,
   isUnnamedTable,
   /**
-   * Re-export of the lazy table-definition constructor from
-   * `@confect/core/Table`. Pass a callback producing the user-field codec and
-   * default-export the returned definition from a table file. Prefer the core
-   * import in application specs so they do not depend on the server package.
+   * Creates a lazy table definition from a callback returning the user-field
+   * codec. Default-export the definition from a table file. Application specs
+   * can import the same constructor from `@confect/core/Table` without
+   * depending on the server package.
    *
    * @category Constructors
    */
   make,
   /**
-   * The bound handle accepted by database readers and writers. Import an
-   * application table's handle from `_generated/tables/<name>`; import the
-   * read-only system handles {@link _storage} and {@link _scheduled_functions}
-   * from this module.
+   * Bound table handle used by database readers and writers. Import an
+   * application handle from `_generated/tables/<name>` or a read-only system
+   * handle, {@link _storage} or {@link _scheduled_functions}, from this
+   * module.
    *
    * @category Models
    */
@@ -29,9 +29,9 @@ export {
   type Any,
   type AnyWithProps,
   /**
-   * Immutable table builder returned by make, before generated name binding.
-   * Its index, searchIndex, and vectorIndex methods return new definitions; the
-   * canonical contract is in `@confect/core/Table`.
+   * Immutable table definition before code generation binds its name. The
+   * `index`, `searchIndex`, and `vectorIndex` methods each return a new
+   * definition without changing the original.
    *
    * @category Models
    */
@@ -119,10 +119,10 @@ export const tableDefinition = <Table extends Table_.AnyWithProps>(
 // -----------------------------------------------------------------------------
 
 /**
- * Read-only handle for scheduled function records, including the function name,
- * arguments, scheduled time, and execution state. Pass it to `reader.table` to
- * look up a scheduled call by ID or query its records. Schedule or cancel calls
- * through the scheduler, not the database writer.
+ * Read-only system table for scheduled calls, including the function name,
+ * arguments, scheduled time, and execution state. Pass this handle to
+ * `reader.table` to query or look up a scheduled call. Use the scheduler to
+ * schedule or cancel calls.
  *
  * @category System tables
  */
@@ -146,9 +146,9 @@ export const _scheduled_functions = Table_.make(() =>
 )("_scheduled_functions");
 
 /**
- * Read-only handle for stored file metadata. Pass it to `reader.table` and look
- * up a storage ID to read the file's SHA-256 hash, size in bytes, and optional
- * content type. Use a storage service to access the file itself.
+ * Read-only system table for stored file metadata. Pass this handle to
+ * `reader.table` to look up a storage ID's SHA-256 hash, size in bytes, and
+ * optional content type. Use a storage service to access the file contents.
  *
  * @category System tables
  */

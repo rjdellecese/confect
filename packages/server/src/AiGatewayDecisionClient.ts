@@ -6,11 +6,9 @@ import * as InternalAiGatewayDecisionClient from "./internal/AiGatewayDecisionCl
 import * as AiGatewayServiceToken from "./internal/AiGatewayServiceToken";
 
 /**
- * Public gateway availability failures and their schema/union.
- * AiGatewayDisabled describes a plan/setting restriction; AiGatewayUnavailable
- * describes an unsupported deployment. Definitions are shared with the language
- * client and remain public through these aliases, with no extra failure payload
- * fields.
+ * Tagged errors for a disabled gateway or an unsupported deployment, and the
+ * schema that accepts either error. Both gateway clients expose the same
+ * errors; neither error carries additional payload fields.
  *
  * @category Errors
  */
@@ -21,13 +19,15 @@ export {
 } from "./internal/AiGatewayServiceToken";
 
 /**
- * The client configured for Convex AI gateway decisions.
+ * Service tag for the OpenRouter client used by gateway decision models.
+ * Provide {@link layer} to authenticate requests with the current Convex
+ * deployment.
  *
- * @category Services
+ * @category Tags
  */
 export const AiGatewayDecisionClient = OpenRouterClient.OpenRouterClient;
 /**
- * Effect requirement of a decision model using the gateway client layer.
+ * Client requirement of a gateway decision model, satisfied by {@link layer}.
  *
  * @category Services
  */
@@ -50,14 +50,21 @@ export const make: Effect.Effect<
 );
 
 /**
- * Provide the AI gateway decision client using the current Effect HTTP client.
+ * Layer that provides the OpenRouter client for `AiGatewayDecisionModel` using
+ * an Effect `HttpClient` in a running Convex action.
  *
- * Requires an Effect HttpClient and a running Convex action. Construction may
- * fail with AiGatewayDisabled or AiGatewayUnavailable; later token failures
- * follow the model/HTTP client's error contract.
+ * **Details**
  *
- * This layer supplies the client for AiGatewayDecisionModel operations; it is a
- * value, not a layer factory.
+ * The layer checks gateway access when built and obtains a bearer token for
+ * each outgoing request. Provide an HTTP client such as `FetchHttpClient.layer`
+ * for transport.
+ *
+ * **Gotchas**
+ *
+ * Building the layer can fail with `AiGatewayDisabled` or
+ * `AiGatewayUnavailable`. If token acquisition fails with either error later,
+ * the request is not sent: the HTTP client reports a transport error, and model
+ * operations report an AI network error.
  *
  * @category Layers
  */

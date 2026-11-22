@@ -4,7 +4,8 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
 /**
- * Native Convex resource metrics, with used and remaining quantities.
+ * Native Convex transaction metrics that report the used and remaining amounts
+ * for each resource, such as documents read or bytes written.
  *
  * @category Models
  */
@@ -14,23 +15,31 @@ const make = (
   meta: Pick<QueryMeta, "getTransactionMetrics" | "getSnapshotTs">,
 ) => ({
   /**
-   * Read current transaction usage and remaining limits without caching them.
+   * Reads how much of each transaction limit has been used and how much
+   * remains. Each execution reads fresh metrics, so successive reads may
+   * differ.
    *
    * @category Getters
    *
-   * @returns An Effect producing native TransactionMetrics; native rejection is
-   *   a defect.
+   * @returns An Effect producing native `TransactionMetrics`. A Convex
+   *   rejection is a defect.
    */
   getMetrics: Effect.fn("TransactionMetadata.getMetrics")(() =>
     Effect.promise(() => meta.getTransactionMetrics()),
   ),
   /**
-   * Read the transaction's snapshot timestamp.
+   * Reads the database snapshot timestamp of the current transaction in
+   * nanoseconds.
+   *
+   * **Gotchas**
+   *
+   * Reading the timestamp in a query limits result caching. It is a database
+   * timestamp, not a wall-clock time to compare with `Date.now()`.
    *
    * @category Getters
    *
-   * @returns An Effect producing bigint nanoseconds. Reading it affects query
-   *   caching; a native throw is a defect.
+   * @returns An Effect producing the timestamp as a `bigint`. A native
+   *   exception is a defect.
    */
   getSnapshotTs: Effect.fn("TransactionMetadata.getSnapshotTs")(() =>
     Effect.sync(() => meta.getSnapshotTs()),
@@ -38,10 +47,11 @@ const make = (
 });
 
 /**
- * Transaction metrics/snapshot service for queries and mutations. Acquire the
- * generated `TransactionMetadata` tag; successive metric reads may differ.
+ * Tag for the service that reports resource usage and snapshot time for the
+ * current transaction. Yield the generated `TransactionMetadata` tag in a query
+ * or mutation.
  *
- * @category Services
+ * @category Tags
  */
 export class TransactionMetadata extends Context.Service<
   TransactionMetadata,

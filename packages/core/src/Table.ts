@@ -57,14 +57,16 @@ export const isUnnamedTable = (u: unknown): u is UnnamedAny =>
 // `@confect/server/Table.tableDefinition`.
 
 /**
- * A bound table handle with its name, document codecs, and index metadata.
- * Default-import the handle from `confect/_generated/tables/<name>`. Pass it to
- * `reader.table` or `writer.table` in a handler, or use its `Doc` and `Fields`
- * codecs in a spec. Author the unnamed definition with {@link make}.
+ * A named table with document codecs and index metadata. Default-import it from
+ * `confect/_generated/tables/<name>`. Pass the handle to `reader.table` or
+ * `writer.table` in a handler, or use its `Doc` and `Fields` codecs in a spec.
+ * Author the unnamed definition with {@link make}.
  *
- * `Name_` is the filename-derived table name. `TableSchema_` describes decoded
- * user fields and their stored representation. Schema getters are lazy and
- * memoized, so importing a bound table does not construct its schemas.
+ * **Details**
+ *
+ * `Name_` is the filename-derived table name, and `TableSchema_` describes the
+ * decoded user fields and their stored representation. Importing the handle
+ * does not construct either schema: the first access builds and caches it.
  *
  * @category Models
  */
@@ -206,7 +208,8 @@ export interface UnnamedTable<
   readonly "~TableValidator": TableValidator_;
 
   /**
-   * Add an ordered database index.
+   * Adds an ordered index for looking up documents by the specified field
+   * paths.
    *
    * @category Indexes
    *
@@ -239,7 +242,7 @@ export interface UnnamedTable<
   >;
 
   /**
-   * Add a full-text search index for the table reader's `search` method.
+   * Adds a full-text index for the table reader's `search` method.
    *
    * @category Indexes
    *
@@ -274,7 +277,8 @@ export interface UnnamedTable<
   >;
 
   /**
-   * Add a vector index for the generated `VectorSearch` service.
+   * Adds an index for finding similar vectors with the generated `VectorSearch`
+   * service.
    *
    * @category Indexes
    *
@@ -558,17 +562,21 @@ const makeUnnamed = <
 };
 
 /**
- * Define a table using a lazy codec for its user fields.
+ * Creates an unnamed table definition from a lazy codec for its user fields.
+ * Chain index declarations before default-exporting it from your table module.
+ *
+ * **Example** (Defining a table indexed by text)
+ *
+ * ```ts
+ * import { Table } from "@confect/core";
+ * import * as Schema from "effect/Schema";
+ *
+ * export default Table.make(() =>
+ *   Schema.Struct({ text: Schema.String }),
+ * ).index("by_text", ["text"]);
+ * ```
  *
  * @category Constructors
- *
- * @example
- *   import { Table } from "@confect/core";
- *   import * as Schema from "effect/Schema";
- *
- *   export default Table.make(() =>
- *     Schema.Struct({ text: Schema.String }),
- *   ).index("by_text", ["text"]);
  *
  * @param lazyFields - Callback constructing the field codec. It runs only when
  *   a bound table's `Fields` or `Doc` is first accessed, not during definition,

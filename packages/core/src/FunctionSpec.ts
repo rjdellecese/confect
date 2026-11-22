@@ -94,10 +94,14 @@ export interface FunctionSpec<
 }
 
 /**
- * The function spec returned by a constructor. On a Confect spec,
- * {@link Builder.middleware | .middleware()} returns a new spec without changing
- * the original. Specs that wrap plain Convex functions do not accept
- * middleware.
+ * A function declaration that can be added to a group. For a function declared
+ * with Effect codecs, {@link Builder.middleware | .middleware()} returns a new
+ * builder without changing the original.
+ *
+ * **Gotchas**
+ *
+ * Plain Convex adapters return the same builder shape, but their handlers
+ * cannot use Confect middleware.
  *
  * @category Models
  */
@@ -115,12 +119,16 @@ export interface Builder<
   MiddlewareSpecs_
 > {
   /**
-   * Attach middleware around this function's handler, inside the group chain.
-   * Attachments run in order. Supply the options schema's decoded value when
-   * the middleware declares options; no decoding or coercion is performed.
-   * Repeated option-bearing attachments must have non-equivalent options,
-   * checked during codegen and registration. Put a provider before middleware
-   * that consumes its services.
+   * Attaches middleware to this function's handler. The group chain runs first,
+   * then the function's attachments run in order. Attach a provider before
+   * middleware that needs its services.
+   *
+   * **Gotchas**
+   *
+   * Supply the decoded options value; attaching middleware does not decode or
+   * coerce it. To attach the same policy more than once, it must declare
+   * options, and each attachment's value must be distinct under the schema's
+   * equivalence. Codegen and server registration check these values.
    *
    * @category Combinators
    *
@@ -636,25 +644,27 @@ const makePaginated = <
 };
 
 /**
- * Declare a public query in the Convex runtime. Clients can subscribe to this
- * query or call it directly.
+ * Declares a read-only query that clients can call or subscribe to in the
+ * Convex runtime.
  *
- * Schema factories are evaluated lazily. Codecs must require no decoding or
- * encoding services and must encode to Convex values.
+ * **Example** (Declaring a query with a named argument)
+ *
+ * ```ts
+ * import { FunctionSpec } from "@confect/core";
+ * import * as Schema from "effect/Schema";
+ *
+ * const greet = FunctionSpec.publicQuery({
+ *   name: "greet",
+ *   args: () => ({ name: Schema.String }),
+ *   returns: () => Schema.String,
+ * });
+ * ```
  *
  * @category Constructors
  *
- * @example
- *   import { FunctionSpec } from "@confect/core";
- *   import * as Schema from "effect/Schema";
- *
- *   const greet = FunctionSpec.publicQuery({
- *     name: "greet",
- *     args: () => ({ name: Schema.String }),
- *     returns: () => Schema.String,
- *   });
- *
- * @param options - The function declaration.
+ * @param options - The declaration's schema factories are lazy. Their codecs
+ *   must encode to Convex values and require no services for encoding or
+ *   decoding.
  * @param options.name - A non-reserved JavaScript identifier, local to its
  *   group.
  * @param options.args - A lazy `Schema.Struct` field map, not a schema; omit
@@ -670,15 +680,14 @@ const makePaginated = <
  */
 export const publicQuery = make(RuntimeAndFunctionType.ConvexQuery, "public");
 /**
- * Declare an internal query in the Convex runtime. Only server-side callers can
- * invoke it; it is not a client endpoint.
- *
- * Schema factories are evaluated lazily. Codecs must require no decoding or
- * encoding services and must encode to Convex values.
+ * Declares a read-only query in the Convex runtime that only server-side
+ * callers can invoke.
  *
  * @category Constructors
  *
- * @param options - The function declaration.
+ * @param options - The declaration's schema factories are lazy. Their codecs
+ *   must encode to Convex values and require no services for encoding or
+ *   decoding.
  * @param options.name - A non-reserved JavaScript identifier, local to its
  *   group.
  * @param options.args - A lazy `Schema.Struct` field map, not a schema; omit
@@ -697,12 +706,15 @@ export const internalQuery = make(
   "internal",
 );
 /**
- * Declare a public paginated query from an item codec. Use its generated ref
- * with a paginated client query.
+ * Declares a query that clients can subscribe to one page at a time. Supply a
+ * codec for a single item rather than for the entire page.
  *
- * Confect adds `paginationOpts` to the handler's args and wraps `item` in a
- * pagination-result codec. All factories are lazy; codecs must require no
- * services and encode to Convex values.
+ * **Details**
+ *
+ * Confect adds `paginationOpts` to the handler's arguments and wraps the item
+ * codec in a pagination-result codec. Omitting `args` leaves only
+ * `paginationOpts`. All schema factories are lazy; their codecs must encode to
+ * Convex values without requiring services for encoding or decoding.
  *
  * @category Constructors
  *
@@ -720,18 +732,23 @@ export const internalQuery = make(
  *
  * @throws For an invalid or reserved name, or when composing args that
  *   redeclare `paginationOpts`.
+ *
+ * @see {@link publicQuery} for a query with an explicit result codec.
  */
 export const publicPaginatedQuery = makePaginated(
   RuntimeAndFunctionType.ConvexQuery,
   "public",
 );
 /**
- * Declare an internal paginated query from an item codec. Only server-side
- * callers can invoke it; it is not a client endpoint.
+ * Declares a server-only query that returns a page of items and a cursor.
+ * Supply the item codec rather than a codec for the entire page.
  *
- * Confect adds `paginationOpts` to the handler's args and wraps `item` in a
- * pagination-result codec. All factories are lazy; codecs must require no
- * services and encode to Convex values.
+ * **Details**
+ *
+ * Confect adds `paginationOpts` to the handler's arguments and wraps the item
+ * codec in a pagination-result codec. Omitting `args` leaves only
+ * `paginationOpts`. All schema factories are lazy; their codecs must encode to
+ * Convex values without requiring services for encoding or decoding.
  *
  * @category Constructors
  *
@@ -755,15 +772,14 @@ export const internalPaginatedQuery = makePaginated(
   "internal",
 );
 /**
- * Declare a public mutation in the Convex runtime. Clients can invoke it to
- * perform a transaction.
- *
- * Schema factories are evaluated lazily. Codecs must require no decoding or
- * encoding services and must encode to Convex values.
+ * Declares a mutation that clients can call to write data in a Convex
+ * transaction.
  *
  * @category Constructors
  *
- * @param options - The function declaration.
+ * @param options - The declaration's schema factories are lazy. Their codecs
+ *   must encode to Convex values and require no services for encoding or
+ *   decoding.
  * @param options.name - A non-reserved JavaScript identifier, local to its
  *   group.
  * @param options.args - A lazy `Schema.Struct` field map, not a schema; omit
@@ -782,15 +798,14 @@ export const publicMutation = make(
   "public",
 );
 /**
- * Declare an internal mutation in the Convex runtime. Only server-side callers
- * can invoke this transaction.
- *
- * Schema factories are evaluated lazily. Codecs must require no decoding or
- * encoding services and must encode to Convex values.
+ * Declares a mutation that only server-side callers can invoke to write data in
+ * a Convex transaction.
  *
  * @category Constructors
  *
- * @param options - The function declaration.
+ * @param options - The declaration's schema factories are lazy. Their codecs
+ *   must encode to Convex values and require no services for encoding or
+ *   decoding.
  * @param options.name - A non-reserved JavaScript identifier, local to its
  *   group.
  * @param options.args - A lazy `Schema.Struct` field map, not a schema; omit
@@ -809,15 +824,14 @@ export const internalMutation = make(
   "internal",
 );
 /**
- * Declare a public action in the Convex runtime. Clients can invoke it for work
- * outside a database transaction.
- *
- * Schema factories are evaluated lazily. Codecs must require no decoding or
- * encoding services and must encode to Convex values.
+ * Declares a client-callable action for work outside a database transaction in
+ * the Convex runtime.
  *
  * @category Constructors
  *
- * @param options - The function declaration.
+ * @param options - The declaration's schema factories are lazy. Their codecs
+ *   must encode to Convex values and require no services for encoding or
+ *   decoding.
  * @param options.name - A non-reserved JavaScript identifier, local to its
  *   group.
  * @param options.args - A lazy `Schema.Struct` field map, not a schema; omit
@@ -833,15 +847,14 @@ export const internalMutation = make(
  */
 export const publicAction = make(RuntimeAndFunctionType.ConvexAction, "public");
 /**
- * Declare an internal action in the Convex runtime. Only server-side callers
- * can invoke this non-transactional function.
- *
- * Schema factories are evaluated lazily. Codecs must require no decoding or
- * encoding services and must encode to Convex values.
+ * Declares a server-only action for work outside a database transaction in the
+ * Convex runtime.
  *
  * @category Constructors
  *
- * @param options - The function declaration.
+ * @param options - The declaration's schema factories are lazy. Their codecs
+ *   must encode to Convex values and require no services for encoding or
+ *   decoding.
  * @param options.name - A non-reserved JavaScript identifier, local to its
  *   group.
  * @param options.args - A lazy `Schema.Struct` field map, not a schema; omit
@@ -861,15 +874,14 @@ export const internalAction = make(
 );
 
 /**
- * Declare a public Node.js action in the Node.js runtime. Add it to a group
+ * Declares a client-callable action for the Node.js runtime. Add it to a group
  * created with `GroupSpec.makeNode()`.
- *
- * Schema factories are evaluated lazily. Codecs must require no decoding or
- * encoding services and must encode to Convex values.
  *
  * @category Constructors
  *
- * @param options - The function declaration.
+ * @param options - The declaration's schema factories are lazy. Their codecs
+ *   must encode to Convex values and require no services for encoding or
+ *   decoding.
  * @param options.name - A non-reserved JavaScript identifier, local to its
  *   group.
  * @param options.args - A lazy `Schema.Struct` field map, not a schema; omit
@@ -888,15 +900,14 @@ export const publicNodeAction = make(
   "public",
 );
 /**
- * Declare an internal Node.js action in the Node.js runtime. Only server-side
- * callers can invoke it. Add it to `GroupSpec.makeNode()`.
- *
- * Schema factories are evaluated lazily. Codecs must require no decoding or
- * encoding services and must encode to Convex values.
+ * Declares a server-only action for the Node.js runtime. Add it to a group
+ * created with `GroupSpec.makeNode()`.
  *
  * @category Constructors
  *
- * @param options - The function declaration.
+ * @param options - The declaration's schema factories are lazy. Their codecs
+ *   must encode to Convex values and require no services for encoding or
+ *   decoding.
  * @param options.name - A non-reserved JavaScript identifier, local to its
  *   group.
  * @param options.args - A lazy `Schema.Struct` field map, not a schema; omit
@@ -991,18 +1002,17 @@ const makeConvex =
   };
 
 /**
- * Declare a public query implemented by an existing registered Convex function.
- * Call `convexPublicQuery<typeof registeredFunction>()("name")` to infer its
- * argument and return types; the registered function must match this type and
- * visibility.
- *
- * The handler is passed through unchanged: no Effect codecs or Confect
- * middleware are applied. Supply it with `FunctionImpl.make` in the impl
- * module. The resulting function is available to clients.
+ * Creates a spec factory for a client-callable Convex query. Call
+ * `convexPublicQuery<typeof registeredFunction>()("name")` to infer its
+ * arguments and result without importing the handler at runtime. Pass the
+ * registered query of the matching visibility to `FunctionImpl.make` in the
+ * implementation module.
  *
  * @category Constructors
  *
- * @returns A name-taking factory that creates the function builder.
+ * @returns A function that takes the local name and returns a builder for the
+ *   registered query. Confect uses the handler unchanged, without Effect codec
+ *   conversion or Confect middleware.
  *
  * @throws If the supplied name is invalid or reserved.
  */
@@ -1011,18 +1021,17 @@ export const convexPublicQuery = makeConvex(
   "public",
 );
 /**
- * Declare an internal query implemented by an existing registered Convex
- * function. Call `convexInternalQuery<typeof registeredFunction>()("name")` to
- * infer its argument and return types; the registered function must match this
- * type and visibility.
- *
- * The handler is passed through unchanged: no Effect codecs or Confect
- * middleware are applied. Supply it with `FunctionImpl.make` in the impl
- * module. The resulting function is available only to server-side callers.
+ * Creates a spec factory for a server-only Convex query. Call
+ * `convexInternalQuery<typeof registeredFunction>()("name")` to infer its
+ * arguments and result without importing the handler at runtime. Pass the
+ * registered query of the matching visibility to `FunctionImpl.make` in the
+ * implementation module.
  *
  * @category Constructors
  *
- * @returns A name-taking factory that creates the function builder.
+ * @returns A function that takes the local name and returns a builder for the
+ *   registered query. Confect uses the handler unchanged, without Effect codec
+ *   conversion or Confect middleware.
  *
  * @throws If the supplied name is invalid or reserved.
  */
@@ -1031,18 +1040,17 @@ export const convexInternalQuery = makeConvex(
   "internal",
 );
 /**
- * Declare a public mutation implemented by an existing registered Convex
- * function. Call `convexPublicMutation<typeof registeredFunction>()("name")` to
- * infer its argument and return types; the registered function must match this
- * type and visibility.
- *
- * The handler is passed through unchanged: no Effect codecs or Confect
- * middleware are applied. Supply it with `FunctionImpl.make` in the impl
- * module. The resulting function is available to clients.
+ * Creates a spec factory for a client-callable Convex mutation. Call
+ * `convexPublicMutation<typeof registeredFunction>()("name")` to infer its
+ * arguments and result without importing the handler at runtime. Pass the
+ * registered mutation of the matching visibility to `FunctionImpl.make` in the
+ * implementation module.
  *
  * @category Constructors
  *
- * @returns A name-taking factory that creates the function builder.
+ * @returns A function that takes the local name and returns a builder for the
+ *   registered mutation. Confect uses the handler unchanged, without Effect
+ *   codec conversion or Confect middleware.
  *
  * @throws If the supplied name is invalid or reserved.
  */
@@ -1051,18 +1059,17 @@ export const convexPublicMutation = makeConvex(
   "public",
 );
 /**
- * Declare an internal mutation implemented by an existing registered Convex
- * function. Call `convexInternalMutation<typeof registeredFunction>()("name")`
- * to infer its argument and return types; the registered function must match
- * this type and visibility.
- *
- * The handler is passed through unchanged: no Effect codecs or Confect
- * middleware are applied. Supply it with `FunctionImpl.make` in the impl
- * module. The resulting function is available only to server-side callers.
+ * Creates a spec factory for a server-only Convex mutation. Call
+ * `convexInternalMutation<typeof registeredFunction>()("name")` to infer its
+ * arguments and result without importing the handler at runtime. Pass the
+ * registered mutation of the matching visibility to `FunctionImpl.make` in the
+ * implementation module.
  *
  * @category Constructors
  *
- * @returns A name-taking factory that creates the function builder.
+ * @returns A function that takes the local name and returns a builder for the
+ *   registered mutation. Confect uses the handler unchanged, without Effect
+ *   codec conversion or Confect middleware.
  *
  * @throws If the supplied name is invalid or reserved.
  */
@@ -1071,18 +1078,17 @@ export const convexInternalMutation = makeConvex(
   "internal",
 );
 /**
- * Declare a public action implemented by an existing registered Convex
- * function. Call `convexPublicAction<typeof registeredFunction>()("name")` to
- * infer its argument and return types; the registered function must match this
- * type and visibility.
- *
- * The handler is passed through unchanged: no Effect codecs or Confect
- * middleware are applied. Supply it with `FunctionImpl.make` in the impl
- * module. The resulting function is available to clients.
+ * Creates a spec factory for a client-callable Convex action. Call
+ * `convexPublicAction<typeof registeredFunction>()("name")` to infer its
+ * arguments and result without importing the handler at runtime. Pass the
+ * registered action of the matching visibility to `FunctionImpl.make` in the
+ * implementation module.
  *
  * @category Constructors
  *
- * @returns A name-taking factory that creates the function builder.
+ * @returns A function that takes the local name and returns a builder for the
+ *   registered action. Confect uses the handler unchanged, without Effect codec
+ *   conversion or Confect middleware.
  *
  * @throws If the supplied name is invalid or reserved.
  */
@@ -1091,18 +1097,17 @@ export const convexPublicAction = makeConvex(
   "public",
 );
 /**
- * Declare an internal action implemented by an existing registered Convex
- * function. Call `convexInternalAction<typeof registeredFunction>()("name")` to
- * infer its argument and return types; the registered function must match this
- * type and visibility.
- *
- * The handler is passed through unchanged: no Effect codecs or Confect
- * middleware are applied. Supply it with `FunctionImpl.make` in the impl
- * module. The resulting function is available only to server-side callers.
+ * Creates a spec factory for a server-only Convex action. Call
+ * `convexInternalAction<typeof registeredFunction>()("name")` to infer its
+ * arguments and result without importing the handler at runtime. Pass the
+ * registered action of the matching visibility to `FunctionImpl.make` in the
+ * implementation module.
  *
  * @category Constructors
  *
- * @returns A name-taking factory that creates the function builder.
+ * @returns A function that takes the local name and returns a builder for the
+ *   registered action. Confect uses the handler unchanged, without Effect codec
+ *   conversion or Confect middleware.
  *
  * @throws If the supplied name is invalid or reserved.
  */
@@ -1111,18 +1116,18 @@ export const convexInternalAction = makeConvex(
   "internal",
 );
 /**
- * Declare a public Node.js action implemented by an existing registered Convex
- * function. Call `convexPublicNodeAction<typeof registeredFunction>()("name")`
- * to infer its argument and return types; the registered function must match
- * this type and visibility.
- *
- * The handler is passed through unchanged: no Effect codecs or Confect
- * middleware are applied. Supply it with `FunctionImpl.make` in the impl
- * module. Add the spec to a group created with `GroupSpec.makeNode()`.
+ * Creates a spec factory for a client-callable Convex Node.js action. Call
+ * `convexPublicNodeAction<typeof registeredFunction>()("name")` to infer its
+ * arguments and result without importing the handler at runtime. Pass the
+ * registered Node.js action of the matching visibility to `FunctionImpl.make`
+ * in the implementation module. Add the spec to a group created with
+ * `GroupSpec.makeNode()`.
  *
  * @category Constructors
  *
- * @returns A name-taking factory that creates the function builder.
+ * @returns A function that takes the local name and returns a builder for the
+ *   registered Node.js action. Confect uses the handler unchanged, without
+ *   Effect codec conversion or Confect middleware.
  *
  * @throws If the supplied name is invalid or reserved.
  */
@@ -1131,18 +1136,18 @@ export const convexPublicNodeAction = makeConvex(
   "public",
 );
 /**
- * Declare an internal Node.js action implemented by an existing registered
- * Convex function. Call `convexInternalNodeAction<typeof
- * registeredFunction>()("name")` to infer its argument and return types; the
- * registered function must match this type and visibility.
- *
- * The handler is passed through unchanged: no Effect codecs or Confect
- * middleware are applied. Supply it with `FunctionImpl.make` in the impl
- * module. Add the spec to a group created with `GroupSpec.makeNode()`.
+ * Creates a spec factory for a server-only Convex Node.js action. Call
+ * `convexInternalNodeAction<typeof registeredFunction>()("name")` to infer its
+ * arguments and result without importing the handler at runtime. Pass the
+ * registered Node.js action of the matching visibility to `FunctionImpl.make`
+ * in the implementation module. Add the spec to a group created with
+ * `GroupSpec.makeNode()`.
  *
  * @category Constructors
  *
- * @returns A name-taking factory that creates the function builder.
+ * @returns A function that takes the local name and returns a builder for the
+ *   registered Node.js action. Confect uses the handler unchanged, without
+ *   Effect codec conversion or Confect middleware.
  *
  * @throws If the supplied name is invalid or reserved.
  */

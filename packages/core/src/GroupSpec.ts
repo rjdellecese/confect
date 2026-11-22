@@ -26,12 +26,14 @@ export const isGroupSpec = (u: unknown): u is AnyWithProps =>
 
 /**
  * An immutable group of function declarations sharing one runtime. Build a
- * Convex group with {@link make}, or a Node.js action group with
- * {@link makeNode}, then default-export it from a spec module. Codegen assigns
- * its filename-derived name and assembles child groups without evaluating
- * schema factories.
+ * Convex group with {@link make} or a Node.js action group with
+ * {@link makeNode}, then default-export it from a spec module.
  *
- * Group middleware covers this group's functions, not its child groups.
+ * **Details**
+ *
+ * Codegen assigns the group a filename-derived name and assembles child groups
+ * without evaluating schema factories. Each child keeps its own runtime and
+ * middleware; the parent's middleware covers only its own functions.
  *
  * @category Models
  */
@@ -118,9 +120,9 @@ export interface GroupSpec<
   readonly "~Groups": Groups_;
 
   /**
-   * Add a function whose runtime matches this group. Its kind must also be
-   * covered by every group middleware, and plain Convex functions cannot be
-   * covered by Confect middleware.
+   * Adds a function to the group without changing the original group. The
+   * function must use the same runtime and have a kind covered by every group
+   * middleware. Plain Convex functions cannot use Confect middleware.
    *
    * @category Combinators
    *
@@ -143,9 +145,10 @@ export interface GroupSpec<
   >;
 
   /**
-   * Attach middleware to every function in this group, but not to child groups.
-   * The group chain runs in attachment order, before function-level middleware.
-   * Required services must be provided by an earlier group attachment.
+   * Attaches middleware to this group's functions, not its child groups. Group
+   * middleware runs in attachment order before function-level middleware. If a
+   * group attachment requires a service, attach its provider earlier in the
+   * group chain.
    *
    * @category Combinators
    *
@@ -401,30 +404,40 @@ const makeProto = <
   >;
 
 /**
- * Create an empty group for queries, mutations, and actions in the Convex
+ * Creates an empty group for queries, mutations, and actions in the Convex
  * runtime. Default-export the completed builder from a `*.spec.ts` module.
+ *
+ * **Gotchas**
+ *
+ * With experimental context reuse enabled, the same V8 context may serve
+ * different users. Never retain request-specific data in module state. The name
+ * `experimental_reuseContext` is reserved for the generated flag in an opted-in
+ * group.
+ *
+ * **Example** (Grouping a public query in a spec module)
+ *
+ * ```ts
+ * import { FunctionSpec, GroupSpec } from "@confect/core";
+ * import * as Schema from "effect/Schema";
+ *
+ * export default GroupSpec.make().addFunction(
+ *   FunctionSpec.publicQuery({
+ *     name: "count",
+ *     returns: () => Schema.Number,
+ *   }),
+ * );
+ * ```
  *
  * @category Constructors
  *
- * @example
- *   import { FunctionSpec, GroupSpec } from "@confect/core";
- *   import * as Schema from "effect/Schema";
- *
- *   export default GroupSpec.make().addFunction(
- *     FunctionSpec.publicQuery({
- *       name: "count",
- *       returns: () => Schema.Number,
- *     }),
- *   );
- *
  * @param options - Optional group configuration.
- * @param options.experimental_reuseContext - Opt this group's queries and
- *   mutations into experimental V8 context reuse; defaults to false. Does not
- *   affect actions or child groups. Never retain request-specific data in
- *   module state; reused contexts may serve different users. The function name
- *   `experimental_reuseContext` is reserved in an opted-in group.
+ * @param options.experimental_reuseContext - Enables experimental V8 context
+ *   reuse for this group's queries and mutations. Defaults to false and does
+ *   not affect actions or child groups.
  *
  * @returns A new unnamed group; codegen assigns the module's name.
+ *
+ * @see {@link makeNode} for a group of Node.js actions.
  */
 export const make = (
   options: { readonly experimental_reuseContext?: boolean | undefined } = {},
@@ -439,14 +452,16 @@ export const make = (
   });
 
 /**
- * Create an empty group that accepts only Node.js actions. Default-export it
- * from a Node spec module and add `publicNodeAction`, `internalNodeAction`, or
- * their plain-Convex counterparts. Context reuse is not configurable for Node
- * groups.
+ * Creates an empty group for Node.js actions. Add `publicNodeAction`,
+ * `internalNodeAction`, or their plain Convex counterparts and default-export
+ * the result from a Node spec module. Node groups do not support context
+ * reuse.
  *
  * @category Constructors
  *
  * @returns A new unnamed Node group; codegen assigns the module's name.
+ *
+ * @see {@link make} for a Convex-runtime group.
  */
 export const makeNode = (): GroupSpec<"Node", ""> =>
   makeProto({

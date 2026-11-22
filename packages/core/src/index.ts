@@ -3,8 +3,8 @@
  */
 export * as FunctionProvenance from "./FunctionProvenance";
 /**
- * Declare client-safe query, mutation, and action contracts for Effect or plain
- * Convex handlers.
+ * Client-safe declarations for queries, mutations, and actions implemented with
+ * Effect or plain Convex handlers.
  *
  * @category Function declarations
  */
@@ -20,7 +20,8 @@ export * as GenericId from "./GenericId";
  */
 export * as GroupPath from "./GroupPath";
 /**
- * Build immutable groups of function specs and attach group-wide middleware.
+ * Immutable groups of function declarations that share a runtime and group-wide
+ * middleware.
  *
  * @category Function declarations
  */
@@ -38,8 +39,8 @@ export * as Lazy from "./Lazy";
  */
 export * as MiddlewareAttachment from "./MiddlewareAttachment";
 /**
- * Declare client-safe middleware policies, coverage, attachment options, and
- * invocation contracts.
+ * Client-safe middleware declarations, attachment options, and invocation
+ * contracts.
  *
  * @category Middleware
  */
@@ -64,13 +65,13 @@ export * as PaginationResult from "./PaginationResult";
  * Generated function-ref contracts consumed by clients, runners, and
  * schedulers.
  *
- * @category Models
+ * @category References
  */
 export * as Ref from "./Ref";
 /**
  * The generated project's public and internal trees of function refs.
  *
- * @category Models
+ * @category References
  */
 export * as Refs from "./Refs";
 /**
@@ -95,7 +96,8 @@ export * as Spec from "./Spec";
  */
 export * as SystemFields from "./SystemFields";
 /**
- * Declare table codecs and indexes for generated table and document APIs.
+ * Table definitions, document codecs, and index declarations used by generated
+ * table handles.
  *
  * @category Schemas
  */

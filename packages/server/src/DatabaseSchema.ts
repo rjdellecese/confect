@@ -25,15 +25,16 @@ export const isDatabaseSchema = (u: unknown): u is Any =>
   Predicate.hasProperty(u, TypeId);
 
 /**
- * The application's registry of bound table handles, exported as the default
- * from `_generated/schema`. Assembling the registry does not evaluate table
- * schemas or construct Convex deployment validators.
+ * Registry of bound application tables, default-exported from
+ * `_generated/schema`. Assembling it does not evaluate table codecs or
+ * construct Convex deployment validators.
  *
- * Use a type-only import for the database model. A value import brings in every
- * application table module; handlers that need individual tables should import
- * their handles from `_generated/tables/<name>` instead. The separate
- * `_generated/convexSchema` export is the Convex schema for deployment and test
- * setup.
+ * **Gotchas**
+ *
+ * A value import loads every application table module. Use a type-only import
+ * for a model annotation and import individual handles from
+ * `_generated/tables/<name>` in handlers. `_generated/convexSchema` supplies
+ * the separate Convex schema for deployment and test setup.
  *
  * @category Models
  */
@@ -68,17 +69,21 @@ export type Tables<DatabaseSchema_ extends AnyWithProps> =
   DatabaseSchema_[TypeId][keyof DatabaseSchema_[TypeId]];
 
 /**
- * Look up bound application table handles by name. Use this when a tool needs
- * the full registry; if only the names are needed, default-import
- * `_generated/tableNames` to avoid loading the table modules.
+ * Returns the registry's bound application tables by name without evaluating
+ * their codecs.
+ *
+ * **When to use**
+ *
+ * Use when inspecting the handles for all application tables. For a list of
+ * names alone, default-import `_generated/tableNames` to avoid loading the
+ * table modules.
  *
  * @category Getters
  *
  * @param self - The application registry from `_generated/schema`.
  *
- * @returns Its readonly record of application table handles, without evaluating
- *   their codecs. The two system tables are not part of the generated
- *   registry.
+ * @returns A readonly record keyed by application table name. The system tables
+ *   are not part of this record.
  */
 export const tables = <DatabaseSchema_ extends AnyWithProps>(
   self: DatabaseSchema_,

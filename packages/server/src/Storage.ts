@@ -11,20 +11,21 @@ const make = Effect.gen(function* () {
   const reader = yield* StorageReader;
   return {
     /**
-     * Get a blob's download URL. Available in every function context.
+     * Reads the download URL for a stored blob in any function context.
      *
      * @category Reading
      *
      * @param storageId - ID in the `_storage` table.
      *
-     * @returns An Effect producing a URL, failing with BlobNotFoundError if the
-     *   blob has no download URL. Unexpected native failures are defects.
+     * @returns An Effect producing a `URL`, or failing with `BlobNotFoundError`
+     *   if no URL exists. An invalid URL or unexpected Convex failure is a
+     *   defect.
      */
     getUrl: reader.getUrl,
     /**
-     * Effect producing a temporary upload URL. Available in mutations, actions
-     * and HTTP handlers; it is a property, not a method call. Native failures
-     * and invalid returned URLs are defects.
+     * Effect that creates a temporary upload URL in a mutation, action, or HTTP
+     * handler. Yield `storage.generateUploadUrl` without calling it. An invalid
+     * URL or Convex failure is a defect.
      *
      * @category Writing
      */
@@ -33,39 +34,41 @@ const make = Effect.gen(function* () {
       (writer) => writer.generateUploadUrl,
     ),
     /**
-     * Delete a stored blob in a mutation, action or HTTP handler.
+     * Deletes a stored blob in a mutation, action, or HTTP handler.
      *
      * @category Writing
      *
      * @param storageId - ID of the blob to delete.
      *
-     * @returns An Effect producing void; native rejection becomes
-     *   BlobNotFoundError.
+     * @returns An Effect that completes without a value. Any Convex rejection
+     *   becomes `BlobNotFoundError`.
      */
     delete: (storageId: GenericId<"_storage">) =>
       Effect.flatMap(StorageWriter, (writer) => writer.delete(storageId)),
     /**
-     * Read blob contents in a mutation, action or HTTP handler.
+     * Reads the contents of a stored blob in a mutation, action, or HTTP
+     * handler.
      *
      * @category Reading
      *
-     * @param storageId - ID of the stored blob.
+     * @param storageId - ID of the blob to read.
      *
-     * @returns An Effect producing a Blob, failing with BlobNotFoundError if
-     *   absent. Unexpected native failures are defects.
+     * @returns An Effect producing a `Blob`, or failing with
+     *   `BlobNotFoundError` if none exists. A Convex rejection is a defect.
      */
     get: (storageId: GenericId<"_storage">) =>
       Effect.flatMap(StorageActionWriter, (writer) => writer.get(storageId)),
     /**
-     * Store blob contents in a mutation, action or HTTP handler.
+     * Stores a blob in a mutation, action, or HTTP handler and returns its
+     * storage ID.
      *
      * @category Writing
      *
      * @param blob - Contents and media type to store.
-     * @param options - Optional `sha256` checksum checked by Convex.
+     * @param options - Optional `sha256` checksum for Convex to verify.
      *
-     * @returns An Effect producing the `_storage` ID. Native failures are
-     *   defects.
+     * @returns An Effect producing an ID in `_storage`. A Convex rejection is a
+     *   defect.
      */
     store: (blob: Blob, options?: { sha256?: string }) =>
       Effect.flatMap(StorageActionWriter, (writer) =>
@@ -75,11 +78,17 @@ const make = Effect.gen(function* () {
 });
 
 /**
- * Unified storage service obtained from the application's generated `Storage`
- * tag. Individual operations require the context described on each member;
- * Confect supplies the required reader/writer services automatically.
+ * Tag for working with Convex file storage. Yield the application's generated
+ * `Storage` tag in any function context; Confect provides the services required
+ * by each operation.
  *
- * @category Services
+ * **Gotchas**
+ *
+ * Queries can read download URLs but cannot read blob contents. Creating upload
+ * URLs, deleting blobs, and reading or storing blob contents require a
+ * mutation, action, or HTTP handler.
+ *
+ * @category Tags
  */
 export class Storage extends Context.Service<
   Storage,

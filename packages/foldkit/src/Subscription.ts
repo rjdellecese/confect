@@ -12,10 +12,9 @@ import * as PaginatedQuery from "./PaginatedQuery";
 import * as Client from "./Client";
 
 /**
- * Everything a reactive query subscription against `Query` can fail with: the
- * ref's typed error (if it declares an `error` schema), a transport-level
- * `WebSocketClientError`, or a `SchemaError` from encoding args or decoding
- * returns.
+ * Failures delivered to a reactive query's `onError`: an error declared by the
+ * ref or its middleware, a `WebSocketClientError` from the client, or a
+ * `SchemaError` from encoding arguments or decoding a result.
  *
  * @category Errors
  */
@@ -45,9 +44,9 @@ const paginatedError = <Query extends Ref.AnyConfectPublicPaginatedQuery>(
   ) as PaginatedQuery.Error<Query>;
 
 /**
- * The dependency record of a `reactiveQuery` entry. `None` means the
- * subscription is closed; a change from one `Some` to another tears the server
- * subscription down and reopens it with the new args.
+ * Arguments that determine whether a reactive query is subscribed. `None`
+ * closes the subscription; a change to a different `Some` value opens a
+ * listener with the new arguments.
  *
  * @category Models
  */
@@ -62,11 +61,10 @@ export interface Dependencies<Query extends Ref.AnyConfectPublicQuery> {
 }
 
 /**
- * Maps a reactive query's emissions into the app's Messages. Every failure—the
- * ref's typed error, a transport error, or a codec error—arrives via `onError`,
- * so the resulting stream's error channel is `never`, as Foldkit requires.
+ * Callbacks that turn each decoded query result or typed failure into an
+ * application Message. The subscription stream has no typed failure channel.
  *
- * @category Options
+ * @category Configuration
  */
 export interface Handlers<
   Query extends Ref.AnyConfectPublicQuery,
@@ -74,14 +72,13 @@ export interface Handlers<
   ErrorMessage,
 > {
   /**
-   * Map each decoded server result to an application Message.
+   * Maps a decoded server result to an application Message.
    *
    * @category Mapping
    */
   readonly onSuccess: (returns: Ref.Returns<Query>) => SuccessMessage;
   /**
-   * Map a declared, schema or transport failure to a Message without closing
-   * the listener.
+   * Maps a declared, schema, or transport failure to an application Message.
    *
    * @category Mapping
    */
@@ -92,46 +89,55 @@ export interface Handlers<
  * The `args` extractor is required whenever the query declares args; queries
  * without args may omit it, in which case the subscription is always open.
  *
- * @category Options
+ * @category Configuration
  */
 type ArgsConfig<Query extends Ref.AnyConfectPublicQuery, Model> = {
   /**
-   * Extract decoded args from Model; None disables the query.
+   * Extracts decoded query arguments from the Model, or `None` to disable the
+   * query.
    *
-   * @category Options
+   * @category Configuration
    */
   readonly args?: (model: Model) => Option.Option<Ref.Args<Query>>;
 } & (keyof Ref.Args<Query> extends never
   ? unknown
   : {
       /**
-       * Required model extractor for a query with argument fields.
+       * Extracts the decoded arguments for a query with argument fields.
        *
-       * @category Options
+       * @category Configuration
        */
       readonly args: (model: Model) => Option.Option<Ref.Args<Query>>;
     });
 
 /**
- * A `dependenciesToStream` body for a hand-written subscription entry: runs the
- * ref as a reactive query against the `Client` resource and maps every emission
- * and every failure into a Message. Query failures are values, so the
- * subscription remains live and can later emit a successful result.
+ * Creates a `dependenciesToStream` function for a hand-written Foldkit
+ * subscription. It accepts decoded query arguments and emits an application
+ * Message for each result or typed failure.
  *
- * Prefer `reactiveQuery`, which builds the whole entry; reach for this when you
- * need control over the entry's dependencies (custom gating, extra
- * dependencies).
+ * **When to use**
+ *
+ * Use when a subscription tracks dependencies beyond the query arguments or has
+ * its own rules for opening a listener.
+ *
+ * **Gotchas**
+ *
+ * If argument encoding fails, the stream emits one error Message and ends
+ * without opening a listener. Once subscribed, a query failure can be followed
+ * by a successful result.
  *
  * @category Subscriptions
  *
  * @param ref - Public Confect query ref; plain Convex refs lack the codecs
  *   required here.
- * @param handlers - Convert decoded values and failures into Messages.
+ * @param handlers - Callbacks that convert decoded values and typed failures
+ *   into Messages.
  *
- * @returns A function accepting decoded query args and returning a scoped
- *   stream requiring Client. Typed failures become Messages; exceptions in
- *   handlers are defects. An argument-encoding failure emits one error Message
- *   and ends before a listener is registered.
+ * @returns A function accepting decoded query arguments. It returns a scoped
+ *   stream that requires `Client`, maps typed failures to Messages, and treats
+ *   exceptions thrown by handlers as defects.
+ *
+ * @see {@link reactiveQuery} builds the complete subscription entry.
  */
 export const reactiveQueryStream =
   <Query extends Ref.AnyConfectPublicQuery, SuccessMessage, ErrorMessage>(
@@ -153,37 +159,48 @@ export const reactiveQueryStream =
     );
 
 /**
- * A complete Foldkit subscription entry for a Confect reactive query. The
- * leading thunk fixes the `Model` type (TypeScript cannot partially infer type
- * arguments), so the `args` extractor's parameter is already typed. Pass the
- * result as an entry value to `Subscription.make`:
+ * Creates a Foldkit subscription entry for a public Confect query. Supply the
+ * Model type first, then the ref and callbacks that map query outcomes to
+ * Messages.
+ *
+ * **Details**
+ *
+ * Pass the entry to Foldkit's `Subscription.make`. The `args` callback returns
+ * `None` to close the listener or `Some` to subscribe. Foldkit compares
+ * arguments using the ref's schema: equivalent arguments keep the listener
+ * open; changed arguments replace it. For a query with no arguments, omitting
+ * `args` keeps the listener open.
+ *
+ * **Example** (Watching a note only when its ID is selected)
  *
  * ```ts
  * import * as Confect from "@confect/foldkit";
+ * import type { Id } from "confect/_generated/id";
+ * import refs from "confect/_generated/refs";
+ * import * as Option from "effect/Option";
+ * import * as Schema from "effect/Schema";
+ * import { defineMessageUnion } from "foldkit/message";
  * import * as Subscription from "foldkit/subscription";
  *
+ * type Model = { readonly noteId: Option.Option<Id<"notes">> };
+ * const get = refs.public.notes_and_random.notes.getOrFail;
+ * const Message = defineMessageUnion({
+ *   ReceivedNote: { note: get.returns },
+ *   FailedGetNote: { message: Schema.String },
+ * });
  * const subscriptions = Subscription.make<
  *   Model,
- *   Message,
+ *   typeof Message.Type,
  *   Confect.Client.Client
  * >()(() => ({
- *   note: Confect.Subscription.reactiveQuery<Model>()(
- *     refs.public.notes.get,
- *     {
- *       args: (model) =>
- *         Option.map(model.noteId, (noteId) => ({ noteId })),
- *       onSuccess: (note) => SucceededGetNote({ note }),
- *       onError: (error) => FailedGetNote({ message: String(error) }),
- *     },
- *   ),
+ *   note: Confect.Subscription.reactiveQuery<Model>()(get, {
+ *     args: (model) => Option.map(model.noteId, (noteId) => ({ noteId })),
+ *     onSuccess: (note) => Message.ReceivedNote({ note }),
+ *     onError: (error) =>
+ *       Message.FailedGetNote({ message: String(error) }),
+ *   }),
  * }));
  * ```
- *
- * The entry's dependencies are the query args wrapped in `Option`: `None`
- * closes the subscription, a change from one `Some` to another unsubscribes and
- * resubscribes with the new args, and structurally equal args leave the
- * subscription running (equivalence is derived from the ref's args schema).
- * Queries without args may omit `args`, leaving the subscription always open.
  *
  * @category Subscriptions
  */
@@ -220,6 +237,8 @@ export const reactiveQuery =
   };
 
 /**
+ * Schema for the record of values Foldkit compares between Model updates.
+ *
  * @category Schemas
  */
 type DependenciesSchema<Dependencies_> = Schema.Schema<Dependencies_> & {
@@ -232,6 +251,8 @@ type DependenciesSchema<Dependencies_> = Schema.Schema<Dependencies_> & {
 };
 
 /**
+ * Subscription entry that can keep a listener open across a dependency change.
+ *
  * @category Models
  */
 type EntryWithKeepAlive<Model, Message, Dependencies_, Services> = {
@@ -242,21 +263,21 @@ type EntryWithKeepAlive<Model, Message, Dependencies_, Services> = {
    */
   readonly dependenciesSchema: DependenciesSchema<Dependencies_>;
   /**
-   * Extract the current logical request from Model.
+   * Extracts the current logical request from the Model.
    *
    * @category Mapping
    */
   readonly modelToDependencies: (model: Model) => Dependencies_;
   /**
-   * Ignore newly installed pagination ids when deciding whether to restart the
-   * stream.
+   * Compares requests without treating installation of the pagination ID as a
+   * reason to restart the stream.
    *
    * @category Predicates
    */
   readonly keepAliveEquivalence: Equivalence.Equivalence<Dependencies_>;
   /**
-   * Stream Messages for the request; closing or replacing the entry releases
-   * its listener.
+   * Streams Messages for the request and releases its listener when the entry
+   * closes or changes requests.
    *
    * @category Subscriptions
    */
@@ -267,40 +288,56 @@ type EntryWithKeepAlive<Model, Message, Dependencies_, Services> = {
 };
 
 /**
- * A complete Foldkit subscription entry that keeps exactly one live reactive
- * page subscription in sync with a `PaginatedQuery` machine in the Model. The
- * machine state is the single source of truth: navigation and split-pinning
- * change the derived args, while `Idle` closes the subscription. Pagination ids
- * are allocated here and installed by the first settlement.
+ * Creates a Foldkit subscription entry that follows one page of a pagination
+ * machine. Supply the Model type first, then the machine, its state selector,
+ * and a callback that wraps each settlement in a Message.
  *
- * The leading thunk fixes the `Model` type (TypeScript cannot partially infer
- * type arguments), so the `state` extractor's parameter is already typed:
+ * **Details**
+ *
+ * An active machine subscribes to its current cursor range; navigation or a
+ * split can change that range, and `Idle` closes it. The first settlement
+ * carries the allocated pagination ID. Pass settlements to
+ * `PaginatedQuery.settle` in `update` so a late success or failure cannot
+ * replace a newer request's state.
+ *
+ * **Gotchas**
+ *
+ * A query failure can be followed by a success on the same listener.
+ * Argument-encoding failure instead emits one failed settlement without opening
+ * a listener. The stream requires `Client` and has no typed failures; an
+ * exception thrown by `onSettled` is a defect.
+ *
+ * **Example** (Sending page settlements to a Foldkit Model)
  *
  * ```ts
  * import * as Confect from "@confect/foldkit";
+ * import refs from "confect/_generated/refs";
+ * import { defineMessageUnion } from "foldkit/message";
  * import * as Subscription from "foldkit/subscription";
  *
+ * const Notes = Confect.PaginatedQuery.make(
+ *   refs.public.notes_and_random.notes.listPaginated,
+ * );
+ * type Model = { readonly notes: typeof Notes.schema.Type };
+ * const Message = defineMessageUnion({
+ *   SettledGetNotesPage: { settlement: Notes.settlement },
+ * });
  * const subscriptions = Subscription.make<
  *   Model,
- *   Message,
+ *   typeof Message.Type,
  *   Confect.Client.Client
  * >()(() => ({
  *   notesPage: Confect.Subscription.paginatedQuery<Model>()(Notes, {
  *     state: (model) => model.notes,
- *     onSettled: (settlement) => SettledGetNotesPage({ settlement }),
+ *     onSettled: (settlement) =>
+ *       Message.SettledGetNotesPage({ settlement }),
  *   }),
  * }));
  * ```
  *
- * Pass the settlement to `PaginatedQuery.settle` in `update`. The request
- * identity is included in both success and failure Messages, so superseded
- * outcomes cannot settle a newer page or pagination session. Query failures do
- * not close the Convex subscription; a later result can recover naturally. An
- * argument-codec failure emits one failed settlement before any listener is
- * registered. The resulting stream requires Client and has no typed failures;
- * exceptions thrown by onSettled remain defects.
- *
  * @category Subscriptions
+ *
+ * @see {@link PaginatedQuery.settle} applies the emitted settlement to the Model.
  */
 export const paginatedQuery =
   <Model>() =>
@@ -311,9 +348,10 @@ export const paginatedQuery =
     machine: PaginatedQuery.PaginatedQuery<PaginatedQueryRef>,
     config: {
       /**
-       * Select the machine state; Idle disables the page subscription.
+       * Selects the machine state from the Model; `Idle` disables the page
+       * subscription.
        *
-       * @category Options
+       * @category Configuration
        */
       readonly state: (
         model: Model,
@@ -323,8 +361,8 @@ export const paginatedQuery =
         PaginatedQuery.Error<PaginatedQueryRef>
       >;
       /**
-       * Wrap a correlated success or failure in a Message for
-       * PaginatedQuery.settle.
+       * Wraps a correlated success or failure in a Message for
+       * `PaginatedQuery.settle`.
        *
        * @category Mapping
        */

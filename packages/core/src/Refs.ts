@@ -9,12 +9,12 @@ import * as Ref from "./Ref";
 import * as Spec from "./Spec";
 
 /**
- * A generated tree of function refs, nested by group and function name.
- * `Predicate` selects compatible ref types, such as public-only refs; groups
- * with no matching functions are omitted from the resulting type. Leaf call
- * types include the function's declared errors and covering middleware errors.
+ * A generated tree of function refs nested by group and function name.
+ * `Predicate` limits the type to matching refs, such as public functions, and
+ * omits groups with no matches. Each Confect ref's failure type includes the
+ * function's own errors and those of its middleware.
  *
- * @category Models
+ * @category Utility types
  */
 export type Refs<
   Spec_ extends Spec.AnyWithProps,
@@ -22,9 +22,13 @@ export type Refs<
 > = Types.Simplify<OmitEmpty<Helper<Spec.Groups<Spec_>, Predicate>>>;
 
 /**
- * The public and internal reference views generated from a project spec. The
- * two trees are filtered at the type level, not an authorization boundary;
- * Convex enforces the deployed function's visibility.
+ * The generated project's public and internal views of its function refs.
+ *
+ * **Gotchas**
+ *
+ * The two views have different TypeScript types but share one tree at runtime.
+ * Filtering by visibility is not an authorization check; Convex enforces the
+ * deployed function's visibility.
  *
  * @category Models
  */

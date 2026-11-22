@@ -9,30 +9,31 @@ import * as Layer from "effect/Layer";
 
 const make = (scheduler: ConvexScheduler) => ({
   /**
-   * Cancel a scheduled invocation.
+   * Cancels a scheduled invocation by its scheduled-function ID. Cancellation
+   * does not undo work that has already run.
    *
    * @category Scheduling
    *
-   * @param id - ID in `_scheduled_functions` returned by runAfter/runAt.
+   * @param id - ID in `_scheduled_functions` returned by `runAfter` or `runAt`.
    *
-   * @returns An Effect producing void. Native rejection is a defect;
-   *   cancellation does not undo work that already ran.
+   * @returns An Effect that completes without a value. A Convex rejection is a
+   *   defect.
    */
   cancel: (id: GenericId<"_scheduled_functions">) =>
     Effect.promise(() => scheduler.cancel(id)),
   /**
-   * Schedule a mutation or action after a delay.
+   * Schedules a mutation or action to run after the given delay.
    *
    * @category Scheduling
    *
-   * @param delay - Effect Duration, converted to milliseconds.
+   * @param delay - Effect duration, converted to milliseconds.
    * @param ref - Generated mutation or action ref.
-   * @param args - Decoded arguments, optional for an argument-free ref.
+   * @param args - Decoded arguments; omit for an argument-free ref.
    *
-   * @returns An Effect producing a scheduled-function ID; native rejection is a
-   *   defect.
+   * @returns An Effect producing the scheduled-function ID. A Convex rejection
+   *   is a defect.
    *
-   * @throws If arguments cannot be encoded, before the Effect is returned.
+   * @throws If the arguments cannot be encoded, before the Effect is returned.
    */
   runAfter: <Ref_ extends Ref.AnyMutation | Ref.AnyAction>(
     delay: Duration.Duration,
@@ -51,18 +52,18 @@ const make = (scheduler: ConvexScheduler) => ({
     );
   },
   /**
-   * Schedule a mutation or action at an absolute time.
+   * Schedules a mutation or action to run at the given instant.
    *
    * @category Scheduling
    *
-   * @param dateTime - Effect DateTime, converted to epoch milliseconds.
+   * @param dateTime - Effect date and time, converted to epoch milliseconds.
    * @param ref - Generated mutation or action ref.
-   * @param args - Decoded arguments, optional for an argument-free ref.
+   * @param args - Decoded arguments; omit for an argument-free ref.
    *
-   * @returns An Effect producing a scheduled-function ID; native rejection is a
-   *   defect.
+   * @returns An Effect producing the scheduled-function ID. A Convex rejection
+   *   is a defect.
    *
-   * @throws If arguments cannot be encoded, before the Effect is returned.
+   * @throws If the arguments cannot be encoded, before the Effect is returned.
    */
   runAt: <Ref_ extends Ref.AnyMutation | Ref.AnyAction>(
     dateTime: DateTime.DateTime,
@@ -83,18 +84,19 @@ const make = (scheduler: ConvexScheduler) => ({
 });
 
 /**
- * Scheduling service supplied in mutations, actions and HTTP handlers. Import
- * the generated `Scheduler` tag to obtain runAfter, runAt and cancel.
+ * Tag for scheduling mutations and actions or canceling a scheduled invocation.
+ * Yield the generated `Scheduler` tag in a mutation, action, or HTTP handler.
  *
- * @category Services
+ * @category Tags
  */
 export const Scheduler =
   // oxlint-disable-next-line effecttsgo/service-not-as-class -- Preserve the public structural Identifier and Effect requirement types; class identifiers would change those contracts.
   Context.Service<ReturnType<typeof make>>("@confect/server/Scheduler");
 /**
- * Effect requirement identifier for the generated scheduling service.
+ * Effect environment requirement for an operation that schedules or cancels a
+ * function through the generated `Scheduler` service.
  *
- * @category Services
+ * @category Context
  */
 export type Scheduler = typeof Scheduler.Identifier;
 

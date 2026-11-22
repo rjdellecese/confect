@@ -9,8 +9,9 @@ import { BlobNotFoundError } from "./BlobNotFoundError";
 
 const make = (storageWriter: ConvexStorageWriter) => ({
   /**
-   * Effect producing a temporary upload URL in mutations, actions and HTTP
-   * handlers. Native failures and invalid URL decoding are defects.
+   * Effect that creates a temporary upload URL in a mutation, action, or HTTP
+   * handler. Yield `generateUploadUrl` without calling it. An invalid URL or
+   * Convex failure is a defect.
    *
    * @category Writing
    */
@@ -26,14 +27,14 @@ const make = (storageWriter: ConvexStorageWriter) => ({
     ),
   ),
   /**
-   * Delete a blob in a writable storage context.
+   * Deletes a stored blob in a mutation, action, or HTTP handler.
    *
    * @category Writing
    *
-   * @param storageId - ID of the stored blob.
+   * @param storageId - ID of the blob to delete.
    *
-   * @returns An Effect producing void; native rejection becomes
-   *   BlobNotFoundError.
+   * @returns An Effect that completes without a value. Any Convex rejection
+   *   becomes {@link BlobNotFoundError}.
    */
   delete: (storageId: GenericId<"_storage">) =>
     Effect.tryPromise({
@@ -43,10 +44,10 @@ const make = (storageWriter: ConvexStorageWriter) => ({
 });
 
 /**
- * Compatibility upload/delete service supplied in mutations, actions and HTTP
- * handlers. New code should use the generated unified `Storage` tag instead.
+ * Compatibility tag for creating upload URLs and deleting blobs in mutations,
+ * actions, and HTTP handlers. Use the generated `Storage` tag in new code.
  *
- * @category Services
+ * @category Tags
  */
 export class StorageWriter extends Context.Service<
   StorageWriter,

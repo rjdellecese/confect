@@ -29,11 +29,11 @@ import * as MiddlewareRegistryItem from "./MiddlewareRegistryItem";
 import { setNestedProperty } from "./internal/utils";
 
 /**
- * Service provided by a middleware implementation layer. A group needs one
- * implementation for each middleware attached to the group or its functions
- * before `GroupImpl.finalize` accepts the layer.
+ * Service that marks a middleware spec as implemented. A group needs an
+ * implementation for each middleware attached to the group or to any of its
+ * functions before `GroupImpl.finalize` accepts the layer.
  *
- * @category Models
+ * @category Services
  */
 export interface MiddlewareImpl<MiddlewareKey extends string> {
   /**
@@ -171,24 +171,32 @@ const layerFromImpls = <
   );
 
 /**
- * The schema-typed `MiddlewareImpl` builders exported by `_generated/server`.
+ * Application-typed middleware builders exported as `MiddlewareImpl` by
+ * `_generated/server`. They type each wrapper's database services against the
+ * application's schema.
  *
  * @category Models
  */
 export interface Builders<DatabaseSchema_ extends DatabaseSchema.AnyWithProps> {
   /**
-   * Use one wrapper for every function type the middleware supports. It can use
-   * services shared by those runtimes and the spec's declared requirements
-   * supplied by earlier middleware.
+   * Creates a middleware layer that uses the same wrapper for every function
+   * type declared in the spec.
+   *
+   * **Details**
+   *
+   * A shared wrapper can use services common to all of those function types,
+   * plus requirements declared by the spec and provided by earlier middleware.
    *
    * @category Layers
    *
    * @param middlewareSpec - Middleware declaration to implement.
-   * @param impl - Wrap the downstream Effect using invocation metadata and,
-   *   when declared, attachment options. The wrapper may provide the spec's
-   *   service and fail with its declared error.
+   * @param impl - Function that wraps the downstream Effect. It receives
+   *   invocation metadata and, if declared, the attachment options. It may
+   *   provide the spec's service and fail with its declared error.
    *
-   * @returns A layer to provide to each group using the middleware.
+   * @returns A layer to provide to each group that uses the middleware.
+   *
+   * @see {@link Builders.makeByFunctionType} for wrappers that need services specific to one function type.
    */
   readonly make: <MiddlewareSpec_ extends MiddlewareSpec.AnyMiddlewareSpec>(
     middlewareSpec: MiddlewareSpec_,
@@ -205,17 +213,22 @@ export interface Builders<DatabaseSchema_ extends DatabaseSchema.AnyWithProps> {
   ) => Layer.Layer<MiddlewareImpl<MiddlewareSpec.Key<MiddlewareSpec_>>>;
 
   /**
-   * Use a separate wrapper for each supported function type. Each wrapper can
-   * use the services of its own runtime: for example, read directly in a query
-   * or mutation and call an internal query from an action.
+   * Creates a middleware layer from a separate wrapper for each function type
+   * declared in the spec.
+   *
+   * **When to use**
+   *
+   * Use when the wrapper needs different services in different runtimes, such
+   * as a database reader in a query and a query runner in an action.
    *
    * @category Layers
    *
    * @param middlewareSpec - Middleware declaration to implement.
    * @param impls - One wrapper per declared function type, each receiving the
-   *   downstream Effect, invocation metadata and any declared options.
+   *   downstream Effect, invocation metadata, and any declared attachment
+   *   options.
    *
-   * @returns A layer to provide to each group using the middleware.
+   * @returns A layer to provide to each group that uses the middleware.
    */
   readonly makeByFunctionType: <
     MiddlewareSpec_ extends MiddlewareSpec.AnyMiddlewareSpec,
@@ -235,18 +248,21 @@ export interface Builders<DatabaseSchema_ extends DatabaseSchema.AnyWithProps> {
   ) => Layer.Layer<MiddlewareImpl<MiddlewareSpec.Key<MiddlewareSpec_>>>;
 
   /**
-   * Run an Effect before the downstream handler and provide its result as a
-   * service. Use {@link Builders.make | make} instead if computing the service
-   * needs the attachment options or invocation metadata.
+   * Creates a middleware layer that runs an Effect at invocation time and
+   * provides its result as a service to the downstream handler.
    *
    * @category Layers
    *
    * @param middlewareSpec - Middleware declaration to implement.
-   * @param tag - Runtime tag for the spec's declared service.
-   * @param effect - Compute the service using dependencies available to a
-   *   shared wrapper. Its failures must fit the middleware's declared error.
+   * @param tag - Service tag for the spec's declared service.
+   * @param effect - Effect that computes the service using dependencies
+   *   available to a shared wrapper. Its failures must fit the middleware's
+   *   declared error.
    *
-   * @returns A layer that supplies the computed service downstream.
+   * @returns An implementation layer to provide to each group that uses the
+   *   middleware.
+   *
+   * @see {@link Builders.make | make} when computing the service requires attachment options or invocation metadata.
    */
   readonly provides: <
     MiddlewareSpec_ extends MiddlewareSpec.AnyMiddlewareSpec,
@@ -304,25 +320,27 @@ export const forSchema = <
 
 export const {
   /**
-   * Share one wrapper across the spec's function types without specializing its
-   * database services. For the application-typed {@link Builders.make} method,
-   * import `MiddlewareImpl` from `_generated/server`.
+   * Creates a middleware layer with one wrapper shared across the spec's
+   * function types, without specializing its database services. Import
+   * `MiddlewareImpl` from `_generated/server` for the application-typed
+   * {@link Builders.make} method.
    *
    * @category Layers
    */
   make,
   /**
-   * Provide one wrapper per declared function type without specializing its
-   * database services. Use {@link Builders.makeByFunctionType} from the
-   * generated `MiddlewareImpl` for application-typed services.
+   * Creates a middleware layer with one wrapper per declared function type,
+   * without specializing its database services. The generated `MiddlewareImpl`
+   * exposes {@link Builders.makeByFunctionType} with application-typed services.
    *
    * @category Layers
    */
   makeByFunctionType,
   /**
-   * Supply a service to the downstream handler without specializing database
-   * services. Use {@link Builders.provides} from the generated `MiddlewareImpl`
-   * for application-typed services.
+   * Creates a middleware layer that supplies a service to the downstream
+   * handler without specializing database services. The generated
+   * `MiddlewareImpl` exposes {@link Builders.provides} with application-typed
+   * services.
    *
    * @category Layers
    */

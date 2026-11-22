@@ -27,11 +27,11 @@ export type TypeId = typeof TypeId;
 export type FinalizationStatus = "Unfinalized" | "Finalized";
 
 /**
- * Group implementation layer's service. The status distinguishes a layer still
- * awaiting implementations from one finalized for the codegen entry point.
- * Build through make/provide/finalize rather than constructing this value.
+ * Service that distinguishes a group still awaiting implementations from one
+ * ready for code generation. Build the group with {@link make}, provide its
+ * implementation layers, and pass the result to {@link finalize}.
  *
- * @category Models
+ * @category Services
  */
 export interface GroupImpl<
   FinalizationStatus_ extends FinalizationStatus = "Unfinalized",
@@ -121,17 +121,21 @@ export const GroupImpl = <FinalizationStatus_ extends FinalizationStatus>({
   );
 
 /**
- * Begin a group's implementation layer. Import `GroupImpl` from
- * `_generated/server` and pass the spec from the sibling `.spec.ts` module.
+ * Creates an unfinalized layer for a group that requires the implementations of
+ * its declared functions and attached middleware.
+ *
+ * **Details**
+ *
+ * Import `GroupImpl` from `_generated/server` and supply each implementation
+ * using `Layer.provide`. If a function's middleware requires a service, the
+ * group or function must have middleware that provides it.
  *
  * @category Layers
  *
- * @param _group - Group spec whose functions and middleware must be
- *   implemented.
+ * @param _group - Group declaration from the sibling `.spec.ts` module.
  *
- * @returns An unfinalized layer. Supply each implementation with
- *   `Layer.provide`, then pass the layer to {@link finalize} and default-export
- *   the result from the matching `.impl.ts` module.
+ * @returns An unfinalized layer to pass to {@link finalize} after supplying all
+ *   implementations.
  */
 export const make = <Group extends GroupSpec.AnyWithProps>(
   _group: Group &
@@ -164,16 +168,24 @@ const findUnfinalizedGroupImpl = <S>(
   Array.findFirst(context.mapUnsafe.values(), isUnfinalizedGroupImpl);
 
 /**
- * Finish a group after all function and middleware implementations are
- * supplied.
+ * Returns the finalized group layer to default-export from the group's
+ * `.impl.ts` module.
+ *
+ * **Gotchas**
+ *
+ * The input type rejects groups with outstanding function or middleware
+ * implementations. If a layer supplied outside that type contract builds a
+ * context with no unfinalized group service, building the finalized layer dies
+ * with a defect.
  *
  * @category Combinators
  *
- * @param group - An unfinalized layer with no remaining requirements. Missing
- *   implementations are rejected by the parameter's type.
+ * @param group - Unfinalized group layer with no remaining requirements.
  *
- * @returns A finalized layer accepted as the .impl.ts default export. Building
- *   an invalid layer without its unfinalized group service dies with a defect.
+ * @returns A layer whose finalized group records the registered function names
+ *   and middleware keys.
+ *
+ * @see {@link make} to start a group implementation.
  */
 export const finalize = (
   group: Layer.Layer<GroupImpl<"Unfinalized">>,

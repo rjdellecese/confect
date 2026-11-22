@@ -1,6 +1,7 @@
 /**
- * Effect-native in-memory function, HTTP and scheduled-work testing.
+ * In-memory Convex backend and Effect test helpers for functions, HTTP
+ * endpoints, and scheduled work.
  *
- * @category Services
+ * @category Testing
  */
 export * as TestConfect from "./TestConfect";

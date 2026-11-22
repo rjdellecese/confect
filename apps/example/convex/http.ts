@@ -1,8 +1,8 @@
 import http from "../confect/http";
 
 /**
- * HTTP router exposed to Convex from the application's HTTP routes.
+ * HTTP router that registers the application's HTTP routes with Convex.
  *
- * @category Deployment
+ * @category Configuration
  */
 export default http;

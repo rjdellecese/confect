@@ -41,6 +41,17 @@ Confect is a library that integrates Effect with the Convex backend platform. It
 - `apps/example` - Vite + React example app demonstrating Confect usage
 - `apps/docs` - Documentation site powered by Mintlify
 
+## Public API documentation
+
+Use [Effect's pinned JSDoc conventions](https://github.com/Effect-TS/effect/tree/9a91b1926a5fbfaffd302a7a41a94d4d53a1154e/.agents/skills/jsdocs) for public declarations and the helpers emitted by codegen:
+
+- Lead with one practical summary paragraph. Say what a function or method does in the present tense (“Returns…”, “Attaches…”); describe a value by its role (“Layer that…”, “Schema for…”).
+- Add **When to use**, **Details**, then **Gotchas** only where useful. Verify behavior against the implementation and tests. Distinguish typed failures from defects and state which function contexts supply a service.
+- Before the tags, introduce each example with `**Example** (Use-case title)`, a blank line, and one plain `ts` fence. Use public imports and enough setup for the snippet to compile. Do not use an `@example` tag.
+- Link symbols with `{@link Symbol}`, external pages with Markdown, and close public alternatives with `@see`. Retain useful parameter, return and failure contracts. For shared metadata, use the upstream order: deprecation, default, related APIs, stability, category, then since, subject to Oxfmt's tag ordering.
+- Group exports by purpose rather than declaration kind. Distinguish service contracts, service tags and layers; use guards for type narrowing and predicates for boolean tests. Keep categories on public members used by the reference navigation and document generated default exports. Use the repository formatter's casing.
+- Keep `@internal` and experimental boundaries intact. Add `@since` only for a verified Confect release and stability metadata only for an established Confect guarantee. Do not infer either from an upstream dependency.
+
 ## Tools
 
 - `tools/bench-harness` - Private package that runs `@ark/attest` type benchmarks on tsrs; see its README
@@ -82,6 +93,7 @@ Build, lint, and format run through Vite+ (`vp`), which orders packages by their
 - `pnpm dev:example`/`pnpm dev:docs` - Run the example app/docs site
 - `pnpm test` - Run all package test suites via Vitest (`vitest run`)
 - `pnpm typecheck` - Typecheck the package graph and test suites via `tsrs -b` (project references, incremental)
+- `pnpm check:examples` - After `pnpm build`, typecheck fenced public API examples with `@effect/docgen` and `tsrs`. Imports from `confect/_generated/*` resolve to the example app. Snippets are not executed and docgen's Markdown is discarded.
 - `pnpm typecheck:inexact` - Refresh normal package declarations, then typecheck every package's sources and tests with `exactOptionalPropertyTypes: false`
 - `pnpm --filter example typecheck:inexact` - Typecheck both example projects with `exactOptionalPropertyTypes: false` (run `pnpm build` first)
 - `pnpm lint`/`pnpm lint:fix` - Lint (Oxlint + Syncpack); `lint:fix` writes fixes

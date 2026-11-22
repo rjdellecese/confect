@@ -53,11 +53,9 @@ export const Limits = Schema.Struct({
 export type Limits = typeof Limits.Type;
 
 /**
- * Publicly re-exported by QueryStream: a supplied pagination read limit failed
- * schema validation. `maximumRowsRead` and `maximumBytesRead` must be
- * nonnegative integers when present. `paginate` dies with this error; unlike
- * `ReadBudgetExceededError`, it does not indicate exhaustion of a valid
- * budget.
+ * Defect from `QueryStream.paginate` when `maximumRowsRead` or
+ * `maximumBytesRead` is not a nonnegative integer. The `cause` describes the
+ * invalid option; exhausting a valid budget is a separate condition.
  *
  * @category Errors
  *
@@ -75,7 +73,7 @@ export class InvalidReadLimitError extends Schema.TaggedError<
   cause: Schema.declare<Schema.SchemaError>(Schema.isSchemaError),
 }) {
   /**
-   * Diagnostic containing the underlying limit-validation message.
+   * Returns a message describing the invalid read limit.
    *
    * @category Getters
    */

@@ -10,22 +10,29 @@ import * as Layer from "effect/Layer";
 import type { Options as MutationOptions } from "./QueryTransactionContext";
 
 /**
- * Convex's resource limits for an individual nested transaction call.
+ * Convex resource limits for one nested transaction call, such as the maximum
+ * number of documents read.
  *
- * @category Options
+ * @category Configuration
  */
 export type { TransactionLimits } from "convex/server";
 /**
- * Transaction-limit options accepted by a nested mutation.
+ * Options that let a mutation limit a nested mutation's resource use without
+ * changing the enclosing transaction's limits.
  *
- * @category Options
+ * @category Configuration
  */
 export type { Options as MutationOptions } from "./QueryTransactionContext";
 /**
- * Nested-query options including transactionLimits and useStaleSnapshot.
- * Providing useStaleSnapshot, even false, requires a mutation context.
+ * Options that let a mutation limit a nested query's resource use or request a
+ * stale snapshot.
  *
- * @category Options
+ * **Gotchas**
+ *
+ * Specifying `useStaleSnapshot` requires a mutation even when the value is
+ * `false`.
+ *
+ * @category Configuration
  */
 export type QueryOptions = AdvancedRunQueryOptions;
 

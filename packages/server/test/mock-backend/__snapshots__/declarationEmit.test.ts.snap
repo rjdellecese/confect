@@ -4,12 +4,22 @@ exports[`declaration emit > refs.ts emits a declaration without TS7056 1`] = `
 "import { Refs } from "@confect/core";
 import spec from "./spec";
 /**
- * Typed function references nested by group path and function name.
- * public exposes client-callable functions; internal exposes server-only functions.
- * These are type-filtered views, not a runtime authorization boundary.
- * Each leaf is a Ref carrying argument, return, and declared error types, not a callable function.
- * Pass leaves to Confect clients, runners, or the scheduler; Confect codecs are evaluated lazily.
- * @category References
+ * Typed function references grouped by path and function name. Pass a leaf
+ * reference to a Confect client, runner, or scheduler rather than calling it
+ * directly.
+ *
+ * **Details**
+ *
+ * The \`public\` view exposes client-callable references and \`internal\` exposes
+ * server-only references. Each carries its argument, result, and declared error
+ * types; Confect evaluates codecs lazily.
+ *
+ * **Gotchas**
+ *
+ * The views filter references at the type level. Convex enforces visibility on the
+ * deployed functions.
+ *
+ * @category references
  */
 declare const refs: Refs.FromSpec<typeof spec>;
 export default refs;
@@ -23,9 +33,15 @@ import notesTable from "./tables/notes";
 import tagsTable from "./tables/tags";
 import usersTable from "./tables/users";
 /**
- * Registry of all application table handles. A value import loads every table module.
- * Import the registry as a type for the full database model. In handlers, import only the table handles you use.
- * @category Schemas
+ * Registry of all application table handles. Import its type when a service or
+ * helper needs the full database model.
+ *
+ * **Gotchas**
+ *
+ * A value import loads every table module. In handlers, import individual handles
+ * from \`_generated/tables\` instead.
+ *
+ * @category schemas
  */
 declare const databaseSchema: DatabaseSchema_.DatabaseSchema<{
     readonly events: typeof eventsTable;
@@ -42,65 +58,81 @@ exports[`declaration emit > services.d.ts prints public types by name 1`] = `
 import type schemaDefinition from "./schema";
 import type { Docs } from "./docs";
 /**
- * Authentication service tag, provided in queries, mutations, actions, and HTTP handlers.
- * Yield this tag to read the caller's identity; getUserIdentity fails with NoUserIdentityFoundError when unauthenticated.
- * @category Services
+ * Service tag for reading the caller's identity in queries, mutations, actions,
+ * and HTTP handlers. The service's \`getUserIdentity\` Effect fails with
+ * \`NoUserIdentityFoundError\` when the caller is unauthenticated.
+ *
+ * @category tags
  */
 export declare const Auth: typeof Auth_.Auth;
 /**
  * Effect environment requirement for {@link Auth}.
- * @category Services
+ *
+ * @category context
  */
 export type Auth = typeof Auth.Identifier;
 /**
- * JWT-signing service tag, provided only in mutations.
- * Yield this tag and pass SignJwtOptions to signJwt; signing failures are defects.
- * @category Services
+ * Service tag for signing deployment JWTs in mutations. Pass \`SignJwtOptions\` to
+ * the service's \`signJwt\` method; signing failures are defects.
+ *
+ * @category tags
  */
 export declare const MutationAuth: typeof MutationAuth_.MutationAuth;
 /**
  * Effect environment requirement for {@link MutationAuth}.
- * @category Services
+ *
+ * @category context
  */
 export type MutationAuth = typeof MutationAuth.Identifier;
 /**
- * Execution metadata service tag, provided in queries, mutations, actions, and HTTP handlers.
- * Yield this tag to read function and deployment metadata.
- * @category Services
+ * Service tag for reading function and deployment metadata in queries, mutations,
+ * actions, and HTTP handlers.
+ *
+ * @category tags
  */
 export declare const ExecutionMetadata: typeof ExecutionMetadata_.ExecutionMetadata;
 /**
  * Effect environment requirement for {@link ExecutionMetadata}.
- * @category Services
+ *
+ * @category context
  */
 export type ExecutionMetadata = typeof ExecutionMetadata.Identifier;
 /**
- * Request metadata service tag, provided in mutations, actions, and HTTP handlers, not queries.
- * Yield this tag to read metadata for the current request.
- * @category Services
+ * Service tag for reading metadata about the current request in mutations,
+ * actions, and HTTP handlers. Queries do not provide request metadata.
+ *
+ * @category tags
  */
 export declare const RequestMetadata: typeof RequestMetadata_.RequestMetadata;
 /**
  * Effect environment requirement for {@link RequestMetadata}.
- * @category Services
+ *
+ * @category context
  */
 export type RequestMetadata = typeof RequestMetadata.Identifier;
 /**
- * Transaction metadata service tag, provided in queries and mutations.
- * Yield this tag to read transaction metrics and the snapshot timestamp.
- * @category Services
+ * Service tag for reading transaction metrics and the snapshot timestamp in
+ * queries and mutations.
+ *
+ * @category tags
  */
 export declare const TransactionMetadata: typeof TransactionMetadata_.TransactionMetadata;
 /**
  * Effect environment requirement for {@link TransactionMetadata}.
- * @category Services
+ *
+ * @category context
  */
 export type TransactionMetadata = typeof TransactionMetadata.Identifier;
 /**
- * Scheduling service tag, provided in mutations, actions, and HTTP handlers.
- * Yield this tag to schedule mutation or action refs with an Effect Duration or DateTime, or cancel a scheduled ID.
- * Scheduling returns the scheduled-function ID; argument encoding can throw synchronously.
- * @category Services
+ * Service tag for scheduling mutations and actions from mutations, actions, and
+ * HTTP handlers. Schedule a reference after an Effect \`Duration\` or at a
+ * \`DateTime\`; use the returned scheduled-function ID to cancel the job.
+ *
+ * **Gotchas**
+ *
+ * Argument encoding can throw before the scheduling method returns an Effect.
+ *
+ * @category tags
  */
 export declare const Scheduler: import("effect/Context").Service<{
     cancel: (id: import("convex/values").GenericId<"_scheduled_functions">) => import("effect/Effect").Effect<void, never, never>;
@@ -113,109 +145,154 @@ export declare const Scheduler: import("effect/Context").Service<{
 }>;
 /**
  * Effect environment requirement for {@link Scheduler}.
- * @category Services
+ *
+ * @category context
  */
 export type Scheduler = typeof Scheduler.Identifier;
 /**
- * Storage facade tag, provided in queries, mutations, actions, and HTTP handlers.
- * getUrl returns a URL or fails with BlobNotFoundError. Upload URLs and deletion require StorageWriter;
- * blob reads and writes require StorageActionWriter. Both writer services are provided in mutations, actions, and HTTP handlers.
- * @category Services
+ * Service tag for working with files in Convex storage. Queries, mutations,
+ * actions, and HTTP handlers can resolve a storage ID to a URL; a missing file
+ * fails with \`BlobNotFoundError\`.
+ *
+ * **Details**
+ *
+ * Upload URL generation and deletion require {@link StorageWriter}. Reading and
+ * storing blobs require {@link StorageActionWriter}. Mutations, actions, and HTTP
+ * handlers provide both writer services.
+ *
+ * @category tags
  */
 export declare const Storage: typeof Storage_.Storage;
 /**
  * Effect environment requirement for {@link Storage}.
- * @category Services
+ *
+ * @category context
  */
 export type Storage = typeof Storage.Identifier;
 /**
- * Compatibility storage URL service tag, provided in queries, mutations, actions, and HTTP handlers.
- * Use Storage in new code. getUrl resolves a storage ID to a URL or fails with BlobNotFoundError.
- * @category Services
+ * Compatibility tag for resolving storage IDs to URLs in queries, mutations,
+ * actions, and HTTP handlers. A missing file fails with \`BlobNotFoundError\`.
+ *
+ * @see {@link Storage} for the storage API recommended for new code.
+ * @category tags
  */
 export declare const StorageReader: typeof StorageReader_.StorageReader;
 /**
- * Compatibility environment requirement for {@link StorageReader}; use Storage in new code.
- * @category Services
+ * Compatibility environment requirement for {@link StorageReader}; use
+ * {@link Storage} in new code.
+ *
+ * @category context
  */
 export type StorageReader = typeof StorageReader.Identifier;
 /**
- * Compatibility storage write service tag, provided in mutations, actions, and HTTP handlers.
- * Use Storage in new code. This service generates upload URLs and deletes files; deletion failures become BlobNotFoundError.
- * @category Services
+ * Compatibility tag for generating upload URLs and deleting stored files in
+ * mutations, actions, and HTTP handlers. The service reports deletion failures as
+ * \`BlobNotFoundError\`.
+ *
+ * @see {@link Storage} for the storage API recommended for new code.
+ * @category tags
  */
 export declare const StorageWriter: typeof StorageWriter_.StorageWriter;
 /**
- * Compatibility environment requirement for {@link StorageWriter}; use Storage in new code.
- * @category Services
+ * Compatibility environment requirement for {@link StorageWriter}; use
+ * {@link Storage} in new code.
+ *
+ * @category context
  */
 export type StorageWriter = typeof StorageWriter.Identifier;
 /**
- * Compatibility blob storage service tag, provided in mutations, actions, and HTTP handlers despite its name.
- * Use Storage in new code.
- * get returns a Blob or fails with BlobNotFoundError; store accepts a Blob and optional sha256 and returns a storage ID.
- * @category Services
+ * Compatibility tag for reading and storing blobs in mutations, actions, and HTTP
+ * handlers. A missing blob fails with \`BlobNotFoundError\`; storing a blob accepts
+ * an optional SHA-256 checksum and returns a storage ID.
+ *
+ * @see {@link Storage} for the storage API recommended for new code.
+ * @category tags
  */
 export declare const StorageActionWriter: typeof StorageActionWriter_.StorageActionWriter;
 /**
- * Compatibility environment requirement for {@link StorageActionWriter}; use Storage in new code.
- * @category Services
+ * Compatibility environment requirement for {@link StorageActionWriter}; use
+ * {@link Storage} in new code.
+ *
+ * @category context
  */
 export type StorageActionWriter = typeof StorageActionWriter.Identifier;
 /**
- * Schema-typed vector search service tag for actions and HTTP routers built with the database schema type.
- * Yield this tag and call it with a table name, vector index, and search options to return document IDs and scores.
- * Convex search failures are defects; results do not contain decoded documents.
+ * Service tag for searching a table's vector index from actions or a schema-typed
+ * HTTP router. Call the service with the table name, index, and search options to
+ * get ranked document IDs and scores.
+ *
+ * **Gotchas**
+ *
+ * Results do not contain decoded documents. A Convex search failure is a defect.
+ *
  * @public
- * @category Services
+ * @category tags
  */
 export declare const VectorSearch: VectorSearch_.VectorSearchTag<DataModel.FromDatabaseSchema<typeof schemaDefinition>>;
 /**
  * Effect environment requirement for {@link VectorSearch}.
+ *
  * @public
- * @category Services
+ * @category context
  */
 export type VectorSearch = typeof VectorSearch.Identifier;
 /**
- * Schema-typed ID validation service tag, provided in queries and mutations.
- * parse checks a string against a table; identify checks application and system tables.
- * Both return Option.none for invalid IDs and do not check whether the document exists.
+ * Service tag for validating document IDs in queries and mutations. Use \`parse\` to
+ * check a string against one table or \`identify\` to find its table among the
+ * application's tables and Convex's system tables.
+ *
+ * **Gotchas**
+ *
+ * Both methods return \`None\` for an invalid ID. A match does not prove a document
+ * exists.
+ *
  * @public
- * @category Services
+ * @category tags
  */
 export declare const DocumentIds: DocumentIds_.DocumentIdsTag<typeof schemaDefinition>;
 /**
  * Effect environment requirement for {@link DocumentIds}.
+ *
  * @public
- * @category Services
+ * @category context
  */
 export type DocumentIds = typeof DocumentIds.Identifier;
 /**
- * Schema-typed database reader tag, provided in queries and mutations.
- * Pass a generated table handle to reader.table to read decoded documents. System table handles are also supported.
- * Document decoding failures use DocumentDecodeError; reader.table(handle).get(id) fails with GetByIdFailure when absent.
+ * Service tag for reading decoded documents in queries and mutations. Pass a
+ * generated application table handle or a system table handle to \`reader.table\`.
+ *
+ * **Gotchas**
+ *
+ * A decoding failure is a typed \`DocumentDecodeError\`. Looking up a missing
+ * document with \`get(id)\` fails with \`GetByIdFailure\` rather than returning an
+ * empty result.
+ *
  * @public
- * @category Services
+ * @category tags
  */
 export declare const DatabaseReader: DatabaseReader_.DatabaseReaderTag<typeof schemaDefinition, Docs>;
 /**
  * Effect environment requirement for {@link DatabaseReader}.
+ *
  * @public
- * @category Services
+ * @category context
  */
 export type DatabaseReader = typeof DatabaseReader.Identifier;
 /**
- * Schema-typed database writer tag, provided only in mutations.
- * Pass a generated application table handle to writer.table to insert, patch, replace, or delete documents.
- * Inserts, patches, and replacements encode values through the table schema; see each operation's error behavior.
+ * Service tag for writing documents in mutations. Pass a generated application
+ * table handle to \`writer.table\` to insert, patch, replace, or delete documents.
+ * Inserts, patches, and replacements encode values through the table schema.
+ *
+ * @see {@link DatabaseReader} for reading application and system tables.
  * @public
- * @category Services
+ * @category tags
  */
 export declare const DatabaseWriter: DatabaseWriter_.DatabaseWriterTag<typeof schemaDefinition, Docs>;
 /**
  * Effect environment requirement for {@link DatabaseWriter}.
+ *
  * @public
- * @category Services
+ * @category context
  */
 export type DatabaseWriter = typeof DatabaseWriter.Identifier;
 /**
@@ -241,11 +318,16 @@ export declare const MutationTransactionContext: typeof MutationTransactionConte
  */
 export type MutationTransactionContext = typeof MutationTransactionContext.Identifier;
 /**
- * Query invocation service tag, provided in queries, mutations, actions, and HTTP handlers.
- * runQuery accepts a query ref and decoded arguments and returns its decoded result as an Effect.
- * Declared errors and SchemaError are typed failures. transactionLimits require a query or mutation;
- * useStaleSnapshot requires a mutation.
- * @category Services
+ * Service tag for calling queries from queries, mutations, actions, and HTTP
+ * handlers. Pass a query reference and decoded arguments to \`runQuery\` to get the
+ * decoded result. Declared errors and \`SchemaError\` are typed failures.
+ *
+ * **Gotchas**
+ *
+ * Transaction limits require a query or mutation context. Supplying
+ * \`useStaleSnapshot\`, even when false, requires a mutation.
+ *
+ * @category tags
  */
 export declare const QueryRunner: import("effect/Context").Service<{
     runQuery: {
@@ -272,14 +354,21 @@ export declare const QueryRunner: import("effect/Context").Service<{
 }>;
 /**
  * Effect environment requirement for {@link QueryRunner}.
- * @category Services
+ *
+ * @category context
  */
 export type QueryRunner = typeof QueryRunner.Identifier;
 /**
- * Mutation invocation service tag, provided in mutations, actions, and HTTP handlers.
- * runMutation accepts a mutation ref and decoded arguments and returns its decoded result as an Effect.
- * Declared errors and SchemaError are typed failures. transactionLimits require a mutation context.
- * @category Services
+ * Service tag for calling mutations from mutations, actions, and HTTP handlers.
+ * Pass a mutation reference and decoded arguments to \`runMutation\` to get the
+ * decoded result. Declared errors and \`SchemaError\` are typed failures.
+ *
+ * **Gotchas**
+ *
+ * Transaction limits require a mutation context. Omit the options when calling
+ * from an action or HTTP handler.
+ *
+ * @category tags
  */
 export declare const MutationRunner: import("effect/Context").Service<{
     runMutation: {
@@ -294,14 +383,16 @@ export declare const MutationRunner: import("effect/Context").Service<{
 }>;
 /**
  * Effect environment requirement for {@link MutationRunner}.
- * @category Services
+ *
+ * @category context
  */
 export type MutationRunner = typeof MutationRunner.Identifier;
 /**
- * Action invocation service tag, provided in actions and HTTP handlers.
- * runAction accepts an action ref and decoded arguments and returns its decoded result as an Effect.
- * Declared errors and SchemaError are typed failures.
- * @category Services
+ * Service tag for calling actions from actions and HTTP handlers. Pass an action
+ * reference and decoded arguments to \`runAction\` to get the decoded result.
+ * Declared errors and \`SchemaError\` are typed failures.
+ *
+ * @category tags
  */
 export declare const ActionRunner: import("effect/Context").Service<{
     runAction: <Action extends import("@confect/core/Ref").AnyAction>(action: Action, ...args: import("@confect/core/Ref").OptionalArgs<Action>) => import("effect/Effect").Effect<import("@confect/core/Ref").Returns<Action>, import("@confect/core/Ref").Error<Action> | import("effect/Schema").SchemaError>;
@@ -310,46 +401,56 @@ export declare const ActionRunner: import("effect/Context").Service<{
 }>;
 /**
  * Effect environment requirement for {@link ActionRunner}.
- * @category Services
+ *
+ * @category context
  */
 export type ActionRunner = typeof ActionRunner.Identifier;
 /**
- * Schema-typed native Convex query context tag, provided only in queries.
- * Yield this tag to access raw Convex APIs; document values use encoded rather than Confect-decoded types.
+ * Service tag for the native Convex query context, typed to the application's
+ * schema and available only in queries. Native reads return encoded document
+ * values rather than Confect's decoded values.
+ *
  * @public
- * @category Services
+ * @category tags
  */
 export declare const QueryCtx: QueryCtx_.QueryCtxTag<DataModel.ToConvexDataModel<DataModel.FromDatabaseSchema<typeof schemaDefinition>>>;
 /**
  * Effect environment requirement for {@link QueryCtx}.
+ *
  * @public
- * @category Services
+ * @category context
  */
 export type QueryCtx = typeof QueryCtx.Identifier;
 /**
- * Schema-typed native Convex mutation context tag, provided only in mutations.
- * Yield this tag to access raw Convex APIs; document values use encoded rather than Confect-decoded types.
+ * Service tag for the native Convex mutation context, typed to the application's
+ * schema and available only in mutations. Native database operations use encoded
+ * document values rather than Confect's decoded values.
+ *
  * @public
- * @category Services
+ * @category tags
  */
 export declare const MutationCtx: MutationCtx_.MutationCtxTag<DataModel.ToConvexDataModel<DataModel.FromDatabaseSchema<typeof schemaDefinition>>>;
 /**
  * Effect environment requirement for {@link MutationCtx}.
+ *
  * @public
- * @category Services
+ * @category context
  */
 export type MutationCtx = typeof MutationCtx.Identifier;
 /**
- * Schema-typed native Convex action context tag, provided in actions.
- * Yield this tag to access raw Convex APIs; function arguments and results use their wire representations.
+ * Service tag for the native Convex action context, typed to the application's
+ * schema and available in actions. Native function calls use the wire
+ * representations of arguments and results.
+ *
  * @public
- * @category Services
+ * @category tags
  */
 export declare const ActionCtx: ActionCtx_.ActionCtxTag<DataModel.ToConvexDataModel<DataModel.FromDatabaseSchema<typeof schemaDefinition>>>;
 /**
  * Effect environment requirement for {@link ActionCtx}.
+ *
  * @public
- * @category Services
+ * @category context
  */
 export type ActionCtx = typeof ActionCtx.Identifier;
 "
@@ -371,6 +472,13 @@ import groups_runnersSpec from "../groups/runners.spec";
 import groups_schedulingSpec from "../groups/scheduling.spec";
 import groups_typedErrorsSpec from "../groups/typedErrors.spec";
 import typedErrorsNodeSpec from "../typedErrorsNode.spec";
+/**
+ * Function contract for the application, assembled from its group specs. Use it
+ * to inspect the complete function tree without loading handler implementations
+ * or evaluating the functions' schema factories.
+ *
+ * @category models
+ */
 declare const spec: Spec.Spec<{
     readonly databaseReader: GroupSpec_.NamedAt<typeof databaseReaderSpec, "databaseReader">;
     readonly groups: GroupSpec_.NamedAt<GroupSpec_.GroupSpec<"Convex", "groups", never, GroupSpec_.NamedAt<typeof groups_aliasImporterSpec, "aliasImporter"> | GroupSpec_.NamedAt<typeof groups_cjsImporterSpec, "cjsImporter"> | GroupSpec_.NamedAt<typeof groups_middlewareSpec, "middleware"> | GroupSpec_.NamedAt<typeof groups_middlewareHelpersSpec, "middlewareHelpers"> | GroupSpec_.NamedAt<typeof groups_middlewareOptionsSpec, "middlewareOptions"> | GroupSpec_.NamedAt<typeof groups_middlewareOrderSpec, "middlewareOrder"> | GroupSpec_.NamedAt<typeof groups_notesSpec, "notes"> | GroupSpec_.NamedAt<GroupSpec_.AddGroups<typeof groups_randomSpec, GroupSpec_.NamedAt<typeof groups_random_statsSpec, "stats">>, "random"> | GroupSpec_.NamedAt<typeof groups_runnersSpec, "runners"> | GroupSpec_.NamedAt<typeof groups_schedulingSpec, "scheduling"> | GroupSpec_.NamedAt<typeof groups_typedErrorsSpec, "typedErrors">>, "groups">;

@@ -38,7 +38,7 @@ export const allFunctionTypes: ReadonlyArray<FunctionType> = [
  * `true` or `false`, with at least one enabled. A group attachment must cover
  * every function in that group; Node.js actions use the `action` flag.
  *
- * @category Models
+ * @category Configuration
  */
 export interface SupportedFunctionTypes {
   /**
@@ -74,20 +74,22 @@ export interface SuccessValue {
 }
 
 /**
- * The wrap-style middleware implementation shape: receives the downstream
- * effect (the remaining middleware plus the function handler) and the covered
- * invocation's metadata, and returns the effect that runs in its place.
+ * A middleware implementation that wraps the remaining middleware and function
+ * handler. It receives the downstream effect and invocation metadata and
+ * returns the effect to run in their place.
+ *
+ * **Details**
  *
  * Provide the downstream effect's `Provides_` services before running it, or
- * short-circuit with a declared failure. Preserve its opaque success value and
- * unhandled failures; middleware must not reinterpret a handler's result. `R`
- * describes services the wrapper itself requires.
+ * short-circuit with a declared failure. Preserve the downstream effect's
+ * opaque success value and unhandled failures. `R` describes the services the
+ * wrapper itself requires.
  *
  * @category Models
  */
 export interface MiddlewareImpl<Provides_, E, R, Options_ = never> {
   /**
-   * Wrap the remaining chain for one function invocation.
+   * Wraps the remaining middleware and handler for one invocation.
    *
    * @category Models
    *
@@ -105,10 +107,14 @@ export interface MiddlewareImpl<Provides_, E, R, Options_ = never> {
 }
 
 /**
- * The per-invocation context passed to a middleware implementation. `Options_`
- * is the decoded type of its attachment-options schema. When no options schema
- * is declared, the `options` field is absent. Otherwise it is present even if
- * the supplied value is `undefined`; Confect validates the attachment value
+ * The context passed to middleware for one function invocation. It contains
+ * metadata about the function and its decoded arguments.
+ *
+ * **Gotchas**
+ *
+ * The `options` field is absent when the policy declares no options schema.
+ * With a schema, the field is present even when its value is `undefined`.
+ * Confect validates the supplied value against the schema's decoded type
  * without decoding or coercing it.
  *
  * @category Models
@@ -162,14 +168,18 @@ export interface AnyMiddlewareImpl {
 }
 
 /**
- * The class shape produced by {@link MiddlewareSpec}. Only the static side is
- * ever used—the class is a value-level carrier for the middleware's key, its
- * declared functionTypes, and its (lazily-evaluated) error schema, plus the
- * type-level `Provides`/`Error` metadata. It is deliberately not a
- * `Context.Tag`: implementations are registered through the group `Registry`
- * (like `FunctionImpl`s), not resolved from a Layer context.
+ * The static contract of a middleware declaration created with
+ * {@link MiddlewareSpec}. The class carries the key, supported function kinds,
+ * lazy failure and options schemas, and the types of services it provides and
+ * requires.
  *
- * @category Middleware
+ * **Details**
+ *
+ * Pass the class itself when attaching middleware. It is not an Effect service
+ * tag: register its implementation with the group rather than looking up the
+ * declaration in the Effect context.
+ *
+ * @category Models
  */
 export interface MiddlewareSpec<
   in out Self,
@@ -360,11 +370,33 @@ export type FunctionTypes<MiddlewareSpec_ extends AnyMiddlewareSpec> =
     : never;
 
 /**
- * Declare a middleware's client-safe interface: its identifying key, the
- * service it provides to downstream handlers, the error schema its failures
- * encode through, and the function types it may attach to.
+ * Declares a client-safe middleware policy by key, supported function kinds,
+ * and optional failure and attachment-options schemas. Extend the returned
+ * class to give the policy a distinct identity.
+ *
+ * **Details**
+ *
+ * Supply the server implementation separately through `MiddlewareImpl.make`,
+ * `makeByFunctionType`, or `provides` from the application's
+ * `_generated/server` module. The optional `Config.provides` and
+ * `Config.requires` slots describe service types, not runtime service tags.
+ *
+ * **Example** (Declaring a signed-in user policy)
  *
  * ```ts
+ * import { MiddlewareSpec } from "@confect/core";
+ * import * as Context from "effect/Context";
+ * import * as Schema from "effect/Schema";
+ *
+ * class CurrentUser extends Context.Service<
+ *   CurrentUser,
+ *   { name: string }
+ * >()("CurrentUser") {}
+ * class NotSignedIn extends Schema.TaggedError<NotSignedIn>()(
+ *   "NotSignedIn",
+ *   {},
+ * ) {}
+ *
  * class RequireUser extends MiddlewareSpec.MiddlewareSpec<
  *   RequireUser,
  *   {
@@ -376,13 +408,7 @@ export type FunctionTypes<MiddlewareSpec_ extends AnyMiddlewareSpec> =
  * }) {}
  * ```
  *
- * The implementation is server-only and supplied separately via
- * `MiddlewareImpl.make` (or `makeByFunctionType`/`provides`) from the
- * application's `_generated/server`. The optional `Config.provides` and
- * `Config.requires` slots declare services at the type level, not runtime
- * service tags.
- *
- * @category Middleware
+ * @category Constructors
  *
  * @param key - A unique key identifying one declaration and implementation.
  * @param options - Client-safe schema factories and function coverage.

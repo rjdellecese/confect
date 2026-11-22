@@ -10,10 +10,15 @@ import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
 
 /**
- * A transport or backend failure that could not be decoded as the ref's typed
- * error. Appears in request/stream error channels, or inside a failed `Result`
- * from `reactiveQueryResult`. Argument/result codec failures instead use
- * `Schema.SchemaError`.
+ * A WebSocket request or subscription failure that could not be decoded as one
+ * of the ref's declared errors. The client preserves the original failure in
+ * `cause`.
+ *
+ * **Details**
+ *
+ * `reactiveQueryResult` emits this error inside a failed `Result`; one-shot
+ * requests and `reactiveQuery` fail in their error channels. Argument encoding
+ * and result decoding use `Schema.SchemaError` instead.
  *
  * @category Errors
  */
@@ -212,8 +217,18 @@ const make = (
        */
       url: address,
       /**
-       * Installs an Effect-based token provider on this shared client instance.
-       * Captures the calling Effect's services for later callback invocations.
+       * Installs an Effect-based token provider and optional
+       * authentication-change callback on the shared client.
+       *
+       * **Details**
+       *
+       * Running this Effect captures the services that the callbacks need
+       * later. Installation does not wait for Convex to accept the token.
+       *
+       * **Gotchas**
+       *
+       * All callers using this client share the registration. Provide separate
+       * client instances for independent sessions.
        *
        * @category Authentication
        *
@@ -225,15 +240,14 @@ const make = (
        *   authentication. Runs in a forked Effect using the captured services;
        *   it must not have typed failures either.
        *
-       * @returns An Effect requiring both callbacks' services. It installs the
-       *   callbacks, without waiting for authentication to finish, and has no
-       *   typed failure. Use separate layers for independent auth sessions.
+       * @returns An Effect requiring both callbacks' services that installs the
+       *   callbacks without a typed failure.
        */
       setAuth,
       /**
        * Runs a public query once; use `reactiveQuery` to observe later updates.
        *
-       * @category Invocation
+       * @category Running
        *
        * @param ref - The public query ref.
        * @param rest - Decoded arguments; omit them only for an argument-free
@@ -247,7 +261,7 @@ const make = (
       /**
        * Runs a public mutation, encoding its arguments and decoding its result.
        *
-       * @category Invocation
+       * @category Running
        *
        * @param ref - The public mutation ref.
        * @param rest - Decoded arguments; omit them only for an argument-free
@@ -261,7 +275,7 @@ const make = (
       /**
        * Runs a public action, encoding its arguments and decoding its result.
        *
-       * @category Invocation
+       * @category Running
        *
        * @param ref - The public action ref.
        * @param rest - Decoded arguments; omit them only for an argument-free
@@ -273,10 +287,14 @@ const make = (
        */
       action,
       /**
-       * Subscribes to decoded query results when the stream is consumed. Each
-       * consumption registers its own listener and removes it when the stream
-       * ends or is interrupted; keep the client layer alive while consuming
-       * it.
+       * Subscribes to decoded query updates and fails the stream on the first
+       * query or codec error.
+       *
+       * **Details**
+       *
+       * Each consumption opens its own listener and releases it when the stream
+       * ends or is interrupted. Consume the stream while the client layer is in
+       * scope.
        *
        * @category Subscriptions
        *
@@ -290,9 +308,19 @@ const make = (
        */
       reactiveQuery,
       /**
-       * Subscribes with query failures represented as events rather than stream
-       * failures. A later successful update can recover after a failed event.
-       * Each consumption owns a listener, removed on completion/interruption.
+       * Subscribes to query updates as `Result` values so a later success can
+       * follow a query or decoding failure.
+       *
+       * **Details**
+       *
+       * Each consumption owns a listener that stays open after failed updates
+       * and is removed when the stream ends or is interrupted. Keep the client
+       * layer in scope while consuming it.
+       *
+       * **Gotchas**
+       *
+       * An argument encoding failure emits one failed `Result` and completes
+       * without subscribing.
        *
        * @category Subscriptions
        *
@@ -300,25 +328,20 @@ const make = (
        * @param rest - Decoded arguments; omit them only for an argument-free
        *   ref.
        *
-       * @returns A stream of `Result` values containing decoded results or the
-       *   ref's typed error, `WebSocketClientError`, or `Schema.SchemaError`.
-       *   Argument encoding failure emits one failed `Result` and completes
-       *   without opening a listener. Query/result decoding failures leave an
-       *   existing listener open. The stream has no typed error channel; keep
-       *   the client layer alive while consuming it.
+       * @returns A stream with no typed error channel. Each element is a
+       *   `Result` containing a decoded value, the ref's typed error,
+       *   `WebSocketClientError`, or `Schema.SchemaError`.
        */
       reactiveQueryResult,
     };
   });
 
 /**
- * A Confect client which uses a WebSocket to communicate with your Convex
- * backend and supports reactive query subscriptions. The WebSocket connection
- * is managed by the layer's scope and closed automatically when the scope ends.
- * Wraps
+ * Service tag for one-shot function calls and reactive queries over a shared
+ * WebSocket connection. Provide {@link layer} to use Confect refs with
  * [ConvexClient](https://docs.convex.dev/api/classes/browser.ConvexClient).
  *
- * @category Services
+ * @category Tags
  */
 export const WebSocketClient =
   // oxlint-disable-next-line effecttsgo/service-not-as-class -- Preserve the public structural Identifier and Effect requirement types; class identifiers would change those contracts.
@@ -327,36 +350,45 @@ export const WebSocketClient =
   );
 
 /**
- * The Effect requirement supplied by {@link layer} and accessed with
- * {@link WebSocketClient}.
+ * Service requirement for Effects that use {@link WebSocketClient}; {@link layer}
+ * supplies the client.
  *
  * @category Services
  */
 export type WebSocketClient = typeof WebSocketClient.Identifier;
 
 /**
- * Provides a scoped client and closes its underlying connection when the
- * layer's scope ends. Consume subscription streams inside that lifetime.
+ * Creates a layer that constructs a WebSocket client when built and closes it
+ * when the layer's scope ends.
+ *
+ * **Gotchas**
+ *
+ * Consume reactive query streams inside that scope. Exceptions from opening or
+ * closing the connection are defects rather than `WebSocketClientError`
+ * failures.
+ *
+ * **Example** (Reading the address of a scoped WebSocket client)
+ *
+ * ```ts
+ * import { WebSocketClient } from "@confect/js";
+ * import * as Effect from "effect/Effect";
+ *
+ * const deploymentUrl = Effect.gen(function* () {
+ *   const client = yield* WebSocketClient.WebSocketClient;
+ *   return client.url;
+ * }).pipe(
+ *   Effect.provide(WebSocketClient.layer("https://example.convex.cloud")),
+ * );
+ * ```
  *
  * @category Layers
- *
- * @example
- *   import { WebSocketClient } from "@confect/js";
- *   import * as Effect from "effect/Effect";
- *
- *   const deploymentUrl = Effect.gen(function* () {
- *     const client = yield* WebSocketClient.WebSocketClient;
- *     return client.url;
- *   }).pipe(
- *     Effect.provide(WebSocketClient.layer("https://example.convex.cloud")),
- *   );
  *
  * @param address - The Convex deployment URL, such as
  *   `https://example.convex.cloud`.
  * @param options - Options forwarded to Convex's `ConvexClient` constructor.
  *
- * @returns A layer providing {@link WebSocketClient}. Constructor and cleanup
- *   exceptions are defects, not `WebSocketClientError` failures.
+ * @returns A layer providing {@link WebSocketClient} for the lifetime of the
+ *   connection.
  */
 export const layer = (
   address: string,

@@ -6,11 +6,10 @@ import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 
 /**
- * A Convex pagination cursor that no longer describes the current query.
- * Foldkit exposes this failure when it recognizes Convex's invalid-cursor
- * response. Its `_tag` is `"InvalidCursor"`; `cause` retains the original
- * failure or error data. Restart pagination rather than reusing the rejected
- * cursor.
+ * A pagination failure that Foldkit reports when Convex rejects a cursor for
+ * the current query. Match on `_tag: "InvalidCursor"` and restart pagination
+ * rather than retrying the rejected cursor. The `cause` field retains the
+ * original failure or error data.
  *
  * @category Errors
  */
