@@ -38,11 +38,17 @@ const make = (
   ),
 });
 
+/**
+ * @internal
+ */
 export class MutationTransactionContext extends Context.Service<
   MutationTransactionContext,
   ReturnType<typeof make>
 >()("@confect/server/MutationTransactionContext") {}
 
+/**
+ * @internal
+ */
 export const layer = (
   ctx: Pick<GenericMutationCtx<GenericDataModel>, "runQuery" | "runMutation">,
 ) => Layer.succeed(MutationTransactionContext, make(ctx));

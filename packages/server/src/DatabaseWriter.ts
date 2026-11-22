@@ -88,6 +88,8 @@ export interface DatabaseWriterService<
  * The tag's _Identifier_ is `Docs`-independent (see `DatabaseReaderTag`); only
  * the _Service_ carries `Docs` so writer inputs print the named doc
  * interfaces.
+ *
+ * @internal
  */
 export type DatabaseWriterTag<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
@@ -97,6 +99,9 @@ export type DatabaseWriterTag<
   DatabaseWriterService<DatabaseSchema_, Docs>
 >;
 
+/**
+ * @internal
+ */
 export const make = <Model extends GenericDataModel>(
   convexDatabaseWriter: GenericDatabaseWriter<Model>,
 ): DatabaseWriterService<DatabaseSchema.FromConvexDataModel<Model>> => {
@@ -182,6 +187,9 @@ export const make = <Model extends GenericDataModel>(
   } as DatabaseWriterService<DatabaseSchema.FromConvexDataModel<Model>>;
 };
 
+/**
+ * @internal
+ */
 export const DatabaseWriter = <
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
   Docs = {},
@@ -195,6 +203,9 @@ export type DatabaseWriter<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
 > = DatabaseWriterService<DatabaseSchema_>;
 
+/**
+ * @internal
+ */
 export const layer = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
   convexDatabaseWriter: GenericDatabaseWriter<
     DataModel.ToConvexDataModel<DataModel.FromDatabaseSchema<DatabaseSchema_>>

@@ -238,13 +238,22 @@ type MachineActive<Query extends Ref.AnyConfectPublicPaginatedQuery> = Active<
 export interface PaginatedQuery<
   Query extends Ref.AnyConfectPublicPaginatedQuery,
 > {
+  /**
+   * @internal
+   */
   readonly ref: Query;
   readonly schema: Schema.Codec<MachineState<Query>, unknown>;
   readonly idle: Idle;
+  /**
+   * @internal
+   */
   readonly subscriptionRequestSchema: Schema.Codec<
     SubscriptionRequest<UserArgs<Query>>,
     unknown
   >;
+  /**
+   * @internal
+   */
   readonly requestSchema: Schema.Codec<Request<UserArgs<Query>>, unknown>;
   readonly settlement: Schema.Codec<
     Settlement<Item<Query>, UserArgs<Query>, Error<Query>>,
@@ -514,6 +523,8 @@ const descriptorEquals = (a: PageDescriptor, b: PageDescriptor): boolean =>
 
 /**
  * Returns the logical request currently driving the subscription.
+ *
+ * @internal
  */
 export const getSubscriptionRequest = <Item_, UserArgs_, Error_>(
   state: Active<Item_, UserArgs_, Error_>,
@@ -528,6 +539,8 @@ export const getSubscriptionRequest = <Item_, UserArgs_, Error_>(
 
 /**
  * Attaches the client-allocated pagination id to a logical request.
+ *
+ * @internal
  */
 export const allocateRequest = <UserArgs_>(
   request: SubscriptionRequest<UserArgs_>,
@@ -684,6 +697,8 @@ export const first = <Item_, UserArgs_, Error_>(
 
 /**
  * Whether a request still names the machine's live pagination session/page.
+ *
+ * @internal
  */
 export const isCurrentRequest = <Item_, UserArgs_, Error_>(
   state: State<Item_, UserArgs_, Error_>,

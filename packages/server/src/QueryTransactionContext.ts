@@ -27,11 +27,17 @@ const make = (ctx: Pick<GenericQueryCtx<GenericDataModel>, "runQuery">) => ({
   ),
 });
 
+/**
+ * @internal
+ */
 export class QueryTransactionContext extends Context.Service<
   QueryTransactionContext,
   ReturnType<typeof make>
 >()("@confect/server/QueryTransactionContext") {}
 
+/**
+ * @internal
+ */
 export const layer = (
   ctx: Pick<GenericQueryCtx<GenericDataModel>, "runQuery">,
 ) => Layer.succeed(QueryTransactionContext, make(ctx));

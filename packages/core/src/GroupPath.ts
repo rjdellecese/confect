@@ -6,6 +6,8 @@ import type * as GroupSpec from "./GroupSpec";
  * - For a group with no subgroups, returns just the group name.
  * - For a group with subgroups, returns the group name plus all possible paths
  *   through its direct subgroups.
+ *
+ * @internal
  */
 export type All<
   Group extends GroupSpec.AnyWithProps,
@@ -32,6 +34,8 @@ type AllHelper<
  *
  * @example
  *   type G = WithPath<RootGroup, "group.subgroup">;
+ *
+ * @internal
  */
 export type GroupAt<
   Group,
@@ -44,6 +48,9 @@ export type GroupAt<
     : GroupSpec.WithName<Group, Path>
   : never;
 
+/**
+ * @internal
+ */
 export type SubGroupsAt<
   Group extends GroupSpec.AnyWithProps,
   GroupPath extends string,

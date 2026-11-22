@@ -7,9 +7,18 @@ import * as Predicate from "effect/Predicate";
 import type * as Schema from "effect/Schema";
 import type * as Handler from "./Handler";
 
+/**
+ * @internal
+ */
 export const TypeId = "~@confect/server/FunctionRegistryItem";
+/**
+ * @internal
+ */
 export type TypeId = typeof TypeId;
 
+/**
+ * @internal
+ */
 export const isFunctionRegistryItem = (value: unknown): value is AnyWithProps =>
   Predicate.hasProperty(value, TypeId);
 
@@ -20,11 +29,16 @@ const FunctionRegistryItemProto = {
 /**
  * A function registered by `FunctionImpl.make`, one of two shapes keyed by the
  * spec's provenance.
+ *
+ * @internal
  */
 export type AnyWithProps =
   | ConfectFunctionRegistryItem
   | ConvexFunctionRegistryItem;
 
+/**
+ * @internal
+ */
 export interface ConfectFunctionRegistryItem {
   readonly [TypeId]: TypeId;
   readonly _tag: "Confect";
@@ -38,12 +52,18 @@ export interface ConfectFunctionRegistryItem {
   readonly handler: Handler.AnyConfectProvenance;
 }
 
+/**
+ * @internal
+ */
 export interface ConvexFunctionRegistryItem {
   readonly [TypeId]: TypeId;
   readonly _tag: "Convex";
   readonly handler: Handler.AnyConvexProvenance;
 }
 
+/**
+ * @internal
+ */
 export const make = ({
   functionSpec,
   groupMiddlewareAttachments,

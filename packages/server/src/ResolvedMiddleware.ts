@@ -8,6 +8,8 @@ import type * as MiddlewareRegistryItem from "./MiddlewareRegistryItem";
 /**
  * A middleware spec paired with its implementation for one function's type—the
  * resolved form consumed by runtime-specific function preparation.
+ *
+ * @internal
  */
 export interface ResolvedMiddleware {
   readonly middlewareSpec: MiddlewareSpec.AnyMiddlewareSpec;
@@ -24,6 +26,8 @@ export interface ResolvedMiddleware {
  * cover every function). Spec identity is checked separately because
  * implementation services are keyed by string, so the type system cannot
  * distinguish same-key specs.
+ *
+ * @internal
  */
 export const resolve = (
   functionRegistryItem: FunctionRegistryItem.ConfectFunctionRegistryItem,

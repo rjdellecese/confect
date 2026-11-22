@@ -45,6 +45,8 @@ const fromErrorMessage = (
 
 /**
  * Recognizes an invalid-cursor error emitted by a Convex query.
+ *
+ * @internal
  */
 export const fromConvexQueryError = (
   error: unknown,
@@ -66,6 +68,8 @@ export const fromConvexQueryError = (
 
 /**
  * Recognizes the error data attached to Convex's invalid-cursor error.
+ *
+ * @internal
  */
 export const fromConvexErrorData = (
   errorData: unknown,

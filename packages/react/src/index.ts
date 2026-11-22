@@ -48,6 +48,9 @@ export {
   OptimisticLocalStore,
   PaginatedQueryResult,
   QueryResult,
+  /**
+   * @internal
+   */
   StreamPagination,
 };
 

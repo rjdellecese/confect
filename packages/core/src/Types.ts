@@ -12,16 +12,27 @@ import type { Brand } from "effect";
  * Like `Omit`, but implemented with key remapping so that optional modifiers
  * are preserved and index signatures don't reintroduce the omitted key's
  * literal type. Mirrors `BetterOmit` from `convex/server`.
+ *
+ * @internal
  */
 export type OmitKey<T, K extends PropertyKey> = {
   [P in keyof T as P extends K ? never : P]: T[P];
 };
 
+/**
+ * @internal
+ */
 export type IsOptional<T, K extends keyof T> =
   {} extends Pick<T, K> ? true : false;
 
+/**
+ * @internal
+ */
 export type IsAny<T> = 0 extends 1 & T ? true : false;
 
+/**
+ * @internal
+ */
 export type IsUnion<T, U extends T = T> = T extends unknown
   ? [U] extends [T]
     ? false
@@ -29,6 +40,9 @@ export type IsUnion<T, U extends T = T> = T extends unknown
   : never;
 
 // https://stackoverflow.com/a/52806744
+/**
+ * @internal
+ */
 export type IsValueLiteral<Vl> = [Vl] extends [never]
   ? never
   : IsUnion<Vl> extends true
@@ -47,6 +61,8 @@ export type IsValueLiteral<Vl> = [Vl] extends [never]
 
 /**
  * Only checks for records with string keys.
+ *
+ * @internal
  */
 export type IsRecord<T> = [T] extends [never]
   ? false
@@ -64,6 +80,9 @@ export type IsRecord<T> = [T] extends [never]
         : false
       : false;
 
+/**
+ * @internal
+ */
 export type DeepMutable<T> =
   IsAny<T> extends true
     ? any
@@ -81,16 +100,25 @@ export type DeepMutable<T> =
                   : DeepMutable<T[K]>;
               };
 
+/**
+ * @internal
+ */
 export interface TypeError<Message extends string, T = never> {
   readonly "~@confect/core/Types/TypeError": Message;
   readonly "~value"?: T;
 }
 
+/**
+ * @internal
+ */
 export interface TypeDefect<Message extends string, T = never> {
   readonly "~@confect/core/Types/TypeDefect": Message;
   readonly "~value"?: T;
 }
 
+/**
+ * @internal
+ */
 export type IsRecursive<T> = true extends DetectCycle<T> ? true : false;
 
 type NonRecursiveLeaf = Brand.Brand<any> | GenericId<any> | ArrayBuffer;
@@ -151,6 +179,9 @@ type DetectCycle<T, Ancestors = never> =
 
 // https://github.com/arktypeio/arktype/blob/2e911d01a741ccee7a17e31ee144049817fabbb8/ark/util/unionToTuple.ts#L9
 
+/**
+ * @internal
+ */
 export type UnionToTuple<t> =
   _unionToTuple<t, []> extends infer result ? conform<result, t[]> : never;
 
@@ -180,6 +211,9 @@ type conform<t, base> = t extends base ? t : base;
 // END: Vendored from Arktype //
 ////////////////////////////////
 
+/**
+ * @internal
+ */
 export type IndexFieldTypesForEq<
   ConvexDataModel extends GenericDataModel,
   Table extends TableNamesInDataModel<ConvexDataModel>,
@@ -196,6 +230,9 @@ export type IndexFieldTypesForEq<
   : never;
 
 // Would prefer to use `BaseDatabaseReader` from the `convex` package, but it's not exported.
+/**
+ * @internal
+ */
 export type BaseDatabaseReader<DataModel extends GenericDataModel> = {
   get: GenericDatabaseReader<DataModel>["get"];
   query: GenericDatabaseReader<DataModel>["query"];

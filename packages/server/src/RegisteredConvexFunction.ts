@@ -50,6 +50,9 @@ import * as Storage from "./Storage";
 import { StorageActionWriter } from "./StorageActionWriter";
 import { StorageWriter } from "./StorageWriter";
 
+/**
+ * @internal
+ */
 export type Definition = Data.TaggedEnum<{
   PublicQuery: ReturnType<typeof queryFunction>;
   InternalQuery: ReturnType<typeof queryFunction>;
@@ -59,8 +62,14 @@ export type Definition = Data.TaggedEnum<{
   InternalAction: ReturnType<typeof convexActionFunction>;
   Registered: { readonly handler: RegisteredFunction.Any };
 }>;
+/**
+ * @internal
+ */
 export const Definition = Data.taggedEnum<Definition>();
 
+/**
+ * @internal
+ */
 export const prepare = (
   tableNames: ReadonlyArray<string>,
   item: FunctionRegistryItem.ConfectFunctionRegistryItem,
@@ -120,6 +129,9 @@ export const prepare = (
     Match.exhaustive,
   );
 
+/**
+ * @internal
+ */
 export const make = (
   tableNames: ReadonlyArray<string>,
   item: FunctionRegistryItem.ConfectFunctionRegistryItem,
@@ -127,6 +139,9 @@ export const make = (
 ): RegisteredFunction.Any =>
   register(prepare(tableNames, item, resolvedMiddlewares));
 
+/**
+ * @internal
+ */
 export const register = (self: Definition): RegisteredFunction.Any =>
   Definition.$match(self, {
     PublicQuery: (definition) =>
@@ -271,6 +286,9 @@ const queryFunction = <
     ),
 });
 
+/**
+ * @internal
+ */
 export const mutationLayer = <
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
 >(
