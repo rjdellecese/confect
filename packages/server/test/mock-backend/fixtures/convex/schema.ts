@@ -4,9 +4,9 @@
  *
  * **Gotchas**
  *
- * Importing this schema constructs validators for every application table. Keep it
- * out of function runtime code.
+ * Importing this schema constructs validators for every application table. Keep
+ * it out of function runtime code.
  *
- * @category schemas
+ * @category Schemas
  */
 export { default } from "../confect/_generated/convexSchema";

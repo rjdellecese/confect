@@ -35,10 +35,10 @@ const schemaEffect = Effect.fnUntraced(function* ({
  *
  * **Gotchas**
  *
- * Importing this schema constructs validators for every application table. Keep it
- * out of function runtime code.
+ * Importing this schema constructs validators for every application table. Keep
+ * it out of function runtime code.
  *
- * @category schemas
+ * @category Schemas
  */`);
   yield* cbw.writeLine(`export { default } from "${convexSchemaImportPath}";`);
 
@@ -340,7 +340,7 @@ const httpEffect = Effect.fnUntraced(function* ({
     `/**
  * HTTP router that registers the application's HTTP routes with Convex.
  *
- * @category configuration
+ * @category Configuration
  */`,
   );
   yield* cbw.writeLine(`export default http;`);
@@ -362,9 +362,10 @@ const cronsEffect = Effect.fnUntraced(function* ({
   yield* cbw.newLine();
   yield* cbw.writeLine(
     `/**
- * Cron jobs that Convex runs according to the application's recurring schedules.
+ * Cron jobs that Convex runs according to the application's recurring
+ * schedules.
  *
- * @category configuration
+ * @category Configuration
  */`,
   );
   yield* cbw.writeLine(`export default crons.convexCronJobs;`);
@@ -391,7 +392,7 @@ const authConfigEffect = Effect.fnUntraced(function* ({
  * Authentication provider configuration that Convex uses to verify caller
  * identities.
  *
- * @category configuration
+ * @category Configuration
  */`,
   );
   yield* cbw.writeLine(`export default auth;`);
