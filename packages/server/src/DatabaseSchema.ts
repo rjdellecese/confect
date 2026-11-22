@@ -7,7 +7,13 @@ import * as Schema from "effect/Schema";
 import type { GenericDataModel, TableNamesInDataModel } from "convex/server";
 import type * as Table from "./Table";
 
+/**
+ * @internal
+ */
 export const TypeId = "~@confect/server/DatabaseSchema";
+/**
+ * @internal
+ */
 export type TypeId = typeof TypeId;
 
 export interface AppTarget {
@@ -61,10 +67,16 @@ export const checkedTarget = <const Target_ extends Target>(
   target: Target_,
 ): Target_ => Result.getOrThrowWith(validateTarget(target), identity);
 
+/**
+ * @internal
+ */
 export interface Any {
   readonly [TypeId]: unknown;
 }
 
+/**
+ * @internal
+ */
 export const isDatabaseSchema = (u: unknown): u is Any =>
   Predicate.hasProperty(u, TypeId);
 
@@ -83,6 +95,9 @@ export interface DatabaseSchema<
   readonly target: Target_;
 }
 
+/**
+ * @internal
+ */
 export interface AnyWithProps extends DatabaseSchema<
   Readonly<Record<string, Table.AnyWithProps>>,
   Target
@@ -93,6 +108,9 @@ export type AnyApp = AnyWithProps & { readonly target: AppTarget };
 export type Scope<DatabaseSchema_ extends AnyWithProps> =
   DatabaseSchema_["target"]["scope"];
 
+/**
+ * @internal
+ */
 export type FromConvexDataModel<
   Model extends GenericDataModel,
   Scope_ extends IdScope.IdScope = IdScope.App,
@@ -106,6 +124,9 @@ export type FromConvexDataModel<
   Scope_ extends IdScope.App ? AppTarget : ComponentTarget<Scope_>
 >;
 
+/**
+ * @internal
+ */
 export type Tables<DatabaseSchema_ extends AnyWithProps> =
   DatabaseSchema_[TypeId][keyof DatabaseSchema_[TypeId]];
 
@@ -116,17 +137,29 @@ export const tables = <DatabaseSchema_ extends AnyWithProps>(
   self: DatabaseSchema_,
 ): DatabaseSchema_[TypeId] => self[TypeId];
 
+/**
+ * @internal
+ */
 export type TableNames<DatabaseSchema_ extends AnyWithProps> = Table.Name<
   Tables<DatabaseSchema_>
 > &
   string;
 
+/**
+ * @internal
+ */
 export type SystemTableNames = Table.Name<Table.SystemTables>;
 
+/**
+ * @internal
+ */
 export type AllTableNames<DatabaseSchema_ extends AnyWithProps> =
   | TableNames<DatabaseSchema_>
   | SystemTableNames;
 
+/**
+ * @internal
+ */
 export type TableWithName<
   DatabaseSchema_ extends AnyWithProps,
   TableName extends TableNames<DatabaseSchema_>,
@@ -171,10 +204,15 @@ const validateTables = <
  * Construct a database schema from its bound table record. The record's keys
  * must match their tables' names. Table schemas remain lazy; construction only
  * stores the record. The empty case is `make({})`.
+ *
+ * @internal
  */
 export function make<
   const TablesRecord extends Readonly<Record<string, Table.AnyWithProps>>,
 >(tableRecord: TablesRecord, target?: AppTarget): DatabaseSchema<TablesRecord>;
+/**
+ * @internal
+ */
 export function make<
   const TablesRecord extends Readonly<Record<string, Table.AnyWithProps>>,
   const Target_ extends Target,
@@ -182,6 +220,9 @@ export function make<
   tableRecord: TablesRecord,
   target: Target_,
 ): DatabaseSchema<TablesRecord, Target_>;
+/**
+ * @internal
+ */
 export function make<
   const TablesRecord extends Readonly<Record<string, Table.AnyWithProps>>,
 >(

@@ -52,6 +52,9 @@ export class StorageActionWriter extends Context.Service<
   >(): Context.Service<ForScope<Scope>, Service<Scope>> =>
     Context.Service("@confect/server/StorageActionWriter");
 
+  /**
+   * @internal
+   */
   static readonly layer = <Scope extends IdScope.IdScope = IdScope.App>(
     storageActionWriter: ConvexStorageActionWriter,
     _scope?: Scope,

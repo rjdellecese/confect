@@ -265,6 +265,9 @@ export const rebase = <
   return Schema.make(visit(schema.ast));
 };
 
+/**
+ * @internal
+ */
 export const tableName = <TableName extends string>(
   ast: SchemaAST.AST,
 ): Option.Option<TableName> =>

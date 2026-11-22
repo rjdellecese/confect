@@ -4,6 +4,9 @@ import * as Context from "effect/Context";
 import type * as ComponentCtx from "./ComponentCtx";
 import * as Layer from "effect/Layer";
 
+/**
+ * @internal
+ */
 export type QueryCtxTag<
   DataModel extends GenericDataModel,
   Scope extends IdScope.IdScope = IdScope.App,
@@ -14,6 +17,9 @@ export type QueryCtxTag<
     : ComponentCtx.Query<DataModel, Scope>
 >;
 
+/**
+ * @internal
+ */
 export const QueryCtx = <
   DataModel extends GenericDataModel,
   Scope extends IdScope.IdScope = IdScope.App,

@@ -9,9 +9,18 @@ import type * as MiddlewareSpec from "./MiddlewareSpec";
 import type * as RuntimeAndFunctionType from "./RuntimeAndFunctionType";
 import { validateConfectFunctionIdentifier } from "./Identifier";
 
+/**
+ * @internal
+ */
 export const TypeId = "~@confect/core/GroupSpec";
+/**
+ * @internal
+ */
 export type TypeId = typeof TypeId;
 
+/**
+ * @internal
+ */
 export const isGroupSpec = (u: unknown): u is AnyWithProps =>
   Predicate.hasProperty(u, TypeId);
 
@@ -75,10 +84,16 @@ export interface GroupSpec<
   >;
 }
 
+/**
+ * @internal
+ */
 export interface Any {
   readonly [TypeId]: TypeId;
 }
 
+/**
+ * @internal
+ */
 export interface AnyWithProps extends GroupSpec<
   RuntimeAndFunctionType.Runtime,
   string,
@@ -87,21 +102,39 @@ export interface AnyWithProps extends GroupSpec<
   MiddlewareSpec.AnyMiddlewareSpec
 > {}
 
+/**
+ * @internal
+ */
 export type Name<Group extends AnyWithProps> = Group["name"];
 
+/**
+ * @internal
+ */
 export type Functions<Group extends AnyWithProps> = Group["~Functions"];
 
+/**
+ * @internal
+ */
 export type Groups<Group extends AnyWithProps> = Group["~Groups"];
 
+/**
+ * @internal
+ */
 export type MiddlewareSpecs<Group extends AnyWithProps> =
   Group["middlewareSpecs"][number];
 
+/**
+ * @internal
+ */
 export type GroupNames<Group extends AnyWithProps> = [Groups<Group>] extends [
   never,
 ]
   ? never
   : Name<Groups<Group>>;
 
+/**
+ * @internal
+ */
 export type WithName<
   Group extends AnyWithProps,
   Name_ extends Name<Group>,
@@ -110,6 +143,8 @@ export type WithName<
 /**
  * Assigns a segment name to a leaf group created with {@link make} for typing
  * and refs.
+ *
+ * @internal
  */
 export type NamedAt<Group extends Any, Name_ extends string> = Omit<
   Group,
@@ -118,6 +153,9 @@ export type NamedAt<Group extends Any, Name_ extends string> = Omit<
   readonly name: Name_;
 };
 
+/**
+ * @internal
+ */
 export type AddGroups<
   Group extends AnyWithProps,
   ExtraGroups extends AnyWithProps,
@@ -313,6 +351,9 @@ export function withName(name: string, group: Any): AnyWithProps {
   });
 }
 
+/**
+ * @internal
+ */
 export const addGroupsAt = (
   group: AnyWithProps,
   children: Record.ReadonlyRecord<string, AnyWithProps>,
@@ -330,6 +371,9 @@ export const addGroupsAt = (
     middlewareAttachments: group.middlewareAttachments,
   });
 
+/**
+ * @internal
+ */
 export const validateMiddleware = (
   group: AnyWithProps,
 ): Result.Result<void, MiddlewareAttachment.ValidationError> =>

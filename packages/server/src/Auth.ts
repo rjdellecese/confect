@@ -26,6 +26,9 @@ export class Auth extends Context.Service<Auth, ReturnType<typeof make>>()(
   "@confect/server/Auth",
 ) {}
 
+/**
+ * @internal
+ */
 export const layer = (auth: ConvexAuth) => Layer.succeed(Auth, make(auth));
 
 export type ForTarget<Target extends DatabaseSchema.Target> =

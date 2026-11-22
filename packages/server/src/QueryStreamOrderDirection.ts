@@ -9,6 +9,8 @@
  * the join runs).
  *
  * @experimental
+ *
+ * @internal
  */
 export type QueryStreamOrderDirection = "asc" | "desc";
 
@@ -16,12 +18,16 @@ export type QueryStreamOrderDirection = "asc" | "desc";
  * The opposite of a direction; a runtime-chosen direction stays the union.
  *
  * @experimental
+ *
+ * @internal
  */
 export type Flip<OrderDirection extends QueryStreamOrderDirection> =
   OrderDirection extends "asc" ? "desc" : "asc";
 
 /**
  * @experimental
+ *
+ * @internal
  */
 export const flip = <OrderDirection extends QueryStreamOrderDirection>(
   orderDirection: OrderDirection,

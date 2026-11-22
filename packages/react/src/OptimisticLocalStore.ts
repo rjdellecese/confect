@@ -41,6 +41,8 @@ export interface OptimisticLocalStore {
 /**
  * Wraps Convex's `OptimisticLocalStore` so that it accepts Confect query `Ref`s
  * and decoded values, handling the encoding/decoding against Convex's store.
+ *
+ * @internal
  */
 export const make = (
   convexLocalStore: ConvexOptimisticLocalStore,

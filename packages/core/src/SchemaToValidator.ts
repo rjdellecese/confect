@@ -42,6 +42,9 @@ import type {
 
 // Args
 
+/**
+ * @internal
+ */
 export const compileArgsSchema = <ConfectValue, ConvexValue>(
   argsSchema: Schema.Codec<ConfectValue, ConvexValue>,
   scope: IdScope.IdScope = IdScope.app,
@@ -63,6 +66,9 @@ export const compileArgsSchema = <ConfectValue, ConvexValue>(
 
 // Returns
 
+/**
+ * @internal
+ */
 export const compileReturnsSchema = <ConfectValue, ConvexValue>(
   schema: Schema.Codec<ConfectValue, ConvexValue>,
   scope: IdScope.IdScope = IdScope.app,
@@ -73,6 +79,8 @@ export const compileReturnsSchema = <ConfectValue, ConvexValue>(
 
 /**
  * Convert a table `Schema` to a table `Validator`.
+ *
+ * @internal
  */
 export type TableSchemaToTableValidator<
   TableSchema extends Schema.Codec<any, any>,
@@ -144,6 +152,9 @@ export type EmittedTableValidator<
     ? Vd
     : never;
 
+/**
+ * @internal
+ */
 export const compileTableSchema = <
   TableSchema extends Schema.Codec<any, any>,
   const Scope extends IdScope.IdScope = IdScope.App,
@@ -170,6 +181,9 @@ export const compileTableSchema = <
 
 // Compiler
 
+/**
+ * @internal
+ */
 export type ReadonlyValue =
   | string
   | number
@@ -182,6 +196,9 @@ export type ReadonlyValue =
 
 type ReadonlyArrayValue = readonly ReadonlyValue[];
 
+/**
+ * @internal
+ */
 export type ReadonlyRecordValue = {
   readonly [key: string]: ReadonlyValue | undefined;
 };
@@ -203,6 +220,9 @@ type MutableValue<T> =
           : Record<DeployedIdType<keyof T>, MutableValue<T[keyof T]>>
         : T;
 
+/**
+ * @internal
+ */
 export type ValueToValidator<Vl> = [Vl] extends [never]
   ? never
   : IsAny<Vl> extends true
@@ -319,6 +339,9 @@ type ObjectFieldsToValidators<Vl> = {
         : never;
 };
 
+/**
+ * @internal
+ */
 export type UndefinedOrValueToValidator<Vl extends ReadonlyValue | undefined> =
   undefined extends Vl
     ? OptionalValueToValidator<Vl>
@@ -352,6 +375,9 @@ type OptionalValueToValidator<Vl> = [Vl] extends [
   ? ConvertValueToValidator<Val, "optional">
   : never;
 
+/**
+ * @internal
+ */
 export const compileSchema = <
   T,
   E,
@@ -362,6 +388,9 @@ export const compileSchema = <
 ): EmittedValidator<E, Scope> =>
   Effect.runSync(compileAst(Schema.toEncoded(schema).ast, false, scope)) as any;
 
+/**
+ * @internal
+ */
 export const isRecursive = (ast: SchemaAST.AST): boolean =>
   pipe(
     ast,
@@ -402,6 +431,9 @@ export const isRecursive = (ast: SchemaAST.AST): boolean =>
     Match.exhaustive,
   );
 
+/**
+ * @internal
+ */
 export const compileAst = (
   ast: SchemaAST.AST,
   isOptionalPropertyOfTypeLiteral = false,
@@ -654,6 +686,9 @@ const handlePropertySignatures = (
 
 // Errors
 
+/**
+ * @internal
+ */
 export class TopLevelMustBeObjectError extends Schema.TaggedError<
   TopLevelMustBeObjectError,
   {}
@@ -665,6 +700,9 @@ export class TopLevelMustBeObjectError extends Schema.TaggedError<
   /* v8 ignore stop */
 }
 
+/**
+ * @internal
+ */
 export class TopLevelMustBeObjectOrUnionError extends Schema.TaggedError<
   TopLevelMustBeObjectOrUnionError,
   {}
@@ -676,6 +714,9 @@ export class TopLevelMustBeObjectOrUnionError extends Schema.TaggedError<
   /* v8 ignore stop */
 }
 
+/**
+ * @internal
+ */
 export class UnsupportedPropertySignatureKeyTypeError extends Schema.TaggedError<
   UnsupportedPropertySignatureKeyTypeError,
   {}
@@ -692,6 +733,9 @@ export class UnsupportedPropertySignatureKeyTypeError extends Schema.TaggedError
   /* v8 ignore stop */
 }
 
+/**
+ * @internal
+ */
 export class EmptyTupleIsNotSupportedError extends Schema.TaggedError<
   EmptyTupleIsNotSupportedError,
   {}
@@ -703,6 +747,9 @@ export class EmptyTupleIsNotSupportedError extends Schema.TaggedError<
   /* v8 ignore stop */
 }
 
+/**
+ * @internal
+ */
 export class EmptyUnionIsNotSupportedError extends Schema.TaggedError<
   EmptyUnionIsNotSupportedError,
   {}
@@ -714,6 +761,9 @@ export class EmptyUnionIsNotSupportedError extends Schema.TaggedError<
   /* v8 ignore stop */
 }
 
+/**
+ * @internal
+ */
 export class UnsupportedSchemaTypeError extends Schema.TaggedError<
   UnsupportedSchemaTypeError,
   {}
@@ -749,6 +799,9 @@ export class UnsupportedSchemaTypeError extends Schema.TaggedError<
   /* v8 ignore stop */
 }
 
+/**
+ * @internal
+ */
 export class IndexSignaturesAreNotSupportedError extends Schema.TaggedError<
   IndexSignaturesAreNotSupportedError,
   {}
@@ -760,6 +813,9 @@ export class IndexSignaturesAreNotSupportedError extends Schema.TaggedError<
   /* v8 ignore stop */
 }
 
+/**
+ * @internal
+ */
 export class MixedIndexAndPropertySignaturesAreNotSupportedError extends Schema.TaggedError<
   MixedIndexAndPropertySignaturesAreNotSupportedError,
   {}
@@ -771,6 +827,9 @@ export class MixedIndexAndPropertySignaturesAreNotSupportedError extends Schema.
   /* v8 ignore stop */
 }
 
+/**
+ * @internal
+ */
 export class OptionalTupleElementsAreNotSupportedError extends Schema.TaggedError<
   OptionalTupleElementsAreNotSupportedError,
   {}

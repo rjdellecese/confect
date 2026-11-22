@@ -20,6 +20,9 @@ import type * as Handler from "./Handler";
 import type * as RegisteredFunctions from "./RegisteredFunctions";
 import { mapLeaves } from "./internal/utils";
 
+/**
+ * @internal
+ */
 export const buildForGroup = <Group extends GroupSpec.AnyWithProps>(
   groupLayer: Layer.Layer<GroupImpl.GroupImpl<"Finalized">>,
   target?: DatabaseSchema.Target,
@@ -46,6 +49,9 @@ export const buildForGroup = <Group extends GroupSpec.AnyWithProps>(
   ) as RegisteredFunctions.RegisteredFunctionsForGroupSpec<Group>;
 };
 
+/**
+ * @internal
+ */
 export const make = (
   item: FunctionRegistryItem.ConfectFunctionRegistryItem,
   resolvedMiddlewares: ReadonlyArray<ResolvedMiddleware.ResolvedMiddleware> = [],

@@ -52,6 +52,9 @@ export class StorageReader extends Context.Service<
   >(): Context.Service<ForScope<Scope>, Service<Scope>> =>
     Context.Service("@confect/server/StorageReader");
 
+  /**
+   * @internal
+   */
   static readonly layer = <Scope extends IdScope.IdScope = IdScope.App>(
     storageReader: ConvexStorageReader,
     _scope?: Scope,

@@ -18,6 +18,8 @@ import * as QueryStreamKeyValues from "./QueryStreamKeyValues";
  * One side of a range: a (possibly prefix) key and whether it's included.
  *
  * @experimental
+ *
+ * @internal
  */
 export interface KeyBound {
   readonly keyValues: QueryStreamKeyValues.QueryStreamKeyValues;
@@ -29,6 +31,8 @@ export interface KeyBound {
  * stream space, where `desc` reverses which end is which).
  *
  * @experimental
+ *
+ * @internal
  */
 export interface KeyBounds {
   readonly lower: Option.Option<KeyBound>;
@@ -41,6 +45,8 @@ export interface KeyBounds {
  * empty key bounds nothing.
  *
  * @experimental
+ *
+ * @internal
  */
 export interface IndexBounds {
   readonly lower: KeyBound;
@@ -110,6 +116,8 @@ const upperCut = (bound: KeyBound): KeyCut =>
  * The stricter (later) of two lower bounds.
  *
  * @experimental
+ *
+ * @internal
  */
 export const tightestLower = (self: KeyBound, that: KeyBound): KeyBound =>
   Order.isGreaterThan(KeyCutOrder)(lowerCut(that), lowerCut(self))
@@ -120,6 +128,8 @@ export const tightestLower = (self: KeyBound, that: KeyBound): KeyBound =>
  * The stricter (earlier) of two upper bounds.
  *
  * @experimental
+ *
+ * @internal
  */
 export const tightestUpper = (self: KeyBound, that: KeyBound): KeyBound =>
   Order.isLessThan(KeyCutOrder)(upperCut(that), upperCut(self)) ? that : self;
@@ -142,6 +152,8 @@ const combineKeyBound = (
 
 /**
  * @experimental
+ *
+ * @internal
  */
 export const intersect = (
   self: ParsedBounds,
@@ -156,12 +168,16 @@ export const intersect = (
 
 /**
  * @experimental
+ *
+ * @internal
  */
 export const isEmpty = (indexBounds: IndexBounds): boolean =>
   KeyCutOrder(lowerCut(indexBounds.lower), upperCut(indexBounds.upper)) >= 0;
 
 /**
  * @experimental
+ *
+ * @internal
  */
 export const intersectIndexBounds = (
   self: IndexBounds,
@@ -175,6 +191,8 @@ export const intersectIndexBounds = (
  * Whether a compatible key sits after the lower bound (always, when unbounded).
  *
  * @experimental
+ *
+ * @internal
  */
 export const admittedByLower =
   (parsedBounds: ParsedBounds) =>
@@ -198,6 +216,8 @@ export const admittedByLower =
  * unbounded).
  *
  * @experimental
+ *
+ * @internal
  */
 export const admittedByUpper =
   (parsedBounds: ParsedBounds) =>
@@ -221,6 +241,8 @@ export const admittedByUpper =
  * unbounded.
  *
  * @experimental
+ *
+ * @internal
  */
 export type NarrowBounds =
   | {
@@ -234,6 +256,8 @@ export type NarrowBounds =
 
 /**
  * @experimental
+ *
+ * @internal
  */
 export interface ParsedBound {
   readonly key: QueryStreamKey.Prefix;
@@ -246,6 +270,8 @@ const TypeId = "~@confect/server/QueryStreamKeyBounds";
 
 /**
  * @experimental
+ *
+ * @internal
  */
 export interface ParsedBounds {
   readonly [TypeId]: typeof TypeId;
@@ -266,6 +292,8 @@ const make = (
 
 /**
  * @experimental
+ *
+ * @internal
  */
 export const unbounded = (
   keyLayout: QueryStreamKeyLayout.QueryStreamKeyLayout,
@@ -274,6 +302,8 @@ export const unbounded = (
 
 /**
  * @experimental
+ *
+ * @internal
  */
 export const forLayout = (
   keyLayout: QueryStreamKeyLayout.QueryStreamKeyLayout,
@@ -291,6 +321,8 @@ export const forLayout = (
 // when one or both endpoints are absent.
 /**
  * @experimental
+ *
+ * @internal
  */
 export const fromParsed = (
   keyLayout: QueryStreamKeyLayout.QueryStreamKeyLayout,
@@ -327,6 +359,8 @@ const tighterUpper = (self: ParsedBound, that: ParsedBound): ParsedBound =>
 
 /**
  * @experimental
+ *
+ * @internal
  */
 export const tightestParsedLower = (
   self: ParsedBound,
@@ -342,6 +376,8 @@ export const tightestParsedLower = (
 
 /**
  * @experimental
+ *
+ * @internal
  */
 export const tightestParsedUpper = (
   self: ParsedBound,
@@ -357,6 +393,8 @@ export const tightestParsedUpper = (
 
 /**
  * @experimental
+ *
+ * @internal
  */
 export const parseBound = (
   keyLayout: QueryStreamKeyLayout.QueryStreamKeyLayout,
@@ -369,6 +407,8 @@ export const parseBound = (
 
 /**
  * @experimental
+ *
+ * @internal
  */
 export const parse = (
   keyLayout: QueryStreamKeyLayout.QueryStreamKeyLayout,
@@ -388,6 +428,8 @@ export const parse = (
 
 /**
  * @experimental
+ *
+ * @internal
  */
 export const toBounds = (parsedBounds: ParsedBounds): KeyBounds => ({
   lower: Option.map(parsedBounds.lower, rawBound),

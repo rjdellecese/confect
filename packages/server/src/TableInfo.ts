@@ -15,9 +15,18 @@ import type { WithSystemFields } from "@confect/core/SystemFields";
 import type * as Document_ from "./Document";
 import type * as Table from "./Table";
 
+/**
+ * @internal
+ */
 export declare const TypeId: "~@confect/server/TableInfo";
+/**
+ * @internal
+ */
 export type TypeId = typeof TypeId;
 
+/**
+ * @internal
+ */
 export type TableInfo<Table_ extends Table.AnyWithProps> =
   Table_ extends Table.Table<
     infer TableName,
@@ -54,10 +63,16 @@ export type TableInfo<Table_ extends Table.AnyWithProps> =
       }
     : never;
 
+/**
+ * @internal
+ */
 export interface Any {
   readonly [TypeId]: TypeId;
 }
 
+/**
+ * @internal
+ */
 export interface AnyWithProps extends Any {
   readonly document: Document_.Any;
   readonly encodedDocument: Document_.AnyEncoded;
@@ -68,6 +83,9 @@ export interface AnyWithProps extends Any {
   readonly vectorIndexes: GenericTableVectorIndexes;
 }
 
+/**
+ * @internal
+ */
 export type ConvexTableInfo<TableInfo_ extends AnyWithProps> = {
   document: TableInfo_["convexDocument"];
   fieldPaths: TableInfo_["fieldPaths"];
@@ -76,11 +94,17 @@ export type ConvexTableInfo<TableInfo_ extends AnyWithProps> = {
   vectorIndexes: TableInfo_["vectorIndexes"];
 };
 
+/**
+ * @internal
+ */
 export type TableSchema<TableInfo_ extends AnyWithProps> = Schema.Codec<
   TableInfo_["document"],
   TableInfo_["encodedDocument"]
 >;
 
+/**
+ * @internal
+ */
 export type Document<TableInfo_ extends AnyWithProps> = TableInfo_["document"];
 
 // Vendored types from convex-js, partially modified.

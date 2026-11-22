@@ -16,7 +16,13 @@ import type { GenericValidator, Validator } from "convex/values";
 import * as Predicate from "effect/Predicate";
 import type * as Schema from "effect/Schema";
 
+/**
+ * @internal
+ */
 export const TypeId = "~@confect/core/Table";
+/**
+ * @internal
+ */
 export type TypeId = typeof TypeId;
 
 // -----------------------------------------------------------------------------
@@ -30,9 +36,15 @@ export type TypeId = typeof TypeId;
 // The discriminator is `tableName` (not `name`) so it does not collide with
 // the built-in `Function.prototype.name` that every JS function carries.
 
+/**
+ * @internal
+ */
 export const isTable = (u: unknown): u is Any =>
   Predicate.hasProperty(u, TypeId) && Predicate.hasProperty(u, "tableName");
 
+/**
+ * @internal
+ */
 export const isUnnamedTable = (u: unknown): u is UnnamedAny =>
   Predicate.hasProperty(u, TypeId) && !Predicate.hasProperty(u, "tableName");
 
@@ -55,6 +67,9 @@ export interface Table<
   VectorIndexes_ extends GenericTableVectorIndexes = {},
   Scope_ extends IdScope.IdScope = IdScope.App,
 > {
+  /**
+   * @internal
+   */
   readonly [TypeId]: TypeId;
   readonly tableName: Name_;
   readonly scope: Scope_;
@@ -64,17 +79,35 @@ export interface Table<
     TableSchema_,
     Scope_
   >;
+  /**
+   * @internal
+   */
   readonly indexes: Indexes_;
+  /**
+   * @internal
+   */
   readonly searchIndexes: SearchIndexes_;
+  /**
+   * @internal
+   */
   readonly vectorIndexes: VectorIndexes_;
+  /**
+   * @internal
+   */
   readonly "~TableValidator": TableValidator_;
 }
 
+/**
+ * @internal
+ */
 export interface Any {
   readonly [TypeId]: TypeId;
   readonly tableName: string;
 }
 
+/**
+ * @internal
+ */
 export type AnyWithProps = Table<
   any,
   Schema.Codec<any, any>,
@@ -106,6 +139,9 @@ export interface UnnamedTable<
   SearchIndexes_ extends GenericTableSearchIndexes = {},
   VectorIndexes_ extends GenericTableVectorIndexes = {},
 > {
+  /**
+   * @internal
+   */
   <
     const Name_ extends string,
     const Scope_ extends IdScope.IdScope = IdScope.App,
@@ -122,10 +158,25 @@ export interface UnnamedTable<
     Scope_
   >;
 
+  /**
+   * @internal
+   */
   readonly [TypeId]: TypeId;
+  /**
+   * @internal
+   */
   readonly indexes: Indexes_;
+  /**
+   * @internal
+   */
   readonly searchIndexes: SearchIndexes_;
+  /**
+   * @internal
+   */
   readonly vectorIndexes: VectorIndexes_;
+  /**
+   * @internal
+   */
   readonly "~TableValidator": TableValidator_;
 
   index<
@@ -199,10 +250,16 @@ export interface UnnamedTable<
   >;
 }
 
+/**
+ * @internal
+ */
 export interface UnnamedAny {
   readonly [TypeId]: TypeId;
 }
 
+/**
+ * @internal
+ */
 export type UnnamedAnyWithProps = UnnamedTable<
   Schema.Codec<any, any>,
   GenericValidator,
@@ -215,32 +272,62 @@ export type UnnamedAnyWithProps = UnnamedTable<
 // Type extractors
 // -----------------------------------------------------------------------------
 
+/**
+ * @internal
+ */
 export type Name<TableDef extends AnyWithProps> = TableDef["tableName"] &
   string;
 
+/**
+ * @internal
+ */
 export type TableSchema<TableDef extends AnyWithProps> = TableDef["Fields"];
 
+/**
+ * @internal
+ */
 export type TableValidator<TableDef extends AnyWithProps> =
   TableDef["~TableValidator"];
 
+/**
+ * @internal
+ */
 export type Indexes<TableDef extends AnyWithProps> = TableDef["indexes"];
 
+/**
+ * @internal
+ */
 export type SearchIndexes<TableDef extends AnyWithProps> =
   TableDef["searchIndexes"];
 
+/**
+ * @internal
+ */
 export type VectorIndexes<TableDef extends AnyWithProps> =
   TableDef["vectorIndexes"];
 
+/**
+ * @internal
+ */
 export type Doc<TableDef extends AnyWithProps> = TableDef["Doc"];
 
+/**
+ * @internal
+ */
 export type Fields<TableDef extends AnyWithProps> = TableDef["Fields"];
 export type Scope<TableDef extends AnyWithProps> = TableDef["scope"];
 
+/**
+ * @internal
+ */
 export type WithName<
   TableDef extends AnyWithProps,
   Name_ extends string,
 > = TableDef extends { readonly tableName: Name_ } ? TableDef : never;
 
+/**
+ * @internal
+ */
 export type TablesRecord<Tables extends AnyWithProps> = {
   readonly [TableName_ in Name<Tables>]: WithName<Tables, TableName_>;
 };

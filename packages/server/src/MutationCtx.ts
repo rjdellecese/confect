@@ -5,6 +5,9 @@ import type * as ComponentCtx from "./ComponentCtx";
 import * as RequestMetadata from "./RequestMetadata";
 import * as Layer from "effect/Layer";
 
+/**
+ * @internal
+ */
 export type MutationCtxTag<
   DataModel extends GenericDataModel,
   Scope extends IdScope.IdScope = IdScope.App,
@@ -15,6 +18,9 @@ export type MutationCtxTag<
     : ComponentCtx.Mutation<DataModel, Scope>
 >;
 
+/**
+ * @internal
+ */
 export const MutationCtx = <
   DataModel extends GenericDataModel,
   Scope extends IdScope.IdScope = IdScope.App,

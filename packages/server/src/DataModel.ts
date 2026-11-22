@@ -3,31 +3,55 @@ import type * as Table from "./Table";
 import type * as TableInfo from "./TableInfo";
 import type * as GenericId from "@confect/core/GenericId";
 
+/**
+ * @internal
+ */
 export declare const TypeId: "~@confect/server/DataModel";
+/**
+ * @internal
+ */
 export type TypeId = typeof TypeId;
 
+/**
+ * @internal
+ */
 export interface DataModel<
   Tables_ extends Readonly<Record<string, Table.AnyWithProps>>,
 > {
   readonly [TypeId]: Readonly<Tables_>;
 }
 
+/**
+ * @internal
+ */
 export interface Any {
   readonly [TypeId]: unknown;
 }
 
+/**
+ * @internal
+ */
 export interface AnyWithProps extends DataModel<
   Readonly<Record<string, Table.AnyWithProps>>
 > {}
 
+/**
+ * @internal
+ */
 export type FromDatabaseSchema<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
 > = DataModel<DatabaseSchema_[DatabaseSchema.TypeId]>;
 
+/**
+ * @internal
+ */
 export type FromTables<Tables_ extends Table.AnyWithProps> = DataModel<
   Table.TablesRecord<Tables_>
 >;
 
+/**
+ * @internal
+ */
 export type ToConvexDataModel<DataModel_ extends AnyWithProps> = {
   [TableName_ in TableNames<DataModel_>]: TableInfoWithName<
     DataModel_,
@@ -35,24 +59,39 @@ export type ToConvexDataModel<DataModel_ extends AnyWithProps> = {
   >;
 };
 
+/**
+ * @internal
+ */
 export type Tables<DataModel_ extends AnyWithProps> =
   DataModel_[TypeId][keyof DataModel_[TypeId]];
 
+/**
+ * @internal
+ */
 export type TableNames<DataModel_ extends AnyWithProps> = Table.Name<
   Tables<DataModel_>
 > &
   string;
 
+/**
+ * @internal
+ */
 export type TableWithName<
   DataModel_ extends AnyWithProps,
   TableName extends TableNames<DataModel_>,
 > = Table.WithName<Tables<DataModel_>, TableName>;
 
+/**
+ * @internal
+ */
 export type TableInfoWithName_<
   DataModel_ extends AnyWithProps,
   TableName extends TableNames<DataModel_>,
 > = TableInfo.TableInfo<Table.WithName<Tables<DataModel_>, TableName>>;
 
+/**
+ * @internal
+ */
 export type TableInfoWithName<
   DataModel_ extends AnyWithProps,
   TableName extends TableNames<DataModel_>,
@@ -60,6 +99,9 @@ export type TableInfoWithName<
   TableInfo.TableInfo<Table.WithName<Tables<DataModel_>, TableName>>
 >;
 
+/**
+ * @internal
+ */
 export type DocumentWithName<
   DataModel_ extends AnyWithProps,
   TableName extends TableNames<DataModel_>,
@@ -67,6 +109,9 @@ export type DocumentWithName<
   TableInfo.TableInfo<Table.WithName<Tables<DataModel_>, TableName>>
 >;
 
+/**
+ * @internal
+ */
 export type DocumentByName<
   DataModel_ extends AnyWithProps,
   TableName extends TableNames<DataModel_>,

@@ -50,6 +50,9 @@ import { StorageActionWriter } from "./StorageActionWriter";
 import { StorageWriter } from "./StorageWriter";
 import type * as Handler from "./Handler";
 
+/**
+ * @internal
+ */
 export type Definition = Data.TaggedEnum<{
   PublicQuery: ReturnType<typeof queryFunction>;
   InternalQuery: ReturnType<typeof queryFunction>;
@@ -59,8 +62,14 @@ export type Definition = Data.TaggedEnum<{
   InternalAction: ReturnType<typeof convexActionFunction>;
   Registered: { readonly handler: RegisteredFunction.Any };
 }>;
+/**
+ * @internal
+ */
 export const Definition = Data.taggedEnum<Definition>();
 
+/**
+ * @internal
+ */
 export const prepare = (
   tableNames: ReadonlyArray<string>,
   item: FunctionRegistryItem.ConfectFunctionRegistryItem,
@@ -126,6 +135,9 @@ export const prepare = (
   );
 };
 
+/**
+ * @internal
+ */
 export const make = (
   tableNames: ReadonlyArray<string>,
   item: FunctionRegistryItem.ConfectFunctionRegistryItem,
@@ -134,6 +146,9 @@ export const make = (
 ): RegisteredFunction.Any =>
   register(prepare(tableNames, item, resolvedMiddlewares, target));
 
+/**
+ * @internal
+ */
 export const register = (self: Definition): RegisteredFunction.Any =>
   Definition.$match(self, {
     PublicQuery: (definition) =>
@@ -289,16 +304,25 @@ type MutationContext<S extends DatabaseSchema.AnyWithProps> =
     DataModel.ToConvexDataModel<DataModel.FromDatabaseSchema<S>>
   >;
 
+/**
+ * @internal
+ */
 export function mutationLayer(
   tableNames: ReadonlyArray<string>,
   ctx: MutationContext<DatabaseSchema.AnyApp>,
   target?: DatabaseSchema.AppTarget,
 ): Layer.Layer<Handler.MutationServices<DatabaseSchema.AnyApp>>;
+/**
+ * @internal
+ */
 export function mutationLayer<S extends DatabaseSchema.AnyWithProps>(
   tableNames: ReadonlyArray<DatabaseSchema.TableNames<S>>,
   ctx: MutationContext<S>,
   ...targetArgs: DatabaseSchema.TargetArgs<S["target"]>
 ): Layer.Layer<Handler.MutationServices<S>>;
+/**
+ * @internal
+ */
 export function mutationLayer<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
 >(

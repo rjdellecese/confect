@@ -10,6 +10,8 @@ import * as Ref from "effect/Ref";
  * Builds the Foldkit-facing Confect client around one WebSocket client. The
  * pagination id allocator shares the WebSocket client's lifetime because its
  * ids are cache-busters for that client's query cache.
+ *
+ * @internal
  */
 export const make = (webSocketClient: WebSocketClient.WebSocketClient) =>
   Effect.gen(function* () {
@@ -17,6 +19,9 @@ export const make = (webSocketClient: WebSocketClient.WebSocketClient) =>
 
     return {
       ...webSocketClient,
+      /**
+       * @internal
+       */
       resolvePaginationId: (restored: Option.Option<number>) =>
         Ref.modify(paginationId, (current) =>
           Option.match(restored, {

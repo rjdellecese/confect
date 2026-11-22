@@ -77,6 +77,9 @@ export const forScope = <
 >(): Context.Service<ForScope<Scope>, Service<Scope>> =>
   Context.Service("@confect/server/Scheduler");
 
+/**
+ * @internal
+ */
 export const layer = <Scope extends IdScope.IdScope = IdScope.App>(
   scheduler: ConvexScheduler,
   _scope?: Scope,

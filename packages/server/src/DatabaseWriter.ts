@@ -95,6 +95,8 @@ export interface DatabaseWriterService<
  * The tag's _Identifier_ is `Docs`-independent (see `DatabaseReaderTag`); only
  * the _Service_ carries `Docs` so writer inputs print the named doc
  * interfaces.
+ *
+ * @internal
  */
 export type DatabaseWriterTag<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
@@ -104,6 +106,9 @@ export type DatabaseWriterTag<
   DatabaseWriterService<DatabaseSchema_, Docs>
 >;
 
+/**
+ * @internal
+ */
 export const make = <
   Model extends GenericDataModel,
   const Scope extends IdScope.IdScope = IdScope.App,
@@ -193,6 +198,9 @@ export const make = <
   } as DatabaseWriterService<DatabaseSchema.FromConvexDataModel<Model, Scope>>;
 };
 
+/**
+ * @internal
+ */
 export const DatabaseWriter = <
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
   Docs = {},
@@ -210,6 +218,9 @@ export type DatabaseWriter<
       readonly "~@confect/server/ScopedDatabaseWriter": Types.Invariant<DatabaseSchema_>;
     };
 
+/**
+ * @internal
+ */
 export const layer = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
   convexDatabaseWriter: GenericDatabaseWriter<
     DataModel.ToConvexDataModel<DataModel.FromDatabaseSchema<DatabaseSchema_>>

@@ -32,5 +32,8 @@ export const forScope = <Meta extends Pick<MutationMeta, "getRequestMetadata">>(
           })),
       };
 
+/**
+ * @internal
+ */
 export const layer = (meta: Pick<MutationMeta, "getRequestMetadata">) =>
   Layer.succeed(RequestMetadata, make(meta));

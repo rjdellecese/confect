@@ -43,6 +43,9 @@ export type DocumentIds<DatabaseSchema_ extends DatabaseSchema.AnyWithProps> =
     DatabaseSchema.Scope<DatabaseSchema_>
   >;
 
+/**
+ * @internal
+ */
 export type DocumentIdsTag<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
 > = Context.Service<DocumentIds<DatabaseSchema_>, DocumentIds<DatabaseSchema_>>;
@@ -52,6 +55,9 @@ const tag = <AppTableName extends string, Scope extends IdScope.IdScope>() =>
     "@confect/server/DocumentIds",
   );
 
+/**
+ * @internal
+ */
 export const DocumentIds = <
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
 >(): DocumentIdsTag<DatabaseSchema_> =>
@@ -65,6 +71,9 @@ type NativeReader<Name extends string> = Pick<
   "normalizeId" | "system"
 >;
 
+/**
+ * @internal
+ */
 export const make = <
   const AppTableName extends string,
   const Scope extends IdScope.IdScope = IdScope.App,
@@ -115,6 +124,9 @@ export const make = <
   };
 };
 
+/**
+ * @internal
+ */
 export const layer = <
   const AppTableName extends string,
   const Scope extends IdScope.IdScope = IdScope.App,

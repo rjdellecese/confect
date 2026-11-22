@@ -12,6 +12,9 @@ import type * as RegisteredFunctions from "./RegisteredFunctions";
 import * as ResolvedMiddleware from "./ResolvedMiddleware";
 import { mapLeaves } from "./internal/utils";
 
+/**
+ * @internal
+ */
 export interface Definitions {
   readonly [name: string]: RegisteredConvexFunction.Definition | Definitions;
 }
@@ -23,6 +26,9 @@ type DefinitionTag<
   ? "Registered"
   : `${Capitalize<Function["functionVisibility"]>}${Capitalize<Function["runtimeAndFunctionType"]["functionType"]>}`;
 
+/**
+ * @internal
+ */
 export type ForGroup<Group extends GroupSpec.AnyWithProps> = {
   readonly [Name in FunctionSpec.Name<GroupSpec.Functions<Group>>]: Extract<
     RegisteredConvexFunction.Definition,
@@ -38,6 +44,9 @@ export type ForGroup<Group extends GroupSpec.AnyWithProps> = {
   >;
 };
 
+/**
+ * @internal
+ */
 export const isDefinition = (
   value: RegisteredConvexFunction.Definition | Definitions,
 ): value is RegisteredConvexFunction.Definition =>
@@ -52,6 +61,9 @@ const registerDefinitions = (
       : registerDefinitions(value),
   );
 
+/**
+ * @internal
+ */
 export const register = <Group extends GroupSpec.AnyWithProps>(
   definitions: Definitions,
 ): RegisteredFunctions.RegisteredFunctionsForGroupSpec<Group> =>
@@ -59,6 +71,9 @@ export const register = <Group extends GroupSpec.AnyWithProps>(
     definitions,
   ) as RegisteredFunctions.RegisteredFunctionsForGroupSpec<Group>;
 
+/**
+ * @internal
+ */
 export const buildForGroup = <Group extends GroupSpec.AnyWithProps>(
   tableNames: ReadonlyArray<string>,
   groupLayer: Layer.Layer<GroupImpl.GroupImpl<"Finalized">>,

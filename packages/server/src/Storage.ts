@@ -51,6 +51,9 @@ export class Storage extends Context.Service<Storage, Service>()(
     Context.Service("@confect/server/Storage");
 }
 
+/**
+ * @internal
+ */
 export const layer = <Scope extends IdScope.IdScope = IdScope.App>(
   storageReader: ConvexStorageReader,
   scope?: Scope,

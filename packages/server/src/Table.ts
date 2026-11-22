@@ -64,6 +64,9 @@ type CompiledTable<Table extends Table_.AnyWithProps> =
       >
     : never;
 
+/**
+ * @internal
+ */
 export const tableDefinition = <Table extends Table_.AnyWithProps>(
   table: Table,
 ): CompiledTable<Table> => {
@@ -139,8 +142,14 @@ export const systemTablesForScope = <const Scope_ extends IdScope.IdScope>(
     _storage: storage("_storage", scope),
   }) as const;
 
+/**
+ * @internal
+ */
 export const systemTables = systemTablesForScope(IdScope.app);
 export const { _scheduled_functions, _storage } = systemTables;
 
+/**
+ * @internal
+ */
 export type SystemTables<Scope_ extends IdScope.IdScope = IdScope.App> =
   ReturnType<typeof systemTablesForScope<Scope_>>[keyof typeof systemTables];

@@ -5,6 +5,9 @@ import * as GroupSpec from "./GroupSpec";
 export const TypeId = "~@confect/core/Spec";
 export type TypeId = typeof TypeId;
 
+/**
+ * @internal
+ */
 export const isSpec = (u: unknown): u is AnyWithProps =>
   Predicate.hasProperty(u, TypeId);
 
@@ -21,24 +24,38 @@ export interface Spec<
   readonly [TypeId]: Readonly<Groups_>;
 }
 
+/**
+ * @internal
+ */
 export interface Any {
   readonly [TypeId]: unknown;
 }
 
+/**
+ * @internal
+ */
 export interface AnyWithProps extends Any {
   readonly [TypeId]: Record.ReadonlyRecord<string, GroupSpec.AnyWithProps>;
 }
 
+/**
+ * @internal
+ */
 export type Groups<Spec_ extends AnyWithProps> =
   Spec_[TypeId][keyof Spec_[TypeId]];
 
 /**
  * The group record stored by a spec, with its precise member types.
+ *
+ * @internal
  */
 export const groups = <Spec_ extends AnyWithProps>(
   self: Spec_,
 ): Spec_[TypeId] => self[TypeId];
 
+/**
+ * @internal
+ */
 export const fromGroups = (
   record: Record.ReadonlyRecord<string, GroupSpec.AnyWithProps>,
 ): AnyWithProps => ({

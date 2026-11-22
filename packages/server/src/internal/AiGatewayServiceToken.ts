@@ -66,12 +66,18 @@ const defaultRuntimeErrorMessagePrefixes: Record<AiGatewayErrorCode, string> = {
     '`getServiceToken("ai-gateway")` isn\'t available on this deployment',
 };
 
+/**
+ * @internal
+ */
 export interface Service {
   readonly get: (
     service: "ai-gateway",
   ) => Effect.Effect<string, AiGatewayError>;
 }
 
+/**
+ * @internal
+ */
 export class AiGatewayServiceToken extends Context.Service<
   AiGatewayServiceToken,
   Service
@@ -101,6 +107,9 @@ const classifyError = (rejection: unknown): AiGatewayError => {
   throw rejection;
 };
 
+/**
+ * @internal
+ */
 export const make = (getServiceToken: GetServiceToken): Service => ({
   get: (service) =>
     Effect.tryPromise({
@@ -109,8 +118,14 @@ export const make = (getServiceToken: GetServiceToken): Service => ({
     }),
 });
 
+/**
+ * @internal
+ */
 export const service = make(getConvexServiceToken);
 
+/**
+ * @internal
+ */
 export const layer = Layer.succeed(AiGatewayServiceToken, service);
 
 /**
