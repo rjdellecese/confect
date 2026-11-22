@@ -24,9 +24,11 @@ Module pages group types and values by their source `@category` tags, rather
 than by declaration kind. New category names work without a site-side registry;
 untagged declarations use `Other`. Each module has a category-first index of
 exports and their directly declared callable APIs. Methods and service operations
-use owner-qualified names, such as `Builder.middleware` under Combinators and
-`ActionRunner.runAction` under Invocation. Inherited methods are not repeated as
-index entries on derived types. Data properties, inherited members, parameters,
+use owner-qualified names, such as `ActionRunner.runAction` under Running.
+FunctionSpec shows `functionSpec.middleware()` under Combinators on the returned
+spec rather than indexing the `Builder` interface separately. Its real type
+name stays in signatures, and existing links still resolve. Inherited methods
+are not repeated as index entries on derived types. Data properties, inherited members, parameters,
 returns, and signature details stay in the owning entry's body.
 Each indexed operation is rendered once; its owner links to that canonical
 section instead of duplicating its documentation and anchor.
@@ -77,6 +79,12 @@ all generated links/anchors, and byte-for-byte repeatability. The docs workflow
 also generates the reference before Mintlify validation, link checks, and
 accessibility checks. Run those locally with `pnpm --filter docs exec mintlify
 validate` and `pnpm --filter docs exec mintlify broken-links` after generation.
+
+Keep titled examples in the source description, before JSDoc tags. TypeDoc
+renders their plain TypeScript fences alongside sections such as **Gotchas**,
+without adding entries to the page outline. After `pnpm build`, use
+`pnpm check:examples` to typecheck the snippets; its Markdown is not used by
+the site.
 
 ## Publication
 

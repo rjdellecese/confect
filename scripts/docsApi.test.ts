@@ -92,7 +92,7 @@ test("keeps semantic groups and members in the outline without boilerplate label
   expect(functions).toContain("**Returns**");
   expect(functions).toContain("**Throws**");
   expect(functions).toContain("## Combinators");
-  expect(functions).toContain("### Builder.middleware()");
+  expect(functions).toContain("### functionSpec.middleware()");
   expect(functions).toContain("**Middleware**");
   expect(functions).toContain("**middlewareAttachments**");
   expect(functions).not.toMatch(
@@ -154,25 +154,146 @@ test("formats detail labels without rewriting fenced examples, tables, or anchor
   );
 });
 
-test("preserves renderer-identified semantics rather than every heading at a depth", () => {
+test("renders each titled source example once in its module, as a single TypeScript fence", () =>
+  Effect.runPromise(
+    Effect.gen(function* () {
+      const expected: { path: string; title: string; block: string }[] = [];
+      for (const [path, page] of pages) {
+        expect(page, path).not.toMatch(
+          /^#{1,6} (?:Example|When to use|Details|Gotchas)\b/m,
+        );
+        const module = /^api\/reference\/(\w+)\/(\w+)\.mdx$/.exec(path);
+        if (module === null) continue;
+        const source = yield* fs.readFileString(
+          resolve(root, "packages", module[1], "src", module[2] + ".ts"),
+        );
+        const prose = Str.replace(/^\s*\* ?/gm, "")(source);
+        for (const [, title, block] of Str.matchAll(
+          /^\*\*Example\*\* (\([^\n]+\))\n\n(```ts\n[\s\S]*?\n```)/gm,
+        )(prose))
+          expected.push({ path, title: `**Example** ${title}`, block });
+      }
+      expect(expected.length).toBeGreaterThanOrEqual(22);
+      const file = resolve(directory, "source-examples.mdx");
+      yield* fs.writeFileString(
+        file,
+        Array.join(
+          Array.map(expected, ({ block }) => block),
+          "\n\n",
+        ),
+      );
+      const formatted = Bun.spawnSync(["pnpm", "oxfmt", "--write", file], {
+        cwd: root,
+      });
+      expect(formatted.exitCode, formatted.stderr.toString()).toBe(0);
+      const markdown = yield* fs.readFileString(file);
+      const blocks = fromMarkdown(markdown).children;
+      expect(blocks).toHaveLength(expected.length);
+      for (const [i, { path, title }] of expected.entries()) {
+        const page = pages.get(path) ?? "";
+        const sections = Str.split(title)(page);
+        expect(sections, `${path}: ${title}`).toHaveLength(2);
+        const [example, next] = fromMarkdown(sections[1]).children;
+        expect(example, title).toMatchObject({
+          type: "code",
+          lang: "ts",
+          meta: null,
+        });
+        expect(blocks[i].type).toBe("code");
+        if (example.type === "code" && blocks[i].type === "code")
+          expect(example.value, title).toBe(blocks[i].value);
+        expect(next?.type, title).not.toBe("code");
+      }
+    }),
+  ));
+
+test("indexes middleware on the returned spec without changing the Builder contract", () => {
   const functions = pages.get("api/reference/core/FunctionSpec.mdx") ?? "";
-  expect(functions).toMatch(
-    /## Combinators\n\n<span id="api-middleware"><\/span>\n\n### Builder\.middleware\(\)/,
+  const combinators = Str.split("## Constructors")(functions)[0];
+  expect(combinators).toMatch(
+    /## Combinators[\s\S]*<span id="api-middleware"><\/span>\n\n### functionSpec\.middleware\(\)/,
   );
-  expect(functions).toContain("See [Builder.middleware](#api-middleware).");
+  expect(Array.fromIterable(Str.matchAll(/^### /gm)(combinators))).toHaveLength(
+    1,
+  );
+  expect(functions).not.toMatch(/^### Builder\b/m);
+  expect(combinators).toContain(
+    "function spec returned by a Confect constructor",
+  );
+  expect(combinators).toContain(
+    "middleware<MiddlewareSpec_>(middlewareSpec, ...options): Builder<",
+  );
+  expect(combinators).toMatch(
+    /Defined in: \[packages\/core\/src\/FunctionSpec\.ts:\d+\]/,
+  );
+  expect(combinators).toContain("The required attachment value");
+  expect(combinators).toContain("**Returns**");
+  expect(combinators).toContain("**Throws**");
+  expect(functions).toContain("[`Builder`](#functionspec-middleware)");
+  for (const id of [
+    "builder",
+    "builder-middleware",
+    "api-builder",
+    "api-type-parameter-name_",
+  ])
+    expect(combinators).toContain(`<span id="${id}"></span>`);
+  expect(functions).toMatch(
+    /id="api-middlewareattachments"><\/span>\s*<span id="api-middlewareattachments-1"><\/span>\s*\*\*middlewareAttachments\*\*/,
+  );
+  expect(pages.get("api/reference/server/FunctionImpl.mdx")).toMatch(
+    /^### Builder$/m,
+  );
   expect(
     Array.fromIterable(
-      Str.matchAll(/Attach middleware around this function's handler/g)(
+      Str.matchAll(/Attaches middleware to this function's handler/g)(
         functions,
       ),
     ),
   ).toHaveLength(1);
+  const constructors = Str.split("## Models")(
+    Str.split("## Constructors")(functions)[1],
+  )[0];
+  const sections = Array.drop(Str.split(/^### /m)(constructors), 1);
+  expect(sections).toHaveLength(18);
+  for (const section of sections) {
+    const name = Str.split("\n")(section)[0];
+    const adapter = Str.startsWith("convex")(name);
+    const methodLink = "[.middleware()](#functionspec-middleware)";
+    expect(
+      Array.fromIterable(
+        Str.matchAll(/\[`Builder`\]\(#functionspec-middleware\)/g)(section),
+      ),
+      name,
+    ).toHaveLength(adapter ? 1 : 2);
+    if (adapter) {
+      expect(section, name).toContain(
+        "A function that takes the local name and returns a builder",
+      );
+      expect(section, name).toMatch(
+        /without\s+Effect\s+codec\s+conversion or Confect middleware/,
+      );
+      expect(section, name).not.toContain(methodLink);
+    } else {
+      expect(section, name).toContain(methodLink);
+      expect(section, name).toContain(
+        Str.includes("Paginated")(name)
+          ? "A query spec whose handler returns a page with cursors"
+          : "A function spec. Call",
+      );
+    }
+  }
+});
+
+test("preserves renderer-identified semantics rather than every heading at a depth", () => {
   const service = pages.get("api/reference/server/ActionRunner.mdx") ?? "";
   expect(service).toMatch(
-    /## Invocation[\s\S]*### ActionRunner\.runAction[\s\S]*## Services/,
+    /## Context[\s\S]*### ActionRunner \(type\)[\s\S]*## Running[\s\S]*### ActionRunner\.runAction[\s\S]*## Tags[\s\S]*### ActionRunner \(value\)/,
   );
   expect(service).toContain(
     "See [ActionRunner.runAction](#api-operationactionrunnerrunaction).",
+  );
+  expect(pages.get("api/reference/js/HttpClient.mdx")).toMatch(
+    /## Layers[\s\S]*### layer\(\)[\s\S]*## Services[\s\S]*### HttpClient \(type\)[\s\S]*## Tags[\s\S]*### HttpClient \(value\)/,
   );
   expect(pages.get("api/reference/foldkit/PaginatedQuery.mdx")).toContain(
     "### PaginatedQuery.init",
@@ -209,7 +330,7 @@ test("retains source categories and upstream contracts on public reexports", () 
     "region: string | null",
   );
   expect(pages.get("api/reference/server/ExecutionMetadata.mdx")).toContain(
-    "Read metadata for the current function, including its name and component.",
+    "Reads the current function's name, component path, type, and visibility.",
   );
 });
 
@@ -220,25 +341,24 @@ test("renders public functions, overloads, classes, types, and inferred service 
   const functions = pages.get("api/reference/core/FunctionSpec.mdx");
   expect(functions).toContain("publicQuery");
   expect(functions).toContain("**Call Signature**");
-  expect(functions).toContain("Declare a public query in the Convex runtime.");
+  expect(functions).toMatch(
+    /Declares a read-only query that clients can call or subscribe to in the\s+Convex runtime\./,
+  );
   expect(pages.get("api/reference/core/PaginationError.mdx")).toContain(
     '<span id="api-invalidcursor"></span>',
   );
   expect(pages.get("api/reference/core/GenericId.mdx")).toContain("GenericId");
   expect(pages.get("api/reference/server/ActionRunner.mdx")).toContain(
-    "Invoke an action ref with decoded arguments.",
+    "Runs a generated action with decoded arguments",
   );
-  expect(pages.get("api/reference/server/ActionRunner.mdx")).toContain(
-    "Native/undeclared failures become defects.",
-  );
-  expect(pages.get("api/reference/server/DatabaseReader.mdx")).toContain(
-    "Select a table for document lookup or query construction.",
+  expect(pages.get("api/reference/server/ActionRunner.mdx")).toMatch(
+    /Declared errors and\s+`SchemaError` are typed failures; unexpected Convex failures are\s+defects\./,
   );
   expect(pages.get("api/reference/server/DatabaseReader.mdx")).toMatch(
-    /Selecting a\s+handle does not read any documents\./,
+    /Selects a bound application or system table for lookups and queries without\s+reading any documents\./,
   );
   expect(pages.get("api/reference/server/DatabaseReader.mdx")).toMatch(
-    /Narrow the handle by `tableName` before selecting a table-specific\s+index/,
+    /Narrow the handle by `tableName` before using a\s+table-specific index/,
   );
   expect(pages.get("api/reference/server/Table.mdx")).toContain(
     "## System tables",
@@ -271,7 +391,7 @@ test("renders public functions, overloads, classes, types, and inferred service 
     ),
   ).toBe(false);
   expect(pages.get("api/reference/server/VectorSearch.mdx")).toContain(
-    "ranked &#123;\\_id, \\_score&#125; matches",
+    "ranked `{ _id, _score }` matches",
   );
   expect(pages.get("api/reference/server/VectorSearch.mdx")).toContain(
     "`number`[]",
@@ -315,7 +435,14 @@ test("all generated page links and explicit TypeDoc anchors resolve", () => {
     expect(new Set(Array.map(anchors, (match) => match[1])).size, path).toBe(
       anchors.length,
     );
-    for (const anchor of anchors) expect(anchor[1]).toStartWith("api-");
+    for (const anchor of anchors) {
+      if (
+        path === "api/reference/core/FunctionSpec.mdx" &&
+        (anchor[1] === "builder" || anchor[1] === "builder-middleware")
+      )
+        continue;
+      expect(anchor[1]).toStartWith("api-");
+    }
     for (const match of Str.matchAll(/\]\(([^)\s]+)\)/g)(content)) {
       const href = match[1];
       if (/^(?:https?:|mailto:)/.test(href)) continue;
@@ -325,7 +452,10 @@ test("all generated page links and explicit TypeDoc anchors resolve", () => {
       expect(pages.has(target), `${path}: ${href}`).toBe(true);
       if (anchor !== undefined) {
         expect(pages.get(target), `${path}: ${href}`).toContain(
-          `<span id="${anchor}"></span>`,
+          target === "api/reference/core/FunctionSpec.mdx" &&
+            anchor === "functionspec-middleware"
+            ? "### functionSpec.middleware()\n"
+            : `<span id="${anchor}"></span>`,
         );
       }
     }
