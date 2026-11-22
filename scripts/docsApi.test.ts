@@ -92,7 +92,7 @@ test("keeps semantic groups and members in the outline without boilerplate label
   expect(functions).toContain("**Returns**");
   expect(functions).toContain("**Throws**");
   expect(functions).toContain("## Combinators");
-  expect(functions).toContain("### Builder.middleware()");
+  expect(functions).toContain("### functionSpec.middleware()");
   expect(functions).toContain("**Middleware**");
   expect(functions).toContain("**middlewareAttachments**");
   expect(functions).not.toMatch(
@@ -154,12 +154,42 @@ test("formats detail labels without rewriting fenced examples, tables, or anchor
   );
 });
 
-test("preserves renderer-identified semantics rather than every heading at a depth", () => {
+test("indexes middleware on the returned spec without changing the Builder contract", () => {
   const functions = pages.get("api/reference/core/FunctionSpec.mdx") ?? "";
-  expect(functions).toMatch(
-    /## Combinators\n\n<span id="api-middleware"><\/span>\n\n### Builder\.middleware\(\)/,
+  const combinators = Str.split("## Constructors")(functions)[0];
+  expect(combinators).toMatch(
+    /## Combinators[\s\S]*<span id="api-middleware"><\/span>\n\n### functionSpec\.middleware\(\)/,
   );
-  expect(functions).toContain("See [Builder.middleware](#api-middleware).");
+  expect(Array.fromIterable(Str.matchAll(/^### /gm)(combinators))).toHaveLength(
+    1,
+  );
+  expect(functions).not.toMatch(/^### Builder\b/m);
+  expect(combinators).toContain(
+    "function spec returned by a Confect constructor",
+  );
+  expect(combinators).toContain(
+    "middleware<MiddlewareSpec_>(middlewareSpec, ...options): Builder<",
+  );
+  expect(combinators).toMatch(
+    /Defined in: \[packages\/core\/src\/FunctionSpec\.ts:\d+\]/,
+  );
+  expect(combinators).toContain("The required attachment value");
+  expect(combinators).toContain("**Returns**");
+  expect(combinators).toContain("**Throws**");
+  expect(functions).toContain("[`Builder`](#functionspec-middleware)");
+  for (const id of [
+    "builder",
+    "builder-middleware",
+    "api-builder",
+    "api-type-parameter-name_",
+  ])
+    expect(combinators).toContain(`<span id="${id}"></span>`);
+  expect(functions).toMatch(
+    /id="api-middlewareattachments"><\/span>\s*<span id="api-middlewareattachments-1"><\/span>\s*\*\*middlewareAttachments\*\*/,
+  );
+  expect(pages.get("api/reference/server/FunctionImpl.mdx")).toMatch(
+    /^### Builder$/m,
+  );
   expect(
     Array.fromIterable(
       Str.matchAll(/Attach middleware around this function's handler/g)(
@@ -167,6 +197,36 @@ test("preserves renderer-identified semantics rather than every heading at a dep
       ),
     ),
   ).toHaveLength(1);
+  const constructors = Str.split("## Models")(
+    Str.split("## Constructors")(functions)[1],
+  )[0];
+  const sections = Array.drop(Str.split(/^### /m)(constructors), 1);
+  expect(sections).toHaveLength(18);
+  for (const section of sections) {
+    const name = Str.split("\n")(section)[0];
+    const adapter = Str.startsWith("convex")(name);
+    const methodLink = "[.middleware()](#functionspec-middleware)";
+    expect(
+      Array.fromIterable(
+        Str.matchAll(/\[`Builder`\]\(#functionspec-middleware\)/g)(section),
+      ),
+      name,
+    ).toHaveLength(adapter ? 1 : 2);
+    if (adapter) {
+      expect(section, name).toContain("A name-taking factory");
+      expect(section, name).not.toContain(methodLink);
+    } else {
+      expect(section, name).toContain(methodLink);
+      expect(section, name).toContain(
+        Str.includes("Paginated")(name)
+          ? "A query spec whose handler returns a page with cursors"
+          : "A function spec. Call",
+      );
+    }
+  }
+});
+
+test("preserves renderer-identified semantics rather than every heading at a depth", () => {
   const service = pages.get("api/reference/server/ActionRunner.mdx") ?? "";
   expect(service).toMatch(
     /## Invocation[\s\S]*### ActionRunner\.runAction[\s\S]*## Services/,
@@ -315,7 +375,14 @@ test("all generated page links and explicit TypeDoc anchors resolve", () => {
     expect(new Set(Array.map(anchors, (match) => match[1])).size, path).toBe(
       anchors.length,
     );
-    for (const anchor of anchors) expect(anchor[1]).toStartWith("api-");
+    for (const anchor of anchors) {
+      if (
+        path === "api/reference/core/FunctionSpec.mdx" &&
+        (anchor[1] === "builder" || anchor[1] === "builder-middleware")
+      )
+        continue;
+      expect(anchor[1]).toStartWith("api-");
+    }
     for (const match of Str.matchAll(/\]\(([^)\s]+)\)/g)(content)) {
       const href = match[1];
       if (/^(?:https?:|mailto:)/.test(href)) continue;
@@ -325,7 +392,10 @@ test("all generated page links and explicit TypeDoc anchors resolve", () => {
       expect(pages.has(target), `${path}: ${href}`).toBe(true);
       if (anchor !== undefined) {
         expect(pages.get(target), `${path}: ${href}`).toContain(
-          `<span id="${anchor}"></span>`,
+          target === "api/reference/core/FunctionSpec.mdx" &&
+            anchor === "functionspec-middleware"
+            ? "### functionSpec.middleware()\n"
+            : `<span id="${anchor}"></span>`,
         );
       }
     }

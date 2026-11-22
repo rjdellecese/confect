@@ -230,8 +230,18 @@ export class MintlifyTheme extends MarkdownTheme {
   override getRenderContext(page: MarkdownPageEvent<Reflection>) {
     const context = super.getRenderContext(page);
     const urlTo = context.urlTo.bind(context);
+    const builder =
+      page.model instanceof DeclarationReflection &&
+      page.model.getFullName() === "core.FunctionSpec"
+        ? page.model.getChildOrTypePropertyByName(["Builder"])
+        : undefined;
+    const middleware = builder?.getChildOrTypePropertyByName(["middleware"]);
     context.urlTo = (reflection) =>
-      Str.replace(/\.mdx(?=#|$)/, "")(urlTo(reflection));
+      middleware !== undefined &&
+      (reflection === middleware || reflection === builder)
+        ? "#functionspec-middleware"
+        : Str.replace(/\.mdx(?=#|$)/, "")(urlTo(reflection));
+    const inheritedAnchors = new Map<Reflection, string>();
     const entries = new Map<
       DeclarationReflection,
       { name: string; category: string; anchor: string }
@@ -293,8 +303,19 @@ export class MintlifyTheme extends MarkdownTheme {
       page.model instanceof DeclarationReflection &&
       page.model.kindOf(ReflectionKind.Module | ReflectionKind.Namespace)
     ) {
-      for (const child of page.model.children ?? [])
+      for (const child of page.model.children ?? []) {
+        if (child === builder && middleware !== undefined) {
+          addEntry(middleware, "functionSpec.middleware", child);
+          for (const property of child.children ?? []) {
+            const original = property.inheritedFrom?.reflection;
+            const anchor = context.router.getAnchor(property);
+            if (original !== undefined && anchor !== undefined)
+              inheritedAnchors.set(original, anchor);
+          }
+          continue;
+        }
         addEntry(child, child.name, page.model);
+      }
     }
     let currentEntry: DeclarationReflection | undefined;
     const body = context.partials.body;
@@ -339,6 +360,20 @@ export class MintlifyTheme extends MarkdownTheme {
       if (entry !== undefined && currentEntry !== model)
         return `See [${entry.name}](#${entry.anchor}).`;
       const rendered = memberContainer(model, options);
+      if (model === middleware && builder !== undefined) {
+        const anchors = ["builder", "builder-middleware"];
+        for (const reflection of [builder, ...(builder.typeParameters ?? [])]) {
+          const anchor = context.router.getAnchor(reflection);
+          if (anchor !== undefined) anchors.push(anchor);
+        }
+        return `${Array.join(
+          Array.map(anchors, (anchor) => `<span id="${anchor}"></span>`),
+          "\n",
+        )}\n\n${rendered}`;
+      }
+      const inheritedAnchor = inheritedAnchors.get(model);
+      if (inheritedAnchor !== undefined)
+        return `<span id="${inheritedAnchor}"></span>\n\n${rendered}`;
       return entry !== undefined && !context.router.hasUrl(model)
         ? `<a id="${entry.anchor}"></a>\n\n${rendered}`
         : rendered;
@@ -350,6 +385,8 @@ export class MintlifyTheme extends MarkdownTheme {
             headingLevel: options.headingLevel + 1,
           })
         : member(model, options);
+      if (model === middleware)
+        rendered = `Here, \`functionSpec\` is the function spec returned by a Confect constructor such as \`publicQuery\`. Its type is \`Builder<…>\`. Specs that wrap plain Convex functions cannot attach middleware.\n\n${rendered}`;
       if (currentEntry === model) {
         rendered = `<Badge color="gray" size="sm">${declarationKind(model)}</Badge>\n\n${rendered}`;
       }
