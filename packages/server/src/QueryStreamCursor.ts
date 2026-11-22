@@ -33,16 +33,22 @@ type Cursor = typeof Cursor.Type;
 
 /**
  * @experimental
+ *
+ * @internal
  */
 export const QueryStreamCursor = Cursor;
 
 /**
  * @experimental
+ *
+ * @internal
  */
 export interface QueryStreamCursor extends Cursor {}
 
 /**
  * @experimental
+ *
+ * @internal
  */
 export const END_CURSOR = "[]";
 
@@ -50,6 +56,8 @@ export const END_CURSOR = "[]";
  * Bind cursor string encoding and decoding to a layout.
  *
  * @experimental
+ *
+ * @internal
  */
 export const fromKeyLayout = (
   keyLayout: QueryStreamKeyLayout.QueryStreamKeyLayout,

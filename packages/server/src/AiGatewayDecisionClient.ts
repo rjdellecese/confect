@@ -19,6 +19,8 @@ export type AiGatewayDecisionClient = OpenRouterClient.OpenRouterClient;
 
 /**
  * Construct a decision model client using the current Effect HTTP client.
+ *
+ * @internal
  */
 export const make: Effect.Effect<
   OpenRouterClient.Service,

@@ -49,5 +49,8 @@ export const Scheduler =
   Context.Service<ReturnType<typeof make>>("@confect/server/Scheduler");
 export type Scheduler = typeof Scheduler.Identifier;
 
+/**
+ * @internal
+ */
 export const layer = (scheduler: ConvexScheduler) =>
   Layer.succeed(Scheduler, make(scheduler));

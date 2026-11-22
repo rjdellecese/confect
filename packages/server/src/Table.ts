@@ -41,6 +41,9 @@ const tableDefinitionCache = new WeakMap<
   TableDefinition<any, any, any, any>
 >();
 
+/**
+ * @internal
+ */
 export const tableDefinition = <Table extends Table_.AnyWithProps>(
   table: Table,
 ): TableDefinition<
@@ -119,9 +122,15 @@ export const _storage = Table_.make(() =>
   }),
 )("_storage");
 
+/**
+ * @internal
+ */
 export const systemTables = {
   _scheduled_functions,
   _storage,
 } as const;
 
+/**
+ * @internal
+ */
 export type SystemTables = typeof _scheduled_functions | typeof _storage;

@@ -12,6 +12,8 @@ import * as Schema from "effect/Schema";
  * Declaring them is required for the generated Convex argument validator to
  * accept those requests and for the fields to survive decoding and reach
  * `paginate`.
+ *
+ * @internal
  */
 export const PaginationOptions = Schema.Struct({
   numItems: Schema.Finite,

@@ -5,6 +5,9 @@ import * as SchemaAST from "effect/SchemaAST";
 
 const ConvexId = "~@confect/core/ConvexId";
 
+/**
+ * @internal
+ */
 export const GenericId = <TableName extends string>(
   tableName: TableName,
 ): Schema.toType<Schema.refine<ConvexGenericId<TableName>, Schema.String>> =>
@@ -15,6 +18,9 @@ export const GenericId = <TableName extends string>(
 
 export type GenericId<TableName extends string> = ConvexGenericId<TableName>;
 
+/**
+ * @internal
+ */
 export const tableName = <TableName extends string>(
   ast: SchemaAST.AST,
 ): Option.Option<TableName> =>

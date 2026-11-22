@@ -21,6 +21,9 @@ export class ExecutionMetadata extends Context.Service<
   ReturnType<typeof make>
 >()("@confect/server/ExecutionMetadata") {}
 
+/**
+ * @internal
+ */
 export const layer = (
   meta: Pick<QueryMeta, "getFunctionMetadata" | "getDeploymentMetadata">,
 ) => Layer.succeed(ExecutionMetadata, make(meta));

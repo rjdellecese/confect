@@ -32,6 +32,8 @@ export const make = (): ConfigProvider.ConfigProvider =>
 
 /**
  * Installs the Convex-aware `ConfigProvider` as the ambient provider.
+ *
+ * @internal
  */
 export const layer: Layer.Layer<never> = Layer.succeed(
   ConfigProvider.ConfigProvider,
