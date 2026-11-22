@@ -82,6 +82,43 @@ validate` and `pnpm --filter docs exec mintlify broken-links` after generation.
 
 ## Publication
 
+### Pull request previews
+
+For pull requests from branches in this repository, CI compares the rendered
+docs with the PR's merge base. A change to a guide, navigation, asset, or
+generated API page can trigger a preview. A different source commit SHA alone
+does not. The docs workspace's README, changelog, and package manifest are not
+part of the preview. If the docs change, CI writes the validated snapshot to
+`preview/pr-<number>` and posts the Mintlify review link on the PR. Later
+changes update the same preview. Fork and Dependabot PRs do not publish.
+Closing a PR does not delete its snapshot branch. To retire the preview,
+delete that PR's `preview/pr-<number>` branch.
+
+**One-time setup** (repository administrator):
+
+1. Connect the Mintlify GitHub App to this repository. The Mintlify plan must
+   include [preview deployments](https://www.mintlify.com/docs/deploy/preview-deployments)
+   and [preview API access](https://www.mintlify.com/docs/api/preview/trigger).
+   Previews are public by default; configure preview authentication in Mintlify
+   first if unpublished material must be private.
+2. In GitHub **Settings → Environments**, create `mintlify-preview`. Under
+   deployment branches and tags, allow only the `main` branch (no tag or PR
+   patterns). Add `MINTLIFY_API_KEY` as an **environment secret**, using a
+   Mintlify admin key with write access. Do not put the key in repository-wide
+   secrets or in the PR build.
+3. After both preview workflows have landed on `main`, set the **repository
+   Actions variable** `MINTLIFY_PROJECT_ID` to the project ID. Setting it
+   enables previews on subsequent PR opens and updates; unsetting it disables
+   them. The trusted publisher is a `workflow_run` workflow and does not run
+   from a feature branch.
+
+The PR build has read-only repository access and no publishing key. The
+publisher uses the workflow and script from the default branch; it reads the
+rendered files as data and never runs PR code. Preview publication does not
+push to the PR branch, `main`, or `release`.
+
+### Production
+
 Use the existing Docs Release workflow and `release-docs` skill. No package
 publication is required. Deployment checks out the requested main commit before
 installing its frozen dependencies, generates into the staged docs snapshot,

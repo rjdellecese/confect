@@ -1,0 +1,80 @@
+name: Publish docs preview
+
+on:
+  workflow_run:
+    workflows: ["Build docs preview"]
+    types: [completed]
+
+permissions: {}
+
+jobs:
+  publish:
+    if: >-
+      vars.MINTLIFY_PROJECT_ID != '' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.path == '.github/workflows/docs-preview-build.yml' &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      github.event.workflow_run.pull_requests[0].number &&
+      !github.event.workflow_run.pull_requests[1].number &&
+      github.event.workflow_run.pull_requests[0].head.sha == github.event.workflow_run.head_sha
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: mintlify-preview
+    concurrency:
+      group: mintlify-preview-pr-${{ github.event.workflow_run.pull_requests[0].number }}
+      cancel-in-progress: false
+    permissions:
+      actions: read
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Check this is still the current revision of an eligible PR
+        id: pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" > "$RUNNER_TEMP/preview-pr.json"
+          eligible=$(jq --arg repo "$GITHUB_REPOSITORY" --arg sha "$HEAD_SHA" \
+            '.state == "open" and .head.repo.full_name == $repo and .head.sha == $sha and .user.login != "dependabot[bot]"' \
+            "$RUNNER_TEMP/preview-pr.json")
+          echo "eligible=$eligible" >> "$GITHUB_OUTPUT"
+
+      - name: Check out trusted publisher
+        if: steps.pr.outputs.eligible == 'true'
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Download base digest
+        if: steps.pr.outputs.eligible == 'true'
+        uses: actions/download-artifact@v8
+        with:
+          name: docs-preview-base
+          path: ${{ runner.temp }}/docs-preview-base
+          github-token: ${{ github.token }}
+          run-id: ${{ github.event.workflow_run.id }}
+
+      - name: Download rendered snapshot
+        if: steps.pr.outputs.eligible == 'true'
+        uses: actions/download-artifact@v8
+        with:
+          name: docs-preview-head
+          path: ${{ runner.temp }}/docs-preview-head
+          github-token: ${{ github.token }}
+          run-id: ${{ github.event.workflow_run.id }}
+
+      - name: Publish changed docs and update the review link
+        if: steps.pr.outputs.eligible == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MINTLIFY_API_KEY: ${{ secrets.MINTLIFY_API_KEY }}
+          MINTLIFY_PROJECT_ID: ${{ vars.MINTLIFY_PROJECT_ID }}
+          PR_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          python3 -I scripts/publishDocsPreview.py \
+            "$RUNNER_TEMP/docs-preview-base" "$RUNNER_TEMP/docs-preview-head" \
+            "$PR_NUMBER" "$HEAD_SHA"

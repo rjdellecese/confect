@@ -1,0 +1,64 @@
+name: Build docs preview
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions: {}
+
+jobs:
+  snapshot:
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.user.login != 'dependabot[bot]' &&
+      vars.MINTLIFY_PROJECT_ID != ''
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        side: [base, head]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Select the source revision
+        id: source
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+          SIDE: ${{ matrix.side }}
+        run: |
+          cp scripts/docsPreviewSnapshot.py "$RUNNER_TEMP/docsPreviewSnapshot.py"
+          sha=$HEAD
+          if [[ "$SIDE" == base ]]; then
+            sha=$(git merge-base "$BASE" "$HEAD")
+          fi
+          git checkout --detach "$sha"
+          [[ "$(git rev-parse HEAD)" == "$sha" ]]
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          if [[ -f scripts/docsApi.ts || "$SIDE" == head ]]; then
+            echo "install=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: ./.github/actions/docs-setup
+        if: steps.source.outputs.install == 'true'
+        env:
+          npm_config_frozen_lockfile: "true"
+
+      - name: Build the docs snapshot
+        env:
+          REVISION: ${{ steps.source.outputs.sha }}
+          SIDE: ${{ matrix.side }}
+        run: python3 "$RUNNER_TEMP/docsPreviewSnapshot.py" "$REVISION" "$SIDE" "$RUNNER_TEMP/docs-preview"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: docs-preview-${{ matrix.side }}
+          path: ${{ runner.temp }}/docs-preview/
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 2
