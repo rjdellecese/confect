@@ -38,7 +38,7 @@ minimumReleaseAgeExclude:
   - tsrs@0.21.0-ts7.1.0-beta
 
 overrides:
-  convex: 1.50.0
+  convex: 1.51.0
   effect: 4.1.0
   happy-dom: 21.0.4
   react: 19.3.1
