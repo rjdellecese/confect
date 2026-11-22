@@ -94,8 +94,10 @@ export interface FunctionSpec<
 }
 
 /**
- * A function declaration with immutable middleware attachment. Each call to
- * `middleware` returns a new builder; the original spec is unchanged.
+ * The function spec returned by a constructor. On a Confect spec,
+ * {@link Builder.middleware | .middleware()} returns a new spec without changing
+ * the original. Specs that wrap plain Convex functions do not accept
+ * middleware.
  *
  * @category Models
  */
@@ -661,7 +663,8 @@ const makePaginated = <
  *   result.
  * @param options.error - An optional lazy codec for typed handler failures.
  *
- * @returns A new function builder that can be added to a group.
+ * @returns A function spec. Call {@link Builder.middleware | .middleware()} to
+ *   attach middleware before adding the spec to a group.
  *
  * @throws If the name is invalid or reserved.
  */
@@ -684,7 +687,8 @@ export const publicQuery = make(RuntimeAndFunctionType.ConvexQuery, "public");
  *   result.
  * @param options.error - An optional lazy codec for typed handler failures.
  *
- * @returns A new function builder that can be added to a group.
+ * @returns A function spec. Call {@link Builder.middleware | .middleware()} to
+ *   attach middleware before adding the spec to a group.
  *
  * @throws If the name is invalid or reserved.
  */
@@ -710,8 +714,9 @@ export const internalQuery = make(
  * @param options.item - A lazy codec for one item in the returned page.
  * @param options.error - An optional lazy codec for typed handler failures.
  *
- * @returns A query builder whose handler returns a page with cursors and
- *   completion status.
+ * @returns A query spec whose handler returns a page with cursors and
+ *   completion status. Call {@link Builder.middleware | .middleware()} to
+ *   attach middleware before adding the spec to a group.
  *
  * @throws For an invalid or reserved name, or when composing args that
  *   redeclare `paginationOpts`.
@@ -738,8 +743,9 @@ export const publicPaginatedQuery = makePaginated(
  * @param options.item - A lazy codec for one item in the returned page.
  * @param options.error - An optional lazy codec for typed handler failures.
  *
- * @returns A query builder whose handler returns a page with cursors and
- *   completion status.
+ * @returns A query spec whose handler returns a page with cursors and
+ *   completion status. Call {@link Builder.middleware | .middleware()} to
+ *   attach middleware before adding the spec to a group.
  *
  * @throws For an invalid or reserved name, or when composing args that
  *   redeclare `paginationOpts`.
@@ -766,7 +772,8 @@ export const internalPaginatedQuery = makePaginated(
  *   result.
  * @param options.error - An optional lazy codec for typed handler failures.
  *
- * @returns A new function builder that can be added to a group.
+ * @returns A function spec. Call {@link Builder.middleware | .middleware()} to
+ *   attach middleware before adding the spec to a group.
  *
  * @throws If the name is invalid or reserved.
  */
@@ -792,7 +799,8 @@ export const publicMutation = make(
  *   result.
  * @param options.error - An optional lazy codec for typed handler failures.
  *
- * @returns A new function builder that can be added to a group.
+ * @returns A function spec. Call {@link Builder.middleware | .middleware()} to
+ *   attach middleware before adding the spec to a group.
  *
  * @throws If the name is invalid or reserved.
  */
@@ -818,7 +826,8 @@ export const internalMutation = make(
  *   result.
  * @param options.error - An optional lazy codec for typed handler failures.
  *
- * @returns A new function builder that can be added to a group.
+ * @returns A function spec. Call {@link Builder.middleware | .middleware()} to
+ *   attach middleware before adding the spec to a group.
  *
  * @throws If the name is invalid or reserved.
  */
@@ -841,7 +850,8 @@ export const publicAction = make(RuntimeAndFunctionType.ConvexAction, "public");
  *   result.
  * @param options.error - An optional lazy codec for typed handler failures.
  *
- * @returns A new function builder that can be added to a group.
+ * @returns A function spec. Call {@link Builder.middleware | .middleware()} to
+ *   attach middleware before adding the spec to a group.
  *
  * @throws If the name is invalid or reserved.
  */
@@ -868,7 +878,8 @@ export const internalAction = make(
  *   result.
  * @param options.error - An optional lazy codec for typed handler failures.
  *
- * @returns A new function builder that can be added to a group.
+ * @returns A function spec. Call {@link Builder.middleware | .middleware()} to
+ *   attach middleware before adding the spec to a group.
  *
  * @throws If the name is invalid or reserved.
  */
@@ -894,7 +905,8 @@ export const publicNodeAction = make(
  *   result.
  * @param options.error - An optional lazy codec for typed handler failures.
  *
- * @returns A new function builder that can be added to a group.
+ * @returns A function spec. Call {@link Builder.middleware | .middleware()} to
+ *   attach middleware before adding the spec to a group.
  *
  * @throws If the name is invalid or reserved.
  */
