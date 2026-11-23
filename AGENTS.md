@@ -43,14 +43,7 @@ Confect is a library that integrates Effect with the Convex backend platform. It
 
 ## Public API documentation
 
-Use [Effect's pinned JSDoc conventions](https://github.com/Effect-TS/effect/tree/9a91b1926a5fbfaffd302a7a41a94d4d53a1154e/.agents/skills/jsdocs) for public declarations and the helpers emitted by codegen:
-
-- Lead with one practical summary paragraph. Say what a function or method does in the present tense (“Returns…”, “Attaches…”); describe a value by its role (“Layer that…”, “Schema for…”).
-- Add **When to use**, **Details**, then **Gotchas** only where useful. Verify behavior against the implementation and tests. Distinguish typed failures from defects and state which function contexts supply a service.
-- Before the tags, introduce each example with `**Example** (Use-case title)`, a blank line, and one plain `ts` fence. Use public imports and enough setup for the snippet to compile. Do not use an `@example` tag.
-- Link symbols with `{@link Symbol}`, external pages with Markdown, and close public alternatives with `@see`. Retain useful parameter, return and failure contracts. For shared metadata, use the upstream order: deprecation, default, related APIs, stability, category, then since, subject to Oxfmt's tag ordering.
-- Group exports by purpose rather than declaration kind. Distinguish service contracts, service tags and layers; use guards for type narrowing and predicates for boolean tests. Keep categories on public members used by the reference navigation and document generated default exports. Use the repository formatter's casing.
-- Keep `@internal` and experimental boundaries intact. Add `@since` only for a verified Confect release and stability metadata only for an established Confect guarantee. Do not infer either from an upstream dependency.
+Follow the [local JSDoc skill](.agents/skills/jsdocs/SKILL.md) for public API documentation. It adapts [Effect’s JSDoc skill at `9a91b192`](https://github.com/Effect-TS/effect/tree/9a91b1926a5fbfaffd302a7a41a94d4d53a1154e/.agents/skills/jsdocs) under its [MIT license](.agents/skills/jsdocs/LICENSE).
 
 ## Tools
 
