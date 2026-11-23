@@ -25,7 +25,7 @@ algorithm.
 
 ## Compatibility patch
 
-`patches/@ark__attest@0.58.0.patch` changes attest's stale
+`patches/@ark__attest@0.58.1.patch` changes attest's stale
 `tsrs/unstable/{ast,sync,fs}` imports to `tsrs/{ast,sync,fs}`, the exports provided
 by the pinned tsrs release. The patch is registered in `pnpm-workspace.yaml` and
 applied on install. Remove it when an attest release supports these exports,

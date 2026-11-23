@@ -69,9 +69,8 @@ type FilteredFunctions<
         F extends {
           readonly functionProvenance: { readonly _tag: "Confect" };
         }
-          ?
-              | MiddlewareError
-              | MiddlewareSpec.Error<FunctionSpec.MiddlewareSpecs<F>>
+          ? | MiddlewareError
+            | MiddlewareSpec.Error<FunctionSpec.MiddlewareSpecs<F>>
           : never
       >
     : never;

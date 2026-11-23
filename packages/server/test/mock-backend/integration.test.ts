@@ -1345,14 +1345,13 @@ describe("action storage transaction isolation", () => {
           }),
         );
         const outer = makeTest(store(new Blob(["outer"])));
-        const pending: Promise<Id<"_storage">>[] = [];
+        let action: Promise<Id<"_storage">> | undefined;
         let mutation: Promise<unknown> | undefined;
         yield* Effect.gen(function* () {
           if (state !== "foreign") {
             yield* t.run(
               Effect.gen(function* () {
-                const action = start(t.action(actionRef));
-                pending.push(action);
+                action = start(t.action(actionRef));
                 yield* checkpoint(started.promise, action);
               }),
             );
@@ -1369,9 +1368,8 @@ describe("action storage transaction isolation", () => {
             yield* checkpoint(mutating.promise, mutation);
           }
           if (state === "foreign") {
-            pending.push(start(outer.run(t.action(actionRef), Id("_storage"))));
+            action = start(outer.run(t.action(actionRef), Id("_storage")));
           }
-          const action = pending[0];
           assert(action !== undefined);
           yield* checkpoint(started.promise, action);
           allowStore.resolve();
@@ -1401,7 +1399,7 @@ describe("action storage transaction isolation", () => {
               commit.resolve();
               blob.release.resolve();
               yield* Effect.promise(() =>
-                Promise.allSettled([mutation, ...pending]),
+                Promise.allSettled([mutation, action]),
               );
             }),
           ),
