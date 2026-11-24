@@ -787,7 +787,7 @@ export const make = <Query extends Ref.AnyConfectPublicPaginatedQuery>(
           Schema.TaggedStruct("FunctionError", {
             error:
               functionErrorSchemas.length === 1
-                ? functionErrorSchemas[0]!
+                ? functionErrorSchemas[0]
                 : Schema.Union(functionErrorSchemas),
           }),
         ]),
@@ -1218,8 +1218,6 @@ const settleSuccess = <Item_, UserArgs_, Error_>(
   const shouldSplit =
     typeof splitCursor === "string" &&
     (splitSignaled || result.page.length > 2 * state.options.initialNumItems);
-  const shouldRetreat =
-    result.page.length === 0 && result.isDone && state.prevStack.length > 0;
 
   return Match.value(shouldSplit).pipe(
     Match.withReturnType<Active<Item_, UserArgs_, Error_>>(),
@@ -1243,25 +1241,28 @@ const settleSuccess = <Item_, UserArgs_, Error_>(
         phase: pendingPhase(previous, "Split"),
       };
     }),
-    Match.when(false, () =>
-      Match.value(shouldRetreat).pipe(
-        Match.withReturnType<Active<Item_, UserArgs_, Error_>>(),
-        Match.when(true, () => ({
+    Match.when(false, () => {
+      const previousDescriptor = state.prevStack.at(-1);
+      if (
+        result.page.length === 0 &&
+        result.isDone &&
+        previousDescriptor !== undefined
+      ) {
+        return {
           ...state,
           requestId: state.requestId + 1,
-          current: state.prevStack[state.prevStack.length - 1],
+          current: previousDescriptor,
           prevStack: state.prevStack.slice(0, -1),
           phase: pendingPhase(phaseData(state.phase), "Previous"),
-        })),
-        Match.when(false, () => ({
-          ...state,
-          phase: Phase.Success<Item_, Error_>({
-            data: pageFromResult(state, result),
-          }),
-        })),
-        Match.exhaustive,
-      ),
-    ),
+        };
+      }
+      return {
+        ...state,
+        phase: Phase.Success<Item_, Error_>({
+          data: pageFromResult(state, result),
+        }),
+      };
+    }),
     Match.exhaustive,
   );
 };
@@ -1690,19 +1691,24 @@ export const match: {
       readonly onStale: (stale: Stale<Item_, Error_>) => E;
       readonly onSuccess: (success: Success<Item_>) => F;
     },
-  ): A | B | C | D | E | F =>
-    Match.value(state).pipe(
-      Match.tag("Idle", handlers.onIdle),
-      Match.tag("Active", ({ phase }) =>
-        Match.value(phase).pipe(
-          Match.tag("Loading", handlers.onLoading),
-          Match.tag("Refreshing", handlers.onRefreshing),
-          Match.tag("Failure", handlers.onFailure),
-          Match.tag("Stale", handlers.onStale),
-          Match.tag("Success", handlers.onSuccess),
-          Match.exhaustive,
-        ),
-      ),
-      Match.exhaustive,
-    ) as A | B | C | D | E | F,
+  ): A | B | C | D | E | F => {
+    if (state._tag === "Idle") {
+      return handlers.onIdle(state);
+    }
+    const { phase } = state;
+    switch (phase._tag) {
+      case "Loading":
+        return handlers.onLoading(phase);
+      case "Refreshing":
+        return handlers.onRefreshing(phase);
+      case "Failure":
+        return handlers.onFailure(phase);
+      case "Stale":
+        return handlers.onStale(phase);
+      case "Success":
+        return handlers.onSuccess(phase);
+      default:
+        return Function.absurd(phase);
+    }
+  },
 );

@@ -29,13 +29,14 @@ import * as Array from "effect/Array";
 import * as Option from "effect/Option";
 import { pipe } from "effect/Function";
 import * as Record from "effect/Record";
+import type { Mutable } from "effect/Types";
 
 /**
  * The `paginationOpts` one subscribed page queries with.
  *
  * @internal
  */
-export interface PageRequest {
+export type PageRequest = {
   readonly numItems: number;
   readonly cursor: string | null;
   /**
@@ -48,7 +49,7 @@ export interface PageRequest {
    */
   readonly maximumRowsRead?: number;
   readonly maximumBytesRead?: number;
-}
+};
 
 /**
  * The per-page read budgets every growing page is requested with.
@@ -67,16 +68,16 @@ const growingRequest = (
   numItems: number,
   cursor: string | null,
   budget: ReadBudget,
-): PageRequest => ({
-  numItems,
-  cursor,
-  ...(budget.maximumRowsRead === undefined
-    ? {}
-    : { maximumRowsRead: budget.maximumRowsRead }),
-  ...(budget.maximumBytesRead === undefined
-    ? {}
-    : { maximumBytesRead: budget.maximumBytesRead }),
-});
+): PageRequest => {
+  const request: Mutable<PageRequest> = { numItems, cursor };
+  if (budget.maximumRowsRead !== undefined) {
+    request.maximumRowsRead = budget.maximumRowsRead;
+  }
+  if (budget.maximumBytesRead !== undefined) {
+    request.maximumBytesRead = budget.maximumBytesRead;
+  }
+  return request;
+};
 
 /**
  * @internal

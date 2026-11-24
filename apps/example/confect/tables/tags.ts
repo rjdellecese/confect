@@ -7,7 +7,7 @@ import * as Schema from "effect/Schema";
 // default export"; type-only aliases used internally do not violate it.
 export type Tags = {
   readonly name: string;
-  readonly tags: readonly Tags[];
+  readonly tags: ReadonlyArray<Tags>;
 };
 
 const TagSchema = Schema.Struct({

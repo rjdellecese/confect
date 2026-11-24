@@ -9,10 +9,12 @@ import {
   useMutation as useConvexMutation,
   useQueries as useConvexQueries,
   useQuery as useConvexQuery,
-  type ReactMutation as ConvexReactMutation,
 } from "convex/react";
-import { getFunctionName, type FunctionReference } from "convex/server";
-import { ConvexError, convexToJson, type Value } from "convex/values";
+import type { ReactMutation as ConvexReactMutation } from "convex/react";
+import { getFunctionName } from "convex/server";
+import type { FunctionReference } from "convex/server";
+import { ConvexError, convexToJson } from "convex/values";
+import type { Value } from "convex/values";
 import * as Cause from "effect/Cause";
 import * as Array from "effect/Array";
 import * as String from "effect/String";
@@ -183,34 +185,25 @@ export const useQuery = <Query extends Ref.AnyPublicQuery>(
   // hand consumers a fresh object each time, breaking effects and memoization
   // that depend on the result's identity.
   const encodedReturnsOrError: Result.Result<unknown, unknown> = Result.try(
-    () => useConvexQuery(functionReference, encodedArgs),
+    (): unknown => useConvexQuery(functionReference, encodedArgs),
   );
+  const failed = Result.isFailure(encodedReturnsOrError);
+  const value = Result.merge(encodedReturnsOrError);
 
-  return useMemo(
-    () =>
-      Result.match(encodedReturnsOrError, {
-        onSuccess: (encodedReturnsOrUndefined) =>
-          encodedReturnsOrUndefined === undefined
-            ? QueryResult.load(skipped)
-            : QueryResult.succeed(
-                Ref.decodeReturnsSync(ref, encodedReturnsOrUndefined),
-              ),
-        onFailure: (error) => {
-          if (Ref.isConvexError(error)) {
-            const decoded = Ref.decodeErrorOption(ref, error.data);
-            if (Option.isSome(decoded)) {
-              return QueryResult.fail(decoded.value);
-            }
-          }
-          throw error;
-        },
-      }),
-    // `Result.try` allocates a fresh wrapper each render, so we key the memo on
-    // the stable value it carries (the Convex result or thrown error) rather
-    // than the wrapper itself; the decoded result is a function of that value,
-    // `ref`, and `skipped`.
-    [ref, skipped, Result.merge(encodedReturnsOrError)],
-  );
+  return useMemo(() => {
+    if (!failed) {
+      return value === undefined
+        ? QueryResult.load(skipped)
+        : QueryResult.succeed(Ref.decodeReturnsSync(ref, value));
+    }
+    if (Ref.isConvexError(value)) {
+      const decoded = Ref.decodeErrorOption(ref, value.data);
+      if (Option.isSome(decoded)) {
+        return QueryResult.fail(decoded.value);
+      }
+    }
+    throw value;
+  }, [ref, skipped, failed, value]);
 };
 
 /**
@@ -263,11 +256,16 @@ type UseConvexPaginatedQueryInternal = (
 // errors as values: the public positional `usePaginatedQuery` hard-codes
 // throwOnError and throws mid-hook-sequence, which cannot be caught without
 // breaking React's hook-order invariant.
-const useConvexPaginatedQueryInternal = (
-  ConvexReact as unknown as Record<string, unknown>
-).usePaginatedQueryInternal as UseConvexPaginatedQueryInternal | undefined;
+const useConvexPaginatedQueryInternal =
+  "usePaginatedQueryInternal" in ConvexReact
+    ? (ConvexReact.usePaginatedQueryInternal as
+        | UseConvexPaginatedQueryInternal
+        | undefined)
+    : undefined;
 
-const MINIMUM_CONVEX_VERSION = "1.36.0";
+const minimumMajor = 1;
+const minimumMinor = 36;
+const MINIMUM_CONVEX_VERSION = `${minimumMajor}.${minimumMinor}.0`;
 
 /**
  * The non-throwing mode of `usePaginatedQueryInternal`—its fourth,
@@ -294,11 +292,6 @@ const supportsErrorsAsValues = ((): boolean => {
   ) {
     return false;
   }
-  const [minimumMajor, minimumMinor] = pipe(
-    MINIMUM_CONVEX_VERSION,
-    String.split("."),
-    Array.map(Number),
-  ) as [number, number];
   return (
     major > minimumMajor || (major === minimumMajor && minor >= minimumMinor)
   );
@@ -450,16 +443,21 @@ export const usePaginatedQuery = <Query extends Ref.AnyPublicPaginatedQuery>(
  * query (a data-dependent query changed underneath us), calling for a full
  * pagination reset rather than a failure.
  */
-const isInvalidCursorError = (error: Error): boolean =>
-  pipe(error.message, String.includes("InvalidCursor")) ||
-  (error instanceof ConvexError &&
-    typeof error.data === "object" &&
-    error.data !== null &&
+const isInvalidCursorError = (error: Error): boolean => {
+  if (pipe(error.message, String.includes("InvalidCursor"))) {
+    return true;
+  }
+  const data: unknown = error instanceof ConvexError ? error.data : undefined;
+  return (
+    typeof data === "object" &&
+    data !== null &&
     // Both Convex's built-in pagination (which also sets
     // `isConvexSystemError`) and `QueryStream.paginate` signal an invalid
     // cursor with this data shape—the same check `convex/react` performs.
-    (error.data as { paginationError?: unknown }).paginationError ===
-      "InvalidCursor");
+    "paginationError" in data &&
+    data.paginationError === "InvalidCursor"
+  );
+};
 
 const NO_ITEMS: ReadonlyArray<unknown> = [];
 
@@ -551,7 +549,7 @@ export const useStreamPaginatedQuery = <
   const functionReference = useMemo(() => Ref.getFunctionReference(ref), [ref]);
   const skipped = args === "skip";
 
-  const rawEncodedArgs =
+  const encodedArgs =
     args === "skip"
       ? undefined
       : (Ref.encodePaginatedQueryArgsSync(
@@ -559,14 +557,9 @@ export const useStreamPaginatedQuery = <
           args as unknown as Omit<Ref.Args<Query>, "paginationOpts">,
         ) as Record<string, Value>);
   const encodedArgsKey =
-    rawEncodedArgs === undefined
+    encodedArgs === undefined
       ? "skip"
-      : encodeJson(convexToJson(rawEncodedArgs)).pipe(Result.getOrThrow);
-  const encodedArgs = useMemo(
-    () => rawEncodedArgs,
-    // The serialized form stands in for the freshly allocated object.
-    [ref, encodedArgsKey],
-  );
+      : encodeJson(convexToJson(encodedArgs)).pipe(Result.getOrThrow);
 
   // A change of query, args, skippedness, or page size restarts pagination
   // from scratch.
@@ -594,6 +587,7 @@ export const useStreamPaginatedQuery = <
       : StreamPagination.initial(options.initialNumItems, options);
 
   const [tracked, setTracked] = useState(() => ({
+    encodedArgs,
     resetKey,
     state: freshState(),
   }));
@@ -601,7 +595,7 @@ export const useStreamPaginatedQuery = <
   // pattern, also how `convex/react`'s own paginated hook resets.
   let current = tracked;
   if (current.resetKey !== resetKey) {
-    current = { resetKey, state: freshState() };
+    current = { encodedArgs, resetKey, state: freshState() };
     setTracked(current);
   }
 
@@ -612,7 +606,7 @@ export const useStreamPaginatedQuery = <
       >,
     ) =>
       setTracked((previous) => ({
-        resetKey: previous.resetKey,
+        ...previous,
         state: Array.reduce(transitions, previous.state, (state, transition) =>
           transition(state),
         ),
@@ -624,14 +618,12 @@ export const useStreamPaginatedQuery = <
     () =>
       StreamPagination.pageRequests(current.state, (page) => ({
         query: functionReference,
-        args: { ...encodedArgs, paginationOpts: page },
+        args: { ...current.encodedArgs, paginationOpts: page },
       })),
-    [current.state, functionReference, encodedArgs],
+    [current.state, functionReference, current.encodedArgs],
   );
 
-  const resultsObject = useConvexQueries(
-    queries as unknown as Parameters<typeof useConvexQueries>[0],
-  );
+  const resultsObject = useConvexQueries(queries);
 
   const interpretation = useMemo(
     () =>
@@ -648,7 +640,7 @@ export const useStreamPaginatedQuery = <
   // the updated state no longer produces the same discovery.
   if (interpretation._tag === "ResetRequired") {
     setTracked((previous) => ({
-      resetKey: previous.resetKey,
+      ...previous,
       state: freshState(),
     }));
   } else if (
@@ -664,29 +656,27 @@ export const useStreamPaginatedQuery = <
   // actually updated is a fresh object), so caching decodes per encoded
   // item makes a single-page update decode only that page's items rather
   // than every loaded page's.
-  const decodeCache = useMemo(
-    () => new WeakMap<object, PaginatedQueryItem<Query>>(),
-    [ref],
-  );
+  const decodeItem = useMemo(() => {
+    const decodeCache = new WeakMap<object, PaginatedQueryItem<Query>>();
+    return (item: unknown): PaginatedQueryItem<Query> => {
+      if (typeof item !== "object" || item === null) {
+        return Ref.decodePaginationPageSync(ref, [item])[0];
+      }
+      const cached = decodeCache.get(item);
+      if (cached !== undefined) {
+        return cached;
+      }
+      const decoded: PaginatedQueryItem<Query> = Ref.decodePaginationPageSync(
+        ref,
+        [item],
+      )[0];
+      decodeCache.set(item, decoded);
+      return decoded;
+    };
+  }, [ref]);
   const decodedResults = useMemo(
-    () =>
-      Array.map(encodedItems, (item): PaginatedQueryItem<Query> => {
-        if (typeof item !== "object" || item === null) {
-          return Ref.decodePaginationPageSync(ref, [
-            item,
-          ])[0] as PaginatedQueryItem<Query>;
-        }
-        const cached = decodeCache.get(item);
-        if (cached !== undefined) {
-          return cached;
-        }
-        const decoded = Ref.decodePaginationPageSync(ref, [
-          item,
-        ])[0] as PaginatedQueryItem<Query>;
-        decodeCache.set(item, decoded);
-        return decoded;
-      }),
-    [ref, encodedItems, decodeCache],
+    () => Array.map(encodedItems, decodeItem),
+    [encodedItems, decodeItem],
   );
 
   return useMemo((): PaginatedQueryResult.Variants<
@@ -735,7 +725,10 @@ export const useStreamPaginatedQuery = <
         if (!alreadyLoadingMore) {
           alreadyLoadingMore = true;
           applyTransitions([
-            StreamPagination.loadMore(continueCursor, numItems, options),
+            StreamPagination.loadMore(continueCursor, numItems, {
+              maximumRowsRead: options.maximumRowsRead,
+              maximumBytesRead: options.maximumBytesRead,
+            }),
           ]);
         }
       },
@@ -747,6 +740,8 @@ export const useStreamPaginatedQuery = <
     skipped,
     ref,
     applyTransitions,
+    options.maximumRowsRead,
+    options.maximumBytesRead,
   ]) as PaginatedQueryResult.PaginatedQueryResult<
     PaginatedQueryItem<Query>,
     Ref.Error<Query>
@@ -813,7 +808,7 @@ export interface ReactMutation<Mutation extends Ref.AnyPublicMutation> {
     optimisticUpdate: T &
       (ReturnType<T> extends Promise<unknown>
         ? TypeError<"Optimistic update handlers must be synchronous">
-        : {}),
+        : unknown),
   ): ReactMutation<Mutation>;
 }
 
@@ -933,24 +928,21 @@ export const useAction = <Action extends Ref.AnyPublicAction>(
   const actualAction = useConvexAction(functionReference);
 
   return useCallback(
-    ((...args: Ref.OptionalArgs<Action>) =>
+    (...args: Ref.OptionalArgs<Action>) =>
       invokeAsResult(
         ref,
         (_, encodedArgs) => actualAction(encodedArgs),
         args,
       ).then((result) =>
         Ref.hasErrorSchema(ref) ? result : Result.getOrThrow(result),
-      )) as (...args: Ref.OptionalArgs<Action>) => InvokeReturn<Action>,
+      ) as InvokeReturn<Action>,
     [ref, actualAction],
   );
 };
 
 const invokeAsResult = <Ref_ extends Ref.Any>(
   ref: Ref_,
-  invoke: (
-    fnRef: Ref.FunctionReference<Ref_>,
-    encodedArgs: unknown,
-  ) => PromiseLike<unknown>,
+  invoke: Parameters<typeof Ref.runWithCodec<Ref_>>[2],
   args: Ref.OptionalArgs<Ref_>,
 ): Promise<Result.Result<Ref.Returns<Ref_>, Ref.Error<Ref_>>> => {
   const exitPromise = Effect.runPromiseExit(
@@ -960,7 +952,9 @@ const invokeAsResult = <Ref_ extends Ref.Any>(
     ),
   );
   return exitPromise.then((exit) => {
-    if (Exit.isSuccess(exit)) return exit.value;
+    if (Exit.isSuccess(exit)) {
+      return exit.value;
+    }
     throw Cause.squash(exit.cause);
   });
 };

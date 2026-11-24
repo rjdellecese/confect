@@ -1,11 +1,8 @@
-import {
-  type WorkId,
-  Workpool,
-  vOnCompleteArgs,
-  vWorkId,
-} from "@convex-dev/workpool";
+import { Workpool, vOnCompleteArgs, vWorkId } from "@convex-dev/workpool";
+import type { WorkId } from "@convex-dev/workpool";
 import { v } from "convex/values";
 import * as Duration from "effect/Duration";
+import * as Console from "effect/Console";
 import * as Effect from "effect/Effect";
 import * as Random from "effect/Random";
 import { internal } from "../convex/_generated/api";
@@ -26,7 +23,7 @@ export const backgroundWork = internalAction({
   returns: v.null(),
   handler: (): Promise<null> =>
     Effect.gen(function* () {
-      const delay = yield* Random.nextBetween(2_000, 5_000);
+      const delay = yield* Random.nextBetween(2000, 5000);
       yield* Effect.sleep(Duration.millis(delay));
       return null;
     }).pipe(Effect.runPromise),
@@ -37,11 +34,9 @@ export const onComplete = internalMutation({
   returns: v.null(),
   handler: (_ctx, { result }): null => {
     if (result.kind === "success") {
-      // oxlint-disable-next-line effecttsgo/global-console -- This is a raw Convex handler, so console output is captured by Convex's function logs.
-      console.log("Background work completed successfully");
+      Effect.runSync(Console.log("Background work completed successfully"));
     } else if (result.kind === "failed") {
-      // oxlint-disable-next-line effecttsgo/global-console -- This is a raw Convex handler, so console output is captured by Convex's function logs.
-      console.error("Background work failed:", result.error);
+      Effect.runSync(Console.error("Background work failed:", result.error));
     }
     return null;
   },

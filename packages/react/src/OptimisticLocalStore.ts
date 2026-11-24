@@ -8,7 +8,8 @@
  */
 import { Ref } from "@confect/core";
 import type { OptimisticLocalStore as ConvexOptimisticLocalStore } from "convex/browser";
-import { compareValues, convexToJson, type Value } from "convex/values";
+import { compareValues, convexToJson } from "convex/values";
+import type { Value } from "convex/values";
 import * as Option from "effect/Option";
 import * as Array from "effect/Array";
 import * as Schema from "effect/Schema";
@@ -111,7 +112,10 @@ export const make = (
     const functionReference = Ref.getFunctionReference(queryRef);
     const args = (rest[0] ?? {}) as Ref.Args<typeof queryRef>;
     const encodedArgs = Ref.encodeArgsSync(queryRef, args);
-    const encoded = convexLocalStore.getQuery(functionReference, encodedArgs);
+    const encoded: unknown = convexLocalStore.getQuery(
+      functionReference,
+      encodedArgs,
+    );
     return encoded === undefined
       ? Option.none()
       : Option.some(Ref.decodeReturnsSync(queryRef, encoded));
@@ -548,7 +552,7 @@ export const insertAtPosition = <Query extends Ref.AnyPublicPaginatedQuery>({
    *
    * @category Configuration
    */
-  sortKeyFromItem: (item: PaginatedQueryItem<Query>) => Value | Value[];
+  sortKeyFromItem: (item: PaginatedQueryItem<Query>) => Value | Array<Value>;
 }): void =>
   writePages(
     localQueryStore,

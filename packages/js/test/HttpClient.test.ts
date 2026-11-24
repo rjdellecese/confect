@@ -96,68 +96,67 @@ const actionWithError = Ref.make(
   }),
 );
 
+const checkFunctionCalls = (client: HttpClient.HttpClient) => {
+  expectTypeOf(client.query<typeof noArgsQueryRef>).parameters.toEqualTypeOf<
+    [ref: typeof noArgsQueryRef, args?: Ref.Args<typeof noArgsQueryRef>]
+  >();
+  expectTypeOf(client.query<typeof argsQueryRef>).parameters.toEqualTypeOf<
+    [ref: typeof argsQueryRef, args: { readonly id: string }]
+  >();
+  expectTypeOf(
+    client.mutation<typeof noArgsMutationRef>,
+  ).parameters.toEqualTypeOf<
+    [
+      ref: typeof noArgsMutationRef,
+      args?: Ref.Args<typeof noArgsMutationRef>,
+      options?: { skipQueue: boolean },
+    ]
+  >();
+  expectTypeOf(
+    client.mutation<typeof argsMutationRef>,
+  ).parameters.toEqualTypeOf<
+    [
+      ref: typeof argsMutationRef,
+      args: { readonly text: string },
+      options?: { skipQueue: boolean },
+    ]
+  >();
+  expectTypeOf(client.action<typeof argsActionRef>).parameters.toEqualTypeOf<
+    [ref: typeof argsActionRef, args: { readonly to: string }]
+  >();
+  expectTypeOf(client.action<typeof noArgsActionRef>).parameters.toEqualTypeOf<
+    [ref: typeof noArgsActionRef, args?: Ref.Args<typeof noArgsActionRef>]
+  >();
+  expectTypeOf(client.query(queryWithError, { id: "abc" })).toEqualTypeOf<
+    Effect.Effect<
+      { readonly text: string },
+      NotFound | HttpClient.HttpClientError | Schema.SchemaError
+    >
+  >();
+  expectTypeOf(client.mutation(mutationWithError, { id: "abc" })).toEqualTypeOf<
+    Effect.Effect<
+      null,
+      NotFound | HttpClient.HttpClientError | Schema.SchemaError
+    >
+  >();
+  expectTypeOf(
+    client.mutation(mutationWithError, { id: "abc" }, { skipQueue: true }),
+  ).toEqualTypeOf<
+    Effect.Effect<
+      null,
+      NotFound | HttpClient.HttpClientError | Schema.SchemaError
+    >
+  >();
+  expectTypeOf(client.action(actionWithError, { id: "abc" })).toEqualTypeOf<
+    Effect.Effect<
+      null,
+      NotFound | HttpClient.HttpClientError | Schema.SchemaError
+    >
+  >();
+};
+
 it("preserves generic arguments, results, and error channels", () => {
-  const check = (client: HttpClient.HttpClient) => {
-    expectTypeOf(client.query<typeof noArgsQueryRef>).parameters.toEqualTypeOf<
-      [ref: typeof noArgsQueryRef, args?: {}]
-    >();
-    expectTypeOf(client.query<typeof argsQueryRef>).parameters.toEqualTypeOf<
-      [ref: typeof argsQueryRef, args: { readonly id: string }]
-    >();
-    expectTypeOf(
-      client.mutation<typeof noArgsMutationRef>,
-    ).parameters.toEqualTypeOf<
-      [
-        ref: typeof noArgsMutationRef,
-        args?: {},
-        options?: { skipQueue: boolean },
-      ]
-    >();
-    expectTypeOf(
-      client.mutation<typeof argsMutationRef>,
-    ).parameters.toEqualTypeOf<
-      [
-        ref: typeof argsMutationRef,
-        args: { readonly text: string },
-        options?: { skipQueue: boolean },
-      ]
-    >();
-    expectTypeOf(client.action<typeof argsActionRef>).parameters.toEqualTypeOf<
-      [ref: typeof argsActionRef, args: { readonly to: string }]
-    >();
-    expectTypeOf(
-      client.action<typeof noArgsActionRef>,
-    ).parameters.toEqualTypeOf<[ref: typeof noArgsActionRef, args?: {}]>();
-    expectTypeOf(client.query(queryWithError, { id: "abc" })).toEqualTypeOf<
-      Effect.Effect<
-        { readonly text: string },
-        NotFound | HttpClient.HttpClientError | Schema.SchemaError
-      >
-    >();
-    expectTypeOf(
-      client.mutation(mutationWithError, { id: "abc" }),
-    ).toEqualTypeOf<
-      Effect.Effect<
-        null,
-        NotFound | HttpClient.HttpClientError | Schema.SchemaError
-      >
-    >();
-    expectTypeOf(
-      client.mutation(mutationWithError, { id: "abc" }, { skipQueue: true }),
-    ).toEqualTypeOf<
-      Effect.Effect<
-        null,
-        NotFound | HttpClient.HttpClientError | Schema.SchemaError
-      >
-    >();
-    expectTypeOf(client.action(actionWithError, { id: "abc" })).toEqualTypeOf<
-      Effect.Effect<
-        null,
-        NotFound | HttpClient.HttpClientError | Schema.SchemaError
-      >
-    >();
-  };
-  expectTypeOf(check).toBeFunction();
+  expectTypeOf(checkFunctionCalls).toBeFunction();
 });
 
 it.effect(

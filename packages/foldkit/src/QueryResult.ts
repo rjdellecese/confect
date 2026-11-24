@@ -100,17 +100,14 @@ export const isQueryResult = (
 
 const Proto = {
   [TypeId]: TypeId,
-  pipe(this: QueryResult<unknown, unknown>, ...args: ReadonlyArray<unknown>) {
-    return Pipeable.pipeArguments(
-      this,
-      args as unknown as Parameters<typeof Pipeable.pipeArguments>[1],
-    );
-  },
+  ...Pipeable.Prototype,
   [Equal.symbol](
     this: QueryResult<unknown, unknown>,
     that: Equal.Equal,
   ): boolean {
-    if (!isQueryResult(that)) return false;
+    if (!isQueryResult(that)) {
+      return false;
+    }
     return Match.value(this).pipe(
       Match.tag("Loading", () => isLoading(that)),
       Match.tag(
@@ -346,11 +343,16 @@ export const match: {
       readonly onSuccess: (value: A) => Y;
       readonly onFailure: (error: E) => Z;
     },
-  ): X | Y | Z =>
-    Match.value(self).pipe(
-      Match.tag("Loading", () => handlers.onLoading()),
-      Match.tag("Success", ({ value }) => handlers.onSuccess(value)),
-      Match.tag("Failure", ({ error }) => handlers.onFailure(error)),
-      Match.exhaustive,
-    ) as X | Y | Z,
+  ): X | Y | Z => {
+    switch (self._tag) {
+      case "Loading":
+        return handlers.onLoading();
+      case "Success":
+        return handlers.onSuccess(self.value);
+      case "Failure":
+        return handlers.onFailure(self.error);
+      default:
+        return Function.absurd(self);
+    }
+  },
 );

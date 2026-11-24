@@ -59,27 +59,18 @@ const clientLayer = Layer.unwrap(
 const operations = [
   {
     name: "query",
-    run: (client: HttpClient.HttpClient, failure?: "typed" | "unknown") =>
-      client.query(query, {
-        value: 42,
-        ...(failure !== undefined ? { failure } : {}),
-      }),
+    run: (client: HttpClient.HttpClient, args: Ref.Args<typeof query>) =>
+      client.query(query, args),
   },
   {
     name: "mutation",
-    run: (client: HttpClient.HttpClient, failure?: "typed" | "unknown") =>
-      client.mutation(mutation, {
-        value: 42,
-        ...(failure !== undefined ? { failure } : {}),
-      }),
+    run: (client: HttpClient.HttpClient, args: Ref.Args<typeof mutation>) =>
+      client.mutation(mutation, args),
   },
   {
     name: "action",
-    run: (client: HttpClient.HttpClient, failure?: "typed" | "unknown") =>
-      client.action(action, {
-        value: 42,
-        ...(failure !== undefined ? { failure } : {}),
-      }),
+    run: (client: HttpClient.HttpClient, args: Ref.Args<typeof action>) =>
+      client.action(action, args),
   },
 ];
 
@@ -93,8 +84,8 @@ layer(LocalBackend.layer, { timeout: "120 seconds" })(
           Effect.gen(function* () {
             const client = yield* HttpClient.HttpClient;
             const tracer = yield* Tracer.Tracer;
-            const span = vi.fn(tracer.span.bind(tracer));
-            const request = operation.run(client);
+            const span = vi.fn<Tracer.Tracer["span"]>(tracer.span.bind(tracer));
+            const request = operation.run(client, { value: 42 });
             expect(span).not.toHaveBeenCalled();
             const observed1 = yield* Effect.all([request, request], {
               concurrency: 1,
@@ -112,7 +103,10 @@ layer(LocalBackend.layer, { timeout: "120 seconds" })(
             ]);
             const [parent, ...children] = Array.map(
               span.mock.results,
-              (result) => result.value,
+              (result) => {
+                assert(result.type === "return");
+                return result.value;
+              },
             );
             for (const child of children) {
               expect(Option.getOrThrow(child.parent)).toBe(parent);
@@ -129,15 +123,16 @@ layer(LocalBackend.layer, { timeout: "120 seconds" })(
           Effect.gen(function* () {
             const client = yield* HttpClient.HttpClient;
             const tracer = yield* Tracer.Tracer;
-            const span = vi.fn(tracer.span.bind(tracer));
+            const span = vi.fn<Tracer.Tracer["span"]>(tracer.span.bind(tracer));
             const typed = yield* operation
-              .run(client, "typed")
+              .run(client, { value: 42, failure: "typed" })
               .pipe(Effect.result, Effect.withTracer(Tracer.make({ span })));
             expect(
               Array.map(span.mock.calls, ([options]) => options.name),
             ).toEqual([`HttpClient.${operation.name}`]);
-            const child = span.mock.results[0]?.value;
-            assert(child !== undefined);
+            const recorded = span.mock.results[0];
+            assert(recorded?.type === "return");
+            const child = recorded.value;
             assert(child.status._tag === "Ended");
             expect(Exit.isFailure(child.status.exit)).toBe(true);
             const typedIsFailure = Result.isFailure(typed);
@@ -146,7 +141,7 @@ layer(LocalBackend.layer, { timeout: "120 seconds" })(
               MissingValue.make({ caseId: "echo" }),
             );
             const unknown = yield* Effect.result(
-              operation.run(client, "unknown"),
+              operation.run(client, { value: 42, failure: "unknown" }),
             );
             const unknownIsFailure = Result.isFailure(unknown);
             assert(unknownIsFailure);
@@ -157,7 +152,7 @@ layer(LocalBackend.layer, { timeout: "120 seconds" })(
       it.effect("supports omitted arguments for all request types", () =>
         Effect.gen(function* () {
           const client = yield* HttpClient.HttpClient;
-          const returns = () => Schema.FiniteFromString;
+          const { returns } = echoDefinition;
           const noArgsQueryRef = Ref.make(
             "clients",
             FunctionSpec.publicQuery({ name: "echoQuery", returns }),

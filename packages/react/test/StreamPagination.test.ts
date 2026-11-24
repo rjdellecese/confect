@@ -1,4 +1,4 @@
-import { expect, expectTypeOf, test } from "@effect/vitest";
+import { assert, expect, expectTypeOf, test } from "@effect/vitest";
 import * as StreamPagination from "@confect/react/StreamPagination";
 
 test("initializes page requests with optional read budgets", () => {
@@ -49,9 +49,7 @@ test("maps requests and interprets loaded page results", () => {
   };
   const options = { initialNumItems: 2, isInvalidCursorError: () => false };
   const interpreted = StreamPagination.interpret(state, results, options);
-  expect(interpreted._tag).toBe("Interpreted");
-  if (interpreted._tag === "Interpreted") {
-    expect(interpreted.items).toEqual([1, 2]);
-    expect(interpreted.transitions).toHaveLength(1);
-  }
+  assert(interpreted._tag === "Interpreted");
+  expect(interpreted.items).toEqual([1, 2]);
+  expect(interpreted.transitions).toHaveLength(1);
 });

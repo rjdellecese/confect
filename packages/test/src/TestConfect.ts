@@ -8,6 +8,8 @@ import type {
 } from "convex-test";
 import { convexTest } from "convex-test";
 import type {
+  FunctionReference,
+  FunctionVisibility,
   GenericMutationCtx,
   GenericSchema,
   SchemaDefinition,
@@ -256,7 +258,10 @@ class TestConfectImplWithoutIdentity<
       queryRef,
       (args[0] ?? {}) as Ref.Args<QueryRef>,
       (functionReference, encodedArgs) =>
-        this.testConvex.query(functionReference as any, encodedArgs),
+        this.testConvex.query<FunctionReference<"query", FunctionVisibility>>(
+          functionReference,
+          encodedArgs,
+        ),
     );
 
   readonly mutation = <MutationRef extends Ref.AnyMutation>(
@@ -270,7 +275,9 @@ class TestConfectImplWithoutIdentity<
       mutationRef,
       (args[0] ?? {}) as Ref.Args<MutationRef>,
       (functionReference, encodedArgs) =>
-        this.testConvex.mutation(functionReference as any, encodedArgs),
+        this.testConvex.mutation<
+          FunctionReference<"mutation", FunctionVisibility>
+        >(functionReference, encodedArgs),
     );
 
   readonly action = <ActionRef extends Ref.AnyAction>(
@@ -284,17 +291,25 @@ class TestConfectImplWithoutIdentity<
       actionRef,
       (args[0] ?? {}) as Ref.Args<ActionRef>,
       (functionReference, encodedArgs) =>
-        this.testConvex.action(functionReference as any, encodedArgs),
+        this.testConvex.action<FunctionReference<"action", FunctionVisibility>>(
+          functionReference,
+          encodedArgs,
+        ),
     );
 
-  readonly run: TestConfectWithoutIdentity<DatabaseSchema_>["run"] = (<
-    A,
-    B extends Value,
-    E,
-  >(
+  readonly run = this.runHandler.bind(this);
+
+  private runHandler<E>(
+    handler: Effect.Effect<void, E, Handler.MutationServices<DatabaseSchema_>>,
+  ): Effect.Effect<void>;
+  private runHandler<A, B extends Value, E>(
+    handler: Effect.Effect<A, E, Handler.MutationServices<DatabaseSchema_>>,
+    returns: Schema.Codec<A, B>,
+  ): Effect.Effect<A, Schema.SchemaError>;
+  private runHandler<A, B extends Value, E>(
     handler: Effect.Effect<A, E, Handler.MutationServices<DatabaseSchema_>>,
     returns?: Schema.Codec<A, B>,
-  ): Effect.Effect<void> | Effect.Effect<A, Schema.SchemaError> => {
+  ): Effect.Effect<void> | Effect.Effect<A, Schema.SchemaError> {
     const makeMutationLayer = (
       mutationCtx: GenericMutationCtx<
         DataModel.ToConvexDataModel<
@@ -328,7 +343,7 @@ class TestConfectImplWithoutIdentity<
             ),
           ),
         ).pipe(Effect.andThen(Schema.decodeEffect(returns)));
-  }) as TestConfectWithoutIdentity<DatabaseSchema_>["run"];
+  }
 
   readonly fetch = <PathQueryFragment extends string>(
     pathQueryFragment: PathQueryFragment,
@@ -361,6 +376,7 @@ class TestConfectImpl<
       tableNames,
       testConvex,
     );
+    this.run = this.testConfectImplWithoutIdentity.run;
   }
 
   readonly withIdentity = (userIdentity: Partial<UserIdentity>) =>
@@ -386,14 +402,7 @@ class TestConfectImpl<
     ...args: Ref.OptionalArgs<ActionRef>
   ) => this.testConfectImplWithoutIdentity.action(actionRef, ...args);
 
-  readonly run: TestConfect<DatabaseSchema_>["run"] = ((
-    handler: any,
-    returns?: any,
-  ) =>
-    this.testConfectImplWithoutIdentity.run(
-      handler,
-      returns,
-    )) as TestConfect<DatabaseSchema_>["run"];
+  readonly run: TestConfect<DatabaseSchema_>["run"];
 
   readonly fetch = <PathQueryFragment extends string>(
     pathQueryFragment: PathQueryFragment,
@@ -448,7 +457,7 @@ export const layer = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
     Record<DatabaseSchema.TableNames<DatabaseSchema_>, GenericSchema[string]>,
     true
   >,
-  modules: Record<string, () => Promise<any>>,
+  modules: NonNullable<Parameters<typeof convexTest>[0]["modules"]>,
 ): Layer.Layer<TestConfect<DatabaseSchema_>> =>
   Layer.sync(
     TestConfect<DatabaseSchema_>(),

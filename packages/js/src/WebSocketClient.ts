@@ -24,7 +24,7 @@ import * as Stream from "effect/Stream";
  */
 export class WebSocketClientError extends Schema.TaggedError<
   WebSocketClientError,
-  {}
+  unknown
 >()("WebSocketClientError", {
   /**
    * The original failure, encoded with Effect's defect schema when serialized.
@@ -45,6 +45,9 @@ const runMutation = Effect.fn("WebSocketClient.mutation")(
 const runAction = Effect.fn("WebSocketClient.action")(
   <A, E>(effect: Effect.Effect<A, E>): Effect.Effect<A, E> => effect,
 );
+
+const mapUnknownError = (cause: unknown) =>
+  WebSocketClientError.make({ cause });
 
 const make = (
   address: string,
@@ -81,9 +84,6 @@ const make = (
             : []),
         );
       });
-
-    const mapUnknownError = (cause: unknown) =>
-      WebSocketClientError.make({ cause });
 
     const query = <Query extends Ref.AnyPublicQuery>(
       ref: Query,

@@ -83,34 +83,22 @@ const operations = [
     name: "query",
     run: (
       client: WebSocketClient.WebSocketClient,
-      failure?: "typed" | "unknown",
-    ) =>
-      client.query(query, {
-        value: 42,
-        ...(failure !== undefined ? { failure } : {}),
-      }),
+      args: Ref.Args<typeof query>,
+    ) => client.query(query, args),
   },
   {
     name: "mutation",
     run: (
       client: WebSocketClient.WebSocketClient,
-      failure?: "typed" | "unknown",
-    ) =>
-      client.mutation(mutation, {
-        value: 42,
-        ...(failure !== undefined ? { failure } : {}),
-      }),
+      args: Ref.Args<typeof mutation>,
+    ) => client.mutation(mutation, args),
   },
   {
     name: "action",
     run: (
       client: WebSocketClient.WebSocketClient,
-      failure?: "typed" | "unknown",
-    ) =>
-      client.action(action, {
-        value: 42,
-        ...(failure !== undefined ? { failure } : {}),
-      }),
+      args: Ref.Args<typeof action>,
+    ) => client.action(action, args),
   },
 ];
 
@@ -138,8 +126,8 @@ layer(LocalBackend.layer, { timeout: "120 seconds" })(
           Effect.gen(function* () {
             const client = yield* WebSocketClient.WebSocketClient;
             const tracer = yield* Tracer.Tracer;
-            const span = vi.fn(tracer.span.bind(tracer));
-            const request = operation.run(client);
+            const span = vi.fn<Tracer.Tracer["span"]>(tracer.span.bind(tracer));
+            const request = operation.run(client, { value: 42 });
             expect(span).not.toHaveBeenCalled();
             const observed1 = yield* Effect.all([request, request], {
               concurrency: 1,
@@ -163,14 +151,16 @@ layer(LocalBackend.layer, { timeout: "120 seconds" })(
         (operation) =>
           Effect.gen(function* () {
             const client = yield* WebSocketClient.WebSocketClient;
-            const typed = yield* Effect.result(operation.run(client, "typed"));
+            const typed = yield* Effect.result(
+              operation.run(client, { value: 42, failure: "typed" }),
+            );
             const typedIsFailure = Result.isFailure(typed);
             assert(typedIsFailure);
             expect(typed.failure).toEqual(
               MissingValue.make({ caseId: "echo" }),
             );
             const unknown = yield* Effect.result(
-              operation.run(client, "unknown"),
+              operation.run(client, { value: 42, failure: "unknown" }),
             );
             const unknownIsFailure = Result.isFailure(unknown);
             assert(unknownIsFailure);
@@ -183,7 +173,7 @@ layer(LocalBackend.layer, { timeout: "120 seconds" })(
       it.effect("supports omitted arguments for all request types", () =>
         Effect.gen(function* () {
           const client = yield* WebSocketClient.WebSocketClient;
-          const returns = () => Schema.FiniteFromString;
+          const { returns } = echoDefinition;
           const noArgsQueryRef = Ref.make(
             "clients",
             FunctionSpec.publicQuery({ name: "echoQuery", returns }),

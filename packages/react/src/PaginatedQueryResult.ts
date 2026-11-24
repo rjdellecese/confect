@@ -285,41 +285,42 @@ export const isPaginatedQueryResult = (
   u: unknown,
 ): u is Variants<unknown, unknown> => Predicate.hasProperty(u, TypeId);
 
-const PaginatedQueryResultProto = {
-  [TypeId]: TypeId,
-  pipe(this: Variants<any, any>, ...args: ReadonlyArray<unknown>) {
-    return Pipeable.pipeArguments(
-      this,
-      args as unknown as Parameters<typeof Pipeable.pipeArguments>[1],
-    );
-  },
+class PaginatedQueryResultProto<Item, E>
+  extends Pipeable.Class
+  implements PaginatedQueryResult.Proto<Item, E>
+{
+  declare readonly "~Item": Item;
+  declare readonly "~E": E;
+  get [TypeId](): TypeId {
+    return TypeId;
+  }
   /**
    * `CanLoadMore`'s `loadMore` is excluded from equality and hashing, like
    * function fields generally: two results that render identically are equal
    * even though their callbacks differ by identity.
    */
-  [Equal.symbol](this: Variants<any, any>, that: Variants<any, any>): boolean {
-    if (this._tag !== that._tag) {
-      return false;
+  [Equal.symbol](
+    this: Variants<unknown, unknown>,
+    that: Variants<unknown, unknown>,
+  ): boolean {
+    switch (this._tag) {
+      case "LoadingFirstPage":
+        return (
+          that._tag === "LoadingFirstPage" && this.skipped === that.skipped
+        );
+      case "Failure":
+        return (
+          that._tag === "Failure" &&
+          Equal.equals(this.error, that.error) &&
+          Equal.equals(this.results, that.results)
+        );
+      default:
+        return (
+          this._tag === that._tag && Equal.equals(this.results, that.results)
+        );
     }
-    return Match.value(this).pipe(
-      Match.tag(
-        "LoadingFirstPage",
-        (self) => self.skipped === (that as LoadingFirstPage<any, any>).skipped,
-      ),
-      Match.tag("LoadingMore", "CanLoadMore", "Exhausted", (self) =>
-        Equal.equals(self.results, that.results),
-      ),
-      Match.tag(
-        "Failure",
-        (self) =>
-          Equal.equals(self.error, (that as Failure<any, any>).error) &&
-          Equal.equals(self.results, (that as Failure<any, any>).results),
-      ),
-      Match.exhaustive,
-    );
-  },
-  [Hash.symbol](this: Variants<any, any>): number {
+  }
+  [Hash.symbol](this: Variants<unknown, unknown>): number {
     const tagHash = Hash.string(this._tag);
     return Match.value(this).pipe(
       Match.tag("LoadingFirstPage", (self) =>
@@ -335,8 +336,8 @@ const PaginatedQueryResultProto = {
       ),
       Match.exhaustive,
     );
-  },
-};
+  }
+}
 
 const noResults: ReadonlyArray<never> = [];
 
@@ -346,7 +347,7 @@ const noResults: ReadonlyArray<never> = [];
 export const loadingFirstPage = <Item = never, E = never>(options: {
   skipped: boolean;
 }): LoadingFirstPage<Item, E> =>
-  Object.assign(Object.create(PaginatedQueryResultProto), {
+  Object.assign(new PaginatedQueryResultProto<Item, E>(), {
     _tag: "LoadingFirstPage" as const,
     skipped: options.skipped,
     results: noResults,
@@ -359,7 +360,7 @@ export const loadingFirstPage = <Item = never, E = never>(options: {
 export const loadingMore = <Item, E = never>(options: {
   results: ReadonlyArray<Item>;
 }): LoadingMore<Item, E> =>
-  Object.assign(Object.create(PaginatedQueryResultProto), {
+  Object.assign(new PaginatedQueryResultProto<Item, E>(), {
     _tag: "LoadingMore" as const,
     results: options.results,
     isLoading: true as const,
@@ -372,7 +373,7 @@ export const canLoadMore = <Item, E = never>(options: {
   results: ReadonlyArray<Item>;
   loadMore: (numItems: number) => void;
 }): CanLoadMore<Item, E> =>
-  Object.assign(Object.create(PaginatedQueryResultProto), {
+  Object.assign(new PaginatedQueryResultProto<Item, E>(), {
     _tag: "CanLoadMore" as const,
     results: options.results,
     isLoading: false as const,
@@ -385,7 +386,7 @@ export const canLoadMore = <Item, E = never>(options: {
 export const exhausted = <Item, E = never>(options: {
   results: ReadonlyArray<Item>;
 }): Exhausted<Item, E> =>
-  Object.assign(Object.create(PaginatedQueryResultProto), {
+  Object.assign(new PaginatedQueryResultProto<Item, E>(), {
     _tag: "Exhausted" as const,
     results: options.results,
     isLoading: false as const,
@@ -398,7 +399,7 @@ export const failure = <E, Item = never>(options: {
   error: E;
   results: ReadonlyArray<Item>;
 }): Failure<Item, E> =>
-  Object.assign(Object.create(PaginatedQueryResultProto), {
+  Object.assign(new PaginatedQueryResultProto<Item, E>(), {
     _tag: "Failure" as const,
     error: options.error,
     results: options.results,
@@ -494,7 +495,7 @@ type MatchOptions<Item, E, V, W, X, Y, Z> = {
    */
   readonly onExhausted: (results: ReadonlyArray<Item>) => Y;
 } & ([E] extends [never]
-  ? {}
+  ? object
   : {
       /**
        * Handles the decoded declared error and items retained before it.

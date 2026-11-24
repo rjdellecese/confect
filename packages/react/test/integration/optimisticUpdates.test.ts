@@ -11,7 +11,8 @@ import * as Result from "effect/Result";
 import * as Effect from "effect/Effect";
 import * as Array from "effect/Array";
 import * as Schema from "effect/Schema";
-import { createElement, type ReactNode } from "react";
+import { createElement } from "react";
+import type { ReactNode } from "react";
 import { vi } from "vitest";
 
 const Json = Schema.fromJsonString(Schema.Unknown);
@@ -21,7 +22,7 @@ class TestSocket {
   onopen: (() => void) | undefined;
   onmessage: ((event: { data: string }) => void) | undefined;
   onclose: (() => void) | undefined;
-  send = vi.fn();
+  send = vi.fn<WebSocket["send"]>();
 
   constructor() {
     TestSocket.current = this;
@@ -55,6 +56,19 @@ const mutation = Ref.make(
   }),
 );
 
+const page = (ranks: Array<string>, isDone: boolean) => ({
+  page: Array.map(ranks, (rank) => ({ rank })),
+  continueCursor: isDone ? "end" : "next",
+  isDone,
+});
+const changed = (queryId: number, value: unknown) => ({
+  type: "QueryUpdated",
+  queryId,
+  value,
+  logLines: [],
+  journal: null,
+});
+
 it.effect(
   "native optimistic layers replay over new pages, roll back failures and reconcile success",
   () =>
@@ -82,18 +96,6 @@ it.effect(
       const version1 = { querySet: 2, identity: 0, ts: "AQAAAAAAAAA=" };
       const version2 = { querySet: 2, identity: 0, ts: "AgAAAAAAAAA=" };
       const version3 = { querySet: 2, identity: 0, ts: "AwAAAAAAAAA=" };
-      const page = (ranks: string[], isDone: boolean) => ({
-        page: Array.map(ranks, (rank) => ({ rank })),
-        continueCursor: isDone ? "end" : "next",
-        isDone,
-      });
-      const changed = (queryId: number, value: unknown) => ({
-        type: "QueryUpdated",
-        queryId,
-        value,
-        logLines: [],
-        journal: null,
-      });
       socket.receive({
         type: "Transition",
         startVersion: version0,
@@ -127,7 +129,6 @@ it.effect(
           },
         );
         const failing = configured({ rank: 4 });
-        const rejected = expect(failing).rejects.toThrow("rejected");
         expect(first.localQueryResult()).toEqual(
           page(["11", "13", "14"], false),
         );
@@ -152,7 +153,9 @@ it.effect(
           result: "rejected",
           logLines: [],
         });
-        yield* Effect.promise(() => rejected);
+        yield* Effect.promise(() =>
+          expect(failing).rejects.toThrow("rejected"),
+        );
         expect(first.localQueryResult()).toEqual(page(["1", "3"], false));
         expect(second.localQueryResult()).toEqual(page(["5", "7"], true));
 
