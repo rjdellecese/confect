@@ -14,5 +14,9 @@
     "separateTagGroups": true
   },
   "sortPackageJson": false,
-  "ignorePatterns": ["**/_generated/**", "**/fixtures/convex/**/*.ts"]
+  "ignorePatterns": [
+    "**/_generated/**",
+    "**/fixtures/convex/**/*.ts",
+    "oxlint-suppressions.json"
+  ]
 }

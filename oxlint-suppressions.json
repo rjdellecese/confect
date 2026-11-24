@@ -1,0 +1,1651 @@
+{
+  "apps/example/confect/notes_and_random/notes.impl.ts": {
+    "quality/no-conditional-empty-object-spread": {
+      "count": 1
+    }
+  },
+  "apps/example/confect/tables/tags.ts": {
+    "typescript/array-type": {
+      "count": 1
+    }
+  },
+  "apps/example/confect/workpool.ts": {
+    "import/consistent-type-specifier-style": {
+      "count": 1
+    },
+    "no-console": {
+      "count": 2
+    },
+    "unicorn/numeric-separators-style": {
+      "count": 2
+    }
+  },
+  "apps/example/src/App.tsx": {
+    "quality/no-conditional-empty-object-spread": {
+      "count": 1
+    },
+    "react-hooks/exhaustive-deps": {
+      "count": 1
+    },
+    "react/exhaustive-effect-dependencies": {
+      "count": 1
+    },
+    "typescript/no-explicit-any": {
+      "count": 2
+    },
+    "typescript/no-misused-promises": {
+      "count": 1
+    },
+    "typescript/no-unsafe-assignment": {
+      "count": 1
+    },
+    "typescript/use-unknown-in-catch-callback-variable": {
+      "count": 1
+    }
+  },
+  "packages/cli/src/Ansi.ts": {
+    "unicorn/no-hex-escape": {
+      "count": 1
+    }
+  },
+  "packages/cli/src/Bundler.ts": {
+    "curly": {
+      "count": 14
+    },
+    "quality/no-conditional-empty-object-spread": {
+      "count": 1
+    },
+    "typescript/array-type": {
+      "count": 2
+    },
+    "typescript/no-explicit-any": {
+      "count": 1
+    },
+    "typescript/no-unsafe-assignment": {
+      "count": 1
+    },
+    "typescript/no-unsafe-return": {
+      "count": 1
+    }
+  },
+  "packages/cli/src/CodegenError.ts": {
+    "curly": {
+      "count": 2
+    },
+    "quality/no-known-value-widening": {
+      "count": 1
+    }
+  },
+  "packages/cli/src/ConfectDirectory.ts": {
+    "react-hooks/rules-of-hooks": {
+      "count": 1
+    }
+  },
+  "packages/cli/src/ConvexConfig.ts": {
+    "curly": {
+      "count": 2
+    },
+    "import/consistent-type-specifier-style": {
+      "count": 1
+    },
+    "quality/no-unknown-returns": {
+      "count": 1
+    },
+    "typescript/no-unsafe-assignment": {
+      "count": 1
+    },
+    "typescript/no-unsafe-member-access": {
+      "count": 1
+    }
+  },
+  "packages/cli/src/ConvexDirectory.ts": {
+    "react-hooks/rules-of-hooks": {
+      "count": 1
+    }
+  },
+  "packages/cli/src/EntryPoint.ts": {
+    "curly": {
+      "count": 5
+    },
+    "import/consistent-type-specifier-style": {
+      "count": 1
+    },
+    "quality/no-known-value-widening": {
+      "count": 1
+    }
+  },
+  "packages/cli/src/FunctionPaths.ts": {
+    "import/consistent-type-specifier-style": {
+      "count": 1
+    },
+    "quality/no-known-value-widening": {
+      "count": 1
+    }
+  },
+  "packages/cli/src/GenerationSnapshot.ts": {
+    "@nkzw/no-instanceof": {
+      "count": 1
+    },
+    "curly": {
+      "count": 4
+    },
+    "import/consistent-type-specifier-style": {
+      "count": 1
+    },
+    "quality/no-conditional-empty-object-spread": {
+      "count": 2
+    },
+    "typescript/no-non-null-assertion": {
+      "count": 2
+    }
+  },
+  "packages/cli/src/GroupPath.ts": {
+    "import/consistent-type-specifier-style": {
+      "count": 1
+    },
+    "typescript/array-type": {
+      "count": 1
+    }
+  },
+  "packages/cli/src/LeafModule.ts": {
+    "import/consistent-type-specifier-style": {
+      "count": 1
+    },
+    "typescript/array-type": {
+      "count": 2
+    },
+    "typescript/no-unsafe-assignment": {
+      "count": 1
+    },
+    "typescript/no-unsafe-member-access": {
+      "count": 3
+    }
+  },
+  "packages/cli/src/PackageSelfReference.ts": {
+    "curly": {
+      "count": 1
+    }
+  },
+  "packages/cli/src/ProjectRoot.ts": {
+    "react-hooks/rules-of-hooks": {
+      "count": 1
+    }
+  },
+  "packages/cli/src/SpecAssemblyNode.ts": {
+    "typescript/no-non-null-assertion": {
+      "count": 1
+    }
+  },
+  "packages/cli/src/TableModule.ts": {
+    "typescript/no-unsafe-assignment": {
+      "count": 1
+    },
+    "typescript/no-unsafe-member-access": {
+      "count": 1
+    }
+  },
+  "packages/cli/src/TypeScriptConfig.ts": {
+    "curly": {
+      "count": 9
+    },
+    "unicorn/catch-error-name": {
+      "count": 1
+    }
+  },
+  "packages/cli/src/WatchBuild.ts": {
+    "curly": {
+      "count": 6
+    }
+  },
+  "packages/cli/src/WatchGraph.ts": {
+    "curly": {
+      "count": 3
+    }
+  },
+  "packages/cli/src/WatchTopology.ts": {
+    "curly": {
+      "count": 2
+    }
+  },
+  "packages/cli/src/Watcher.ts": {
+    "curly": {
+      "count": 11
+    }
+  },
+  "packages/cli/src/confect/codegen.ts": {
+    "import/consistent-type-specifier-style": {
+      "count": 2
+    },
+    "typescript/no-unsafe-assignment": {
+      "count": 2
+    },
+    "typescript/no-unsafe-member-access": {
+      "count": 1
+    }
+  },
+  "packages/cli/src/confect/dev.ts": {
+    "curly": {
+      "count": 7
+    }
+  },
+  "packages/cli/src/log.ts": {
+    "typescript/array-type": {
+      "count": 10
+    }
+  },
+  "packages/cli/src/templates.ts": {
+    "import/consistent-type-specifier-style": {
+      "count": 1
+    }
+  },
+  "packages/cli/test/Bundler.test.ts": {
+    "curly": {
+      "count": 3
+    },
+    "quality/no-unknown-returns": {
+      "count": 1
+    },
+    "typescript/array-type": {
+      "count": 7
+    },
+    "typescript/no-unsafe-call": {
+      "count": 6
+    },
+    "typescript/no-unsafe-return": {
+      "count": 6
+    }
+  },
+  "packages/cli/test/EntryPoint.test.ts": {
+    "curly": {
+      "count": 1
+    },
+    "unicorn/prefer-string-raw": {
+      "count": 4
+    }
+  },
+  "packages/cli/test/Evaluation.test.ts": {
+    "typescript/array-type": {
+      "count": 1
+    },
+    "unicorn/numeric-separators-style": {
+      "count": 7
+    },
+    "vitest/require-mock-type-parameters": {
+      "count": 1
+    }
+  },
+  "packages/cli/test/FunctionModule.test.ts": {
+    "quality/no-conditional-empty-object-spread": {
+      "count": 1
+    }
+  },
+  "packages/cli/test/FunctionPaths.test.ts": {
+    "typescript/array-type": {
+      "count": 1
+    }
+  },
+  "packages/cli/test/GenerationSnapshot.test.ts": {
+    "curly": {
+      "count": 1
+    },
+    "quality/no-conditional-empty-object-spread": {
+      "count": 1
+    },
+    "unicorn/prefer-string-raw": {
+      "count": 1
+    },
+    "vitest/require-mock-type-parameters": {
+      "count": 4
+    }
+  },
+  "packages/cli/test/GroupPath.test.ts": {
+    "typescript/array-type": {
+      "count": 1
+    }
+  },
+  "packages/cli/test/ImplModulePath.test.ts": {
+    "unicorn/prefer-string-raw": {
+      "count": 8
+    }
+  },
+  "packages/cli/test/LeafModule.test.ts": {
+    "curly": {
+      "count": 2
+    },
+    "import/consistent-type-specifier-style": {
+      "count": 3
+    },
+    "typescript/array-type": {
+      "count": 3
+    },
+    "unicorn/prefer-at": {
+      "count": 2
+    },
+    "vitest/require-mock-type-parameters": {
+      "count": 3
+    }
+  },
+  "packages/cli/test/RelativeModulePath.test.ts": {
+    "unicorn/prefer-string-raw": {
+      "count": 5
+    }
+  },
+  "packages/cli/test/SpecAssemblyNode.test.ts": {
+    "import/consistent-type-specifier-style": {
+      "count": 1
+    },
+    "typescript/array-type": {
+      "count": 2
+    },
+    "unicorn/prefer-at": {
+      "count": 2
+    }
+  },
+  "packages/cli/test/SpecModulePath.test.ts": {
+    "unicorn/prefer-string-raw": {
+      "count": 8
+    }
+  },
+  "packages/cli/test/SyncState.test.ts": {
+    "curly": {
+      "count": 1
+    }
+  },
+  "packages/cli/test/TableModulePath.test.ts": {
+    "unicorn/prefer-string-raw": {
+      "count": 8
+    }
+  },
+  "packages/cli/test/TypeScriptConfig.test.ts": {
+    "curly": {
+      "count": 1
+    }
+  },
+  "packages/cli/test/Watcher.test.ts": {
+    "curly": {
+      "count": 16
+    },
+    "unicorn/no-useless-promise-resolve-reject": {
+      "count": 3
+    },
+    "unicorn/numeric-separators-style": {
+      "count": 13
+    },
+    "vitest/require-mock-type-parameters": {
+      "count": 1
+    }
+  },
+  "packages/cli/test/codegen.test.ts": {
+    "curly": {
+      "count": 6
+    },
+    "unicorn/numeric-separators-style": {
+      "count": 13
+    },
+    "vitest/require-mock-type-parameters": {
+      "count": 1
+    }
+  },
+  "packages/cli/test/dev.test.ts": {
+    "curly": {
+      "count": 4
+    },
+    "unicorn/numeric-separators-style": {
+      "count": 4
+    },
+    "vitest/require-mock-type-parameters": {
+      "count": 3
+    }
+  },
+  "packages/cli/test/integration/Project.ts": {
+    "array-callback-return": {
+      "count": 1
+    }
+  },
+  "packages/cli/test/integration/devConfiguration.test.ts": {
+    "unicorn/numeric-separators-style": {
+      "count": 2
+    },
+    "vitest/valid-expect": {
+      "count": 1
+    }
+  },
+  "packages/cli/test/integration/devIncremental.test.ts": {
+    "unicorn/numeric-separators-style": {
+      "count": 7
+    }
+  },
+  "packages/cli/test/integration/devOutputs.test.ts": {
+    "unicorn/numeric-separators-style": {
+      "count": 6
+    }
+  },
+  "packages/cli/test/integration/devRecovery.test.ts": {
+    "unicorn/numeric-separators-style": {
+      "count": 7
+    }
+  },
+  "packages/cli/test/integration/importIsolation.test.ts": {
+    "curly": {
+      "count": 1
+    },
+    "typescript/no-unsafe-call": {
+      "count": 1
+    },
+    "unicorn/numeric-separators-style": {
+      "count": 1
+    },
+    "vitest/valid-expect": {
+      "count": 7
+    }
+  },
+  "packages/cli/test/templates.test.ts": {
+    "typescript/array-type": {
+      "count": 2
+    },
+    "typescript/no-unsafe-call": {
+      "count": 2
+    },
+    "unicorn/numeric-separators-style": {
+      "count": 3
+    },
+    "unicorn/prefer-at": {
+      "count": 4
+    },
+    "vitest/valid-expect": {
+      "count": 4
+    }
+  },
+  "packages/core/src/FunctionProvenance.ts": {
+    "quality/no-known-value-widening": {
+      "count": 1
+    },
+    "typescript/no-explicit-any": {
+      "count": 40
+    }
+  },
+  "packages/core/src/FunctionSpec.ts": {
+    "typescript/no-explicit-any": {
+      "count": 51
+    },
+    "typescript/no-unsafe-return": {
+      "count": 4
+    }
+  },
+  "packages/core/src/GroupPath.ts": {
+    "typescript/array-type": {
+      "count": 2
+    },
+    "typescript/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "packages/core/src/GroupSpec.ts": {
+    "curly": {
+      "count": 1
+    }
+  },
+  "packages/core/src/Lazy.ts": {
+    "quality/no-unknown-returns": {
+      "count": 1
+    }
+  },
+  "packages/core/src/MiddlewareAttachment.ts": {
+    "curly": {
+      "count": 2
+    }
+  },
+  "packages/core/src/MiddlewareSpec.ts": {
+    "typescript/no-explicit-any": {
+      "count": 25
+    },
+    "typescript/no-unsafe-assignment": {
+      "count": 1
+    },
+    "typescript/no-unsafe-member-access": {
+      "count": 3
+    },
+    "typescript/no-unsafe-return": {
+      "count": 1
+    }
+  },
+  "packages/core/src/PaginationResult.ts": {
+    "typescript/no-explicit-any": {
+      "count": 4
+    }
+  },
+  "packages/core/src/Ref.ts": {
+    "quality/no-chained-type-assertions": {
+      "count": 1
+    },
+    "quality/no-unknown-returns": {
+      "count": 4
+    },
+    "quality/no-unsafe-dictionary-type": {
+      "count": 1
+    },
+    "typescript/no-explicit-any": {
+      "count": 47
+    },
+    "typescript/no-non-null-assertion": {
+      "count": 1
+    },
+    "typescript/no-unsafe-return": {
+      "count": 7
+    }
+  },
+  "packages/core/src/Refs.ts": {
+    "typescript/no-explicit-any": {
+      "count": 3
+    }
+  },
+  "packages/core/src/RuntimeAndFunctionType.ts": {
+    "quality/no-known-value-widening": {
+      "count": 1
+    }
+  },
+  "packages/core/src/SchemaToValidator.ts": {
+    "typescript/array-type": {
+      "count": 5
+    },
+    "typescript/no-explicit-any": {
+      "count": 32
+    },
+    "typescript/no-unsafe-return": {
+      "count": 2
+    }
+  },
+  "packages/core/src/SystemFields.ts": {
+    "quality/no-chained-type-assertions": {
+      "count": 1
+    },
+    "quality/no-unsafe-dictionary-type": {
+      "count": 1
+    },
+    "typescript/no-explicit-any": {
+      "count": 10
+    },
+    "typescript/no-unsafe-return": {
+      "count": 1
+    }
+  },
+  "packages/core/src/Table.ts": {
+    "quality/no-known-value-widening": {
+      "count": 1
+    },
+    "typescript/array-type": {
+      "count": 1
+    },
+    "typescript/no-explicit-any": {
+      "count": 29
+    },
+    "typescript/no-unsafe-assignment": {
+      "count": 3
+    },
+    "typescript/no-unsafe-return": {
+      "count": 3
+    }
+  },
+  "packages/core/src/Types.ts": {
+    "typescript/array-type": {
+      "count": 4
+    },
+    "typescript/no-explicit-any": {
+      "count": 5
+    }
+  },
+  "packages/core/test/FunctionProvenance.test.ts": {
+    "vitest/require-mock-type-parameters": {
+      "count": 6
+    }
+  },
+  "packages/core/test/FunctionSpec.test.ts": {
+    "typescript/ban-ts-comment": {
+      "count": 4
+    },
+    "vitest/expect-expect": {
+      "count": 2
+    }
+  },
+  "packages/core/test/GenericId.test.ts": {
+    "vitest/require-to-throw-message": {
+      "count": 5
+    }
+  },
+  "packages/core/test/GroupSpec.test.ts": {
+    "typescript/ban-ts-comment": {
+      "count": 5
+    },
+    "vitest/expect-expect": {
+      "count": 1
+    }
+  },
+  "packages/core/test/Lazy.test.ts": {
+    "quality/no-known-value-widening": {
+      "count": 5
+    }
+  },
+  "packages/core/test/MiddlewareAttachment.test.ts": {
+    "typescript/ban-ts-comment": {
+      "count": 1
+    }
+  },
+  "packages/core/test/MiddlewareSpec.test.ts": {
+    "vitest/expect-expect": {
+      "count": 4
+    }
+  },
+  "packages/core/test/Ref.test.ts": {
+    "typescript/array-type": {
+      "count": 3
+    },
+    "typescript/ban-ts-comment": {
+      "count": 2
+    },
+    "vitest/require-mock-type-parameters": {
+      "count": 4
+    }
+  },
+  "packages/core/test/Refs.bench.ts": {
+    "typescript/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "packages/core/test/Refs.test.ts": {
+    "typescript/array-type": {
+      "count": 3
+    }
+  },
+  "packages/core/test/SchemaToValidator.test.ts": {
+    "import/consistent-type-specifier-style": {
+      "count": 6
+    },
+    "quality/no-unsafe-dictionary-type": {
+      "count": 4
+    },
+    "typescript/array-type": {
+      "count": 11
+    },
+    "unicorn/prefer-number-properties": {
+      "count": 1
+    }
+  },
+  "packages/core/test/SystemFields.test.ts": {
+    "unicorn/numeric-separators-style": {
+      "count": 10
+    },
+    "vitest/require-to-throw-message": {
+      "count": 1
+    }
+  },
+  "packages/core/test/Table.test.ts": {
+    "quality/no-chained-type-assertions": {
+      "count": 1
+    }
+  },
+  "packages/core/test/Types.bench.ts": {
+    "typescript/array-type": {
+      "count": 4
+    },
+    "typescript/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "packages/core/test/Types.test.ts": {
+    "quality/no-unsafe-dictionary-type": {
+      "count": 3
+    },
+    "typescript/array-type": {
+      "count": 18
+    }
+  },
+  "packages/foldkit/src/PaginatedQuery.ts": {
+    "typescript/no-non-null-assertion": {
+      "count": 1
+    },
+    "unicorn/prefer-at": {
+      "count": 1
+    }
+  },
+  "packages/foldkit/src/QueryResult.ts": {
+    "curly": {
+      "count": 1
+    },
+    "quality/no-chained-type-assertions": {
+      "count": 1
+    },
+    "quality/no-known-value-widening": {
+      "count": 1
+    },
+    "typescript/no-unsafe-return": {
+      "count": 3
+    }
+  },
+  "packages/foldkit/src/Subscription.ts": {
+    "typescript/no-unsafe-argument": {
+      "count": 1
+    },
+    "typescript/no-unsafe-assignment": {
+      "count": 1
+    }
+  },
+  "packages/foldkit/test/Command.test.ts": {
+    "quality/no-unknown-returns": {
+      "count": 1
+    }
+  },
+  "packages/foldkit/test/PaginatedQuery.test.ts": {
+    "quality/no-chained-type-assertions": {
+      "count": 1
+    },
+    "unicorn/numeric-separators-style": {
+      "count": 2
+    },
+    "vitest/no-conditional-expect": {
+      "count": 6
+    }
+  },
+  "packages/foldkit/test/Subscription.test.ts": {
+    "unicorn/numeric-separators-style": {
+      "count": 3
+    }
+  },
+  "packages/js/src/HttpClient.ts": {
+    "import/consistent-type-specifier-style": {
+      "count": 1
+    }
+  },
+  "packages/js/test/local-backend/HttpClient.test.ts": {
+    "quality/no-conditional-empty-object-spread": {
+      "count": 3
+    },
+    "typescript/no-unsafe-return": {
+      "count": 1
+    },
+    "vitest/require-mock-type-parameters": {
+      "count": 2
+    }
+  },
+  "packages/js/test/local-backend/WebSocketClient.test.ts": {
+    "quality/no-conditional-empty-object-spread": {
+      "count": 3
+    },
+    "vitest/require-mock-type-parameters": {
+      "count": 1
+    }
+  },
+  "packages/react/src/OptimisticLocalStore.ts": {
+    "import/consistent-type-specifier-style": {
+      "count": 1
+    },
+    "typescript/array-type": {
+      "count": 1
+    },
+    "typescript/no-unsafe-assignment": {
+      "count": 1
+    }
+  },
+  "packages/react/src/PaginatedQueryResult.ts": {
+    "quality/no-chained-type-assertions": {
+      "count": 1
+    },
+    "typescript/no-explicit-any": {
+      "count": 14
+    },
+    "typescript/no-unsafe-return": {
+      "count": 5
+    }
+  },
+  "packages/react/src/QueryResult.ts": {
+    "quality/no-chained-type-assertions": {
+      "count": 1
+    },
+    "typescript/no-explicit-any": {
+      "count": 14
+    },
+    "typescript/no-unsafe-return": {
+      "count": 3
+    }
+  },
+  "packages/react/src/StreamPagination.ts": {
+    "quality/no-conditional-empty-object-spread": {
+      "count": 2
+    }
+  },
+  "packages/react/src/index.ts": {
+    "curly": {
+      "count": 1
+    },
+    "import/consistent-type-specifier-style": {
+      "count": 3
+    },
+    "quality/no-chained-type-assertions": {
+      "count": 4
+    },
+    "quality/no-unknown-returns": {
+      "count": 1
+    },
+    "quality/no-unsafe-dictionary-type": {
+      "count": 1
+    },
+    "react-hooks/exhaustive-deps": {
+      "count": 7
+    },
+    "react-hooks/rules-of-hooks": {
+      "count": 1
+    },
+    "react/hooks": {
+      "count": 2
+    },
+    "react/immutability": {
+      "count": 2
+    },
+    "react/memo-dependencies": {
+      "count": 4
+    },
+    "react/use-memo": {
+      "count": 2
+    },
+    "typescript/no-unsafe-return": {
+      "count": 1
+    }
+  },
+  "packages/react/test/OptimisticLocalStore.test.ts": {
+    "import/consistent-type-specifier-style": {
+      "count": 1
+    },
+    "typescript/array-type": {
+      "count": 5
+    },
+    "typescript/no-unsafe-return": {
+      "count": 2
+    },
+    "vitest/require-mock-type-parameters": {
+      "count": 3
+    }
+  },
+  "packages/react/test/StreamPagination.test.ts": {
+    "vitest/no-conditional-expect": {
+      "count": 2
+    }
+  },
+  "packages/react/test/convexVersion.test.ts": {
+    "vitest/require-mock-type-parameters": {
+      "count": 5
+    }
+  },
+  "packages/react/test/index.test.ts": {
+    "react-hooks/rules-of-hooks": {
+      "count": 1
+    },
+    "typescript/array-type": {
+      "count": 5
+    },
+    "typescript/no-unsafe-return": {
+      "count": 4
+    },
+    "vitest/no-conditional-expect": {
+      "count": 1
+    },
+    "vitest/require-mock-type-parameters": {
+      "count": 22
+    }
+  },
+  "packages/react/test/integration/optimisticUpdates.test.ts": {
+    "import/consistent-type-specifier-style": {
+      "count": 1
+    },
+    "quality/no-chained-type-assertions": {
+      "count": 1
+    },
+    "typescript/array-type": {
+      "count": 1
+    },
+    "vitest/require-mock-type-parameters": {
+      "count": 1
+    },
+    "vitest/valid-expect": {
+      "count": 1
+    }
+  },
+  "packages/react/test/useStreamPaginatedQuery.test.ts": {
+    "quality/no-object-parameters": {
+      "count": 2
+    },
+    "typescript/array-type": {
+      "count": 1
+    },
+    "typescript/no-unsafe-return": {
+      "count": 1
+    },
+    "vitest/require-mock-type-parameters": {
+      "count": 5
+    }
+  },
+  "packages/server/src/ActionRunner.ts": {
+    "import/consistent-type-specifier-style": {
+      "count": 1
+    },
+    "typescript/no-explicit-any": {
+      "count": 2
+    },
+    "typescript/no-import-type-side-effects": {
+      "count": 1
+    }
+  },
+  "packages/server/src/CronJob.ts": {
+    "quality/no-unsafe-dictionary-type": {
+      "count": 2
+    },
+    "typescript/no-unsafe-return": {
+      "count": 1
+    }
+  },
+  "packages/server/src/CronJobs.ts": {
+    "curly": {
+      "count": 1
+    },
+    "import/consistent-type-specifier-style": {
+      "count": 1
+    },
+    "typescript/no-unsafe-return": {
+      "count": 1
+    }
+  },
+  "packages/server/src/CronWindow.ts": {
+    "typescript/no-unsafe-return": {
+      "count": 4
+    }
+  },
+  "packages/server/src/DatabaseReader.ts": {
+    "typescript/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "packages/server/src/DatabaseWriter.ts": {
+    "typescript/no-explicit-any": {
+      "count": 1
+    },
+    "typescript/no-unsafe-argument": {
+      "count": 3
+    },
+    "typescript/no-unsafe-assignment": {
+      "count": 5
+    }
+  },
+  "packages/server/src/Document.ts": {
+    "typescript/no-explicit-any": {
+      "count": 1
+    },
+    "typescript/no-unsafe-assignment": {
+      "count": 4
+    },
+    "typescript/no-unsafe-return": {
+      "count": 2
+    }
+  },
+  "packages/server/src/FunctionImpl.ts": {
+    "typescript/no-non-null-assertion": {
+      "count": 1
+    }
+  },
+  "packages/server/src/FunctionRegistryItem.ts": {
+    "typescript/no-explicit-any": {
+      "count": 6
+    },
+    "typescript/no-unsafe-assignment": {
+      "count": 1
+    },
+    "typescript/no-unsafe-return": {
+      "count": 1
+    }
+  },
+  "packages/server/src/Handler.ts": {
+    "typescript/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "packages/server/src/HttpRouter.ts": {
+    "import/consistent-type-specifier-style": {
+      "count": 3
+    },
+    "quality/no-chained-type-assertions": {
+      "count": 1
+    },
+    "typescript/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "packages/server/src/MiddlewareImpl.ts": {
+    "typescript/no-explicit-any": {
+      "count": 2
+    },
+    "typescript/no-unsafe-argument": {
+      "count": 1
+    }
+  },
+  "packages/server/src/MutationRunner.ts": {
+    "typescript/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "packages/server/src/OrderedQuery.ts": {
+    "quality/no-conditional-empty-object-spread": {
+      "count": 2
+    }
+  },
+  "packages/server/src/QueryInitializer.ts": {
+    "typescript/no-explicit-any": {
+      "count": 5
+    },
+    "typescript/no-non-null-assertion": {
+      "count": 1
+    },
+    "typescript/no-unsafe-argument": {
+      "count": 2
+    },
+    "typescript/no-unsafe-assignment": {
+      "count": 3
+    },
+    "typescript/no-unsafe-return": {
+      "count": 2
+    }
+  },
+  "packages/server/src/QueryRunner.ts": {
+    "typescript/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "packages/server/src/QueryStream.ts": {
+    "curly": {
+      "count": 6
+    },
+    "import/consistent-type-specifier-style": {
+      "count": 1
+    },
+    "object-shorthand": {
+      "count": 1
+    },
+    "prefer-rest-params": {
+      "count": 1
+    },
+    "quality/no-known-value-widening": {
+      "count": 1
+    },
+    "typescript/no-explicit-any": {
+      "count": 8
+    },
+    "typescript/no-unsafe-argument": {
+      "count": 2
+    },
+    "typescript/no-unsafe-return": {
+      "count": 1
+    }
+  },
+  "packages/server/src/QueryStreamIndexRange.ts": {
+    "quality/no-chained-type-assertions": {
+      "count": 1
+    },
+    "typescript/array-type": {
+      "count": 1
+    }
+  },
+  "packages/server/src/QueryStreamKeyValues.ts": {
+    "import/consistent-type-specifier-style": {
+      "count": 1
+    }
+  },
+  "packages/server/src/QueryStreamPagination.ts": {
+    "curly": {
+      "count": 1
+    },
+    "unicorn/numeric-separators-style": {
+      "count": 1
+    }
+  },
+  "packages/server/src/RegisteredConvexFunction.ts": {
+    "import/consistent-type-specifier-style": {
+      "count": 4
+    },
+    "typescript/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "packages/server/src/RegisteredFunction.ts": {
+    "import/consistent-type-specifier-style": {
+      "count": 6
+    },
+    "quality/no-known-value-widening": {
+      "count": 2
+    },
+    "typescript/no-explicit-any": {
+      "count": 17
+    },
+    "typescript/no-import-type-side-effects": {
+      "count": 1
+    },
+    "typescript/no-unsafe-argument": {
+      "count": 1
+    },
+    "typescript/no-unsafe-return": {
+      "count": 1
+    }
+  },
+  "packages/server/src/RegisteredNodeFunction.ts": {
+    "import/consistent-type-specifier-style": {
+      "count": 2
+    },
+    "typescript/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "packages/server/src/RegistryItems.ts": {
+    "quality/no-unsafe-dictionary-type": {
+      "count": 1
+    }
+  },
+  "packages/server/src/ResolvedMiddleware.ts": {
+    "typescript/no-unsafe-assignment": {
+      "count": 1
+    }
+  },
+  "packages/server/src/Table.ts": {
+    "import/consistent-type-specifier-style": {
+      "count": 1
+    },
+    "typescript/no-explicit-any": {
+      "count": 11
+    },
+    "typescript/no-unsafe-argument": {
+      "count": 3
+    }
+  },
+  "packages/server/src/internal/utils.ts": {
+    "quality/no-known-value-widening": {
+      "count": 1
+    },
+    "typescript/array-type": {
+      "count": 5
+    },
+    "typescript/no-explicit-any": {
+      "count": 3
+    },
+    "typescript/no-unsafe-assignment": {
+      "count": 2
+    },
+    "typescript/no-unsafe-member-access": {
+      "count": 3
+    },
+    "typescript/no-unsafe-return": {
+      "count": 1
+    }
+  },
+  "packages/server/test/ActionRunner.test.ts": {
+    "vitest/require-mock-type-parameters": {
+      "count": 3
+    }
+  },
+  "packages/server/test/AiGatewayDecisionClient.test.ts": {
+    "vitest/require-mock-type-parameters": {
+      "count": 2
+    }
+  },
+  "packages/server/test/AiGatewayLanguageClient.test.ts": {
+    "vitest/require-mock-type-parameters": {
+      "count": 2
+    }
+  },
+  "packages/server/test/AiGatewayLanguageModel.test.ts": {
+    "import/consistent-type-specifier-style": {
+      "count": 1
+    }
+  },
+  "packages/server/test/ConvexFunctionDefinitions.test.ts": {
+    "import/consistent-type-specifier-style": {
+      "count": 4
+    }
+  },
+  "packages/server/test/ConvexLogger.test.ts": {
+    "vitest/require-mock-type-parameters": {
+      "count": 6
+    }
+  },
+  "packages/server/test/CronJobs.test.ts": {
+    "typescript/no-unsafe-call": {
+      "count": 1
+    }
+  },
+  "packages/server/test/DatabaseReader.test.ts": {
+    "quality/no-chained-type-assertions": {
+      "count": 1
+    },
+    "typescript/no-unsafe-call": {
+      "count": 2
+    },
+    "typescript/no-unsafe-return": {
+      "count": 2
+    }
+  },
+  "packages/server/test/DocumentIds.test.ts": {
+    "vitest/require-mock-type-parameters": {
+      "count": 2
+    }
+  },
+  "packages/server/test/FunctionImpl.test.ts": {
+    "import/consistent-type-specifier-style": {
+      "count": 1
+    },
+    "quality/no-unsafe-dictionary-type": {
+      "count": 2
+    }
+  },
+  "packages/server/test/HttpRouter.test.ts": {
+    "vitest/expect-expect": {
+      "count": 1
+    },
+    "vitest/require-mock-type-parameters": {
+      "count": 1
+    }
+  },
+  "packages/server/test/MiddlewareImpl.test.ts": {
+    "quality/no-chained-type-assertions": {
+      "count": 1
+    },
+    "vitest/expect-expect": {
+      "count": 6
+    }
+  },
+  "packages/server/test/MutationRunner.test.ts": {
+    "vitest/require-mock-type-parameters": {
+      "count": 9
+    }
+  },
+  "packages/server/test/MutationTransactionContext.test.ts": {
+    "vitest/require-mock-type-parameters": {
+      "count": 3
+    }
+  },
+  "packages/server/test/QueryRunner.test.ts": {
+    "vitest/require-mock-type-parameters": {
+      "count": 11
+    }
+  },
+  "packages/server/test/QueryStream.test.ts": {
+    "quality/no-conditional-empty-object-spread": {
+      "count": 1
+    },
+    "vitest/expect-expect": {
+      "count": 1
+    }
+  },
+  "packages/server/test/QueryStreamCursor.test.ts": {
+    "object-shorthand": {
+      "count": 1
+    }
+  },
+  "packages/server/test/QueryStreamIndexRange.test.ts": {
+    "curly": {
+      "count": 1
+    },
+    "typescript/array-type": {
+      "count": 2
+    }
+  },
+  "packages/server/test/QueryStreamKeyBounds.test.ts": {
+    "object-shorthand": {
+      "count": 1
+    },
+    "vitest/no-conditional-expect": {
+      "count": 2
+    }
+  },
+  "packages/server/test/QueryStreamKeyLabels.test.ts": {
+    "typescript/array-type": {
+      "count": 2
+    }
+  },
+  "packages/server/test/QueryStreamKeyLayout.test.ts": {
+    "unicorn/prefer-number-properties": {
+      "count": 1
+    }
+  },
+  "packages/server/test/QueryStreamLifecycle.test.ts": {
+    "curly": {
+      "count": 2
+    },
+    "unicorn/prefer-number-properties": {
+      "count": 1
+    }
+  },
+  "packages/server/test/QueryStreamPagination.test.ts": {
+    "curly": {
+      "count": 4
+    },
+    "unicorn/prefer-number-properties": {
+      "count": 1
+    },
+    "vitest/no-conditional-expect": {
+      "count": 4
+    }
+  },
+  "packages/server/test/QueryStreamReadBudget.test.ts": {
+    "unicorn/numeric-separators-style": {
+      "count": 1
+    },
+    "unicorn/prefer-number-properties": {
+      "count": 1
+    }
+  },
+  "packages/server/test/QueryTransactionContext.test.ts": {
+    "vitest/require-mock-type-parameters": {
+      "count": 2
+    }
+  },
+  "packages/server/test/RegisteredConvexFunction.test.ts": {
+    "quality/no-chained-type-assertions": {
+      "count": 1
+    },
+    "vitest/require-mock-type-parameters": {
+      "count": 6
+    }
+  },
+  "packages/server/test/RegisteredFunction.test.ts": {
+    "vitest/require-mock-type-parameters": {
+      "count": 13
+    }
+  },
+  "packages/server/test/RegisteredFunctions.test.ts": {
+    "quality/no-unsafe-dictionary-type": {
+      "count": 3
+    }
+  },
+  "packages/server/test/RegisteredNodeFunction.test.ts": {
+    "quality/no-chained-type-assertions": {
+      "count": 1
+    },
+    "quality/no-unsafe-dictionary-type": {
+      "count": 1
+    }
+  },
+  "packages/server/test/Scheduler.test.ts": {
+    "vitest/require-mock-type-parameters": {
+      "count": 1
+    }
+  },
+  "packages/server/test/SchemaToValidator.bench.ts": {
+    "quality/no-unsafe-dictionary-type": {
+      "count": 2
+    },
+    "typescript/array-type": {
+      "count": 9
+    },
+    "typescript/no-explicit-any": {
+      "count": 5
+    },
+    "unicorn/numeric-separators-style": {
+      "count": 5
+    }
+  },
+  "packages/server/test/SchemaToValidator.test.ts": {
+    "import/consistent-type-specifier-style": {
+      "count": 4
+    },
+    "typescript/array-type": {
+      "count": 17
+    },
+    "vitest/valid-title": {
+      "count": 4
+    }
+  },
+  "packages/server/test/Storage.test.ts": {
+    "vitest/require-mock-type-parameters": {
+      "count": 6
+    }
+  },
+  "packages/server/test/Table.test.ts": {
+    "import/consistent-type-specifier-style": {
+      "count": 5
+    }
+  },
+  "packages/server/test/TransactionMetadata.test.ts": {
+    "vitest/require-mock-type-parameters": {
+      "count": 3
+    }
+  },
+  "packages/server/test/internal/utils.test.ts": {
+    "typescript/array-type": {
+      "count": 1
+    }
+  },
+  "packages/server/test/local-backend/convexQueryCacheBehavior.test.ts": {
+    "typescript/no-unsafe-return": {
+      "count": 1
+    }
+  },
+  "packages/server/test/local-backend/metadata.test.ts": {
+    "curly": {
+      "count": 2
+    },
+    "typescript/array-type": {
+      "count": 1
+    }
+  },
+  "packages/server/test/local-backend/storage.test.ts": {
+    "curly": {
+      "count": 4
+    }
+  },
+  "packages/server/test/mock-backend/declarationEmit.test.ts": {
+    "vitest/prefer-snapshot-hint": {
+      "count": 2
+    }
+  },
+  "packages/server/test/mock-backend/fixtures/confect/tables/tags.ts": {
+    "typescript/array-type": {
+      "count": 1
+    }
+  },
+  "packages/server/test/mock-backend/http.test.ts": {
+    "curly": {
+      "count": 1
+    },
+    "typescript/array-type": {
+      "count": 1
+    },
+    "typescript/ban-ts-comment": {
+      "count": 1
+    },
+    "vitest/require-mock-type-parameters": {
+      "count": 4
+    }
+  },
+  "packages/server/test/mock-backend/integration.test.ts": {
+    "curly": {
+      "count": 4
+    },
+    "import/consistent-type-specifier-style": {
+      "count": 2
+    },
+    "object-shorthand": {
+      "count": 1
+    },
+    "quality/no-known-value-widening": {
+      "count": 1
+    },
+    "typescript/array-type": {
+      "count": 3
+    },
+    "vitest/require-mock-type-parameters": {
+      "count": 2
+    },
+    "vitest/valid-expect": {
+      "count": 1
+    }
+  },
+  "packages/server/test/mock-backend/queryStream.test.ts": {
+    "curly": {
+      "count": 1
+    },
+    "import/consistent-type-specifier-style": {
+      "count": 2
+    },
+    "quality/no-chained-type-assertions": {
+      "count": 1
+    }
+  },
+  "packages/server/test/mock-backend/queryStreamDistinct.test.ts": {
+    "curly": {
+      "count": 1
+    },
+    "object-shorthand": {
+      "count": 6
+    }
+  },
+  "packages/server/test/tracing.test.ts": {
+    "import/consistent-type-specifier-style": {
+      "count": 1
+    },
+    "quality/no-chained-type-assertions": {
+      "count": 3
+    },
+    "quality/no-unknown-returns": {
+      "count": 2
+    },
+    "vitest/require-mock-type-parameters": {
+      "count": 1
+    }
+  },
+  "packages/test/src/TestConfect.ts": {
+    "typescript/no-explicit-any": {
+      "count": 7
+    },
+    "typescript/no-unsafe-argument": {
+      "count": 3
+    }
+  },
+  "scripts/checkConsumers.ts": {
+    "curly": {
+      "count": 14
+    },
+    "import/consistent-type-specifier-style": {
+      "count": 5
+    },
+    "typescript/no-non-null-assertion": {
+      "count": 4
+    }
+  },
+  "scripts/checkPackContents.test.ts": {
+    "curly": {
+      "count": 1
+    },
+    "unicorn/numeric-separators-style": {
+      "count": 1
+    }
+  },
+  "scripts/checkPackContents.ts": {
+    "curly": {
+      "count": 6
+    },
+    "typescript/no-unsafe-argument": {
+      "count": 2
+    }
+  },
+  "scripts/consumerCompatibility.test.ts": {
+    "import/consistent-type-specifier-style": {
+      "count": 2
+    }
+  },
+  "scripts/consumerCompatibility.ts": {
+    "curly": {
+      "count": 4
+    },
+    "quality/no-conditional-empty-object-spread": {
+      "count": 1
+    }
+  },
+  "scripts/consumerFixture.ts": {
+    "quality/no-conditional-empty-object-spread": {
+      "count": 1
+    },
+    "quality/no-known-value-widening": {
+      "count": 1
+    }
+  },
+  "scripts/prepareDocs.test.ts": {
+    "typescript/array-type": {
+      "count": 2
+    }
+  },
+  "scripts/syncSkillIgnore.ts": {
+    "curly": {
+      "count": 2
+    },
+    "unicorn/prefer-string-replace-all": {
+      "count": 2
+    }
+  },
+  "tools/local-backend/fixtures/confect/groups/httpVectors.impl.ts": {
+    "curly": {
+      "count": 1
+    }
+  },
+  "tools/local-backend/fixtures/confect/groups/storage.impl.ts": {
+    "curly": {
+      "count": 2
+    },
+    "typescript/array-type": {
+      "count": 2
+    }
+  },
+  "tools/local-backend/fixtures/confect/groups/transactions.impl.ts": {
+    "curly": {
+      "count": 2
+    }
+  },
+  "tools/oxlint-rules/src/noSchemaCodecWrappers.ts": {
+    "curly": {
+      "count": 24
+    },
+    "eqeqeq": {
+      "count": 3
+    },
+    "object-shorthand": {
+      "count": 1
+    },
+    "typescript/no-non-null-assertion": {
+      "count": 10
+    }
+  },
+  "tools/oxlint-rules/src/preferEffectVitest.ts": {
+    "object-shorthand": {
+      "count": 1
+    }
+  },
+  "tools/oxlint-rules/src/preferTestEach.ts": {
+    "curly": {
+      "count": 45
+    },
+    "eqeqeq": {
+      "count": 4
+    },
+    "object-shorthand": {
+      "count": 1
+    }
+  },
+  "tools/oxlint-rules/src/requireQueryStreamExperimental.ts": {
+    "curly": {
+      "count": 4
+    },
+    "eqeqeq": {
+      "count": 2
+    },
+    "object-shorthand": {
+      "count": 1
+    }
+  },
+  "tools/oxlint-rules/test/preferEffectVitest.test.ts": {
+    "quality/no-chained-type-assertions": {
+      "count": 1
+    }
+  }
+}

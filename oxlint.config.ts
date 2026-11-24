@@ -1,52 +1,54 @@
-{
-  "$schema": "./node_modules/@effect/tsgo/oxlint-schema.json",
-  "extends": ["./node_modules/@effect/tsgo/oxlint-presets/recommended.json"],
-  "plugins": [
-    "typescript",
-    "unicorn",
-    "import",
-    "promise",
-    "node",
-    "oxc",
-    "effecttsgo"
-  ],
-  "jsPlugins": [
+import cloudflare from "@cloudflare/oxlint-config";
+import { recommended as effectTsgoRecommended } from "@effect/tsgo/oxlint-presets";
+import type { OxlintConfig } from "oxlint";
+
+export default {
+  extends: [cloudflare, effectTsgoRecommended],
+  plugins: ["typescript", "unicorn", "import", "promise", "node", "oxc"],
+  jsPlugins: [
     "confect-oxlint-rules",
     {
-      "name": "jsdoc-style",
-      "specifier": "eslint-plugin-jsdoc"
-    }
+      name: "jsdoc-style",
+      specifier: "eslint-plugin-jsdoc",
+    },
   ],
-  "settings": {
-    "jsdoc": {
-      "tagNamePreference": {
-        "typeParam": "typeParam"
-      }
-    }
+  settings: {
+    jsdoc: {
+      tagNamePreference: {
+        typeParam: "typeParam",
+      },
+    },
   },
-  "options": {
-    "typeAware": true,
-    "denyWarnings": true,
-    "reportUnusedDisableDirectives": "deny"
+  options: {
+    typeAware: true,
+    denyWarnings: true,
+    reportUnusedDisableDirectives: "deny",
   },
-  "categories": {
-    "correctness": "error",
-    "suspicious": "error",
-    "perf": "error"
+  categories: {
+    correctness: "error",
+    suspicious: "error",
+    perf: "error",
   },
-  "env": {
-    "builtin": true
+  env: {
+    builtin: true,
   },
-  "ignorePatterns": [
+  ignorePatterns: [
     "**/dist/**",
     "**/coverage/**",
-    "**/node_modules/**",
+    ...(cloudflare.ignorePatterns ?? []),
     "**/.pnpm-store/**",
     "**/.tsup/**",
     "**/_generated/**",
-    "**/.mintlify/**"
+    "**/.mintlify/**",
   ],
-  "rules": {
+  rules: {
+    "import/no-namespace": "off",
+    "react/react-in-jsx-scope": "off",
+    "typescript/await-thenable": "error",
+    "typescript/no-empty-object-type": [
+      "error",
+      { allowObjectTypes: "always", allowInterfaces: "with-single-extends" },
+    ],
     "confect/no-schema-codec-wrappers": "error",
     "confect/require-query-stream-experimental": "error",
     "jsdoc-style/check-alignment": "error",
@@ -54,34 +56,34 @@
       "error",
       "never",
       {
-        "disableWrapIndent": true,
-        "preserveMainDescriptionPostDelimiter": true
-      }
+        disableWrapIndent: true,
+        preserveMainDescriptionPostDelimiter: true,
+      },
     ],
     "jsdoc-style/no-multi-asterisks": [
       "error",
       {
-        "allowWhitespace": true
-      }
+        allowWhitespace: true,
+      },
     ],
     "jsdoc-style/require-asterisk-prefix": "error",
     "jsdoc-style/require-hyphen-before-param-description": [
       "error",
       "always",
       {
-        "tags": {
-          "template": "always",
-          "typeParam": "always"
-        }
-      }
+        tags: {
+          template: "always",
+          typeParam: "always",
+        },
+      },
     ],
     "no-unused-vars": [
       "error",
       {
-        "argsIgnorePattern": "^_",
-        "varsIgnorePattern": "^_",
-        "ignoreRestSiblings": true
-      }
+        argsIgnorePattern: "^_",
+        varsIgnorePattern: "^_",
+        ignoreRestSiblings: true,
+      },
     ],
     "no-underscore-dangle": "off",
     "unicorn/consistent-function-scoping": "off",
@@ -246,95 +248,152 @@
     "effecttsgo/unnecessary-typeof-type": "error",
     "effecttsgo/unsafe-effect-type-assertion": "error",
     "effecttsgo/unstable-api-usage": "off",
-    "effecttsgo/yield-in-call-argument": "error"
+    "effecttsgo/yield-in-call-argument": "error",
   },
-  "overrides": [
+  overrides: [
     {
-      "files": ["packages/server/test/Document.bench.ts"],
-      "rules": {
-        "confect/no-schema-codec-wrappers": "off"
-      }
+      files: ["packages/cli/bin/*.mjs"],
+      env: { node: true },
+      rules: { "no-console": "off" },
     },
     {
-      "files": ["**/*.{ts,tsx,mts,cts}"],
-      "rules": {
+      files: ["packages/server/test/Document.bench.ts"],
+      rules: {
+        "confect/no-schema-codec-wrappers": "off",
+      },
+    },
+    {
+      files: ["**/*.{ts,tsx,mts,cts}"],
+      rules: {
+        "constructor-super": "error",
+        "getter-return": "error",
+        "no-class-assign": "error",
+        "no-const-assign": "error",
+        "no-dupe-class-members": "error",
+        "no-dupe-keys": "error",
+        "no-func-assign": "error",
+        "no-import-assign": "error",
+        "no-new-native-nonconstructor": "error",
+        "no-obj-calls": "error",
+        "no-setter-return": "error",
+        "no-this-before-super": "error",
+        "no-unreachable": "error",
+        "no-unsafe-negation": "error",
+        "no-with": "error",
+        "typescript/unbound-method": "error",
         "typescript/consistent-type-imports": "error",
-        "no-shadow": "error"
-      }
+        "no-shadow": "error",
+      },
     },
     {
-      "files": ["**/*.{js,jsx,mjs,cjs,ts,tsx,mts,cts}"],
-      "rules": {
+      files: ["**/*.{js,jsx,mjs,cjs,ts,tsx,mts,cts}"],
+      rules: {
         "unicorn/filename-case": [
           "error",
           {
-            "cases": {
-              "camelCase": true,
-              "pascalCase": true
-            }
-          }
-        ]
-      }
+            cases: {
+              camelCase: true,
+              pascalCase: true,
+            },
+          },
+        ],
+      },
     },
     {
-      "files": ["**/*.{ts,tsx,mts,cts}"],
-      "rules": {
+      files: ["**/*.{ts,tsx,mts,cts}"],
+      rules: {
         "no-restricted-imports": [
           "error",
           {
-            "paths": [
+            paths: [
               {
-                "name": "effect",
-                "message": "Import Effect modules from their submodule path so they tree-shake, e.g. `import * as Schema from \"effect/Schema\"`. Bare helpers (pipe, flow, identity) come from \"effect/Function\".",
-                "allowTypeImports": true
-              }
+                name: "effect",
+                message:
+                  'Import Effect modules from their submodule path so they tree-shake, e.g. `import * as Schema from "effect/Schema"`. Bare helpers (pipe, flow, identity) come from "effect/Function".',
+                allowTypeImports: true,
+              },
             ],
-            "patterns": [
+            patterns: [
               {
-                "group": ["@effect/*", "!@effect/vitest", "!@effect/tsgo/**"],
-                "message": "Import @effect/* modules from their submodule path so they tree-shake, e.g. `import * as Path from \"@effect/platform/Path\"`.",
-                "allowTypeImports": true
-              }
-            ]
-          }
-        ]
-      }
+                group: ["@effect/*", "!@effect/vitest", "!@effect/tsgo/**"],
+                message:
+                  'Import @effect/* modules from their submodule path so they tree-shake, e.g. `import * as Path from "@effect/platform/Path"`.',
+                allowTypeImports: true,
+              },
+            ],
+          },
+        ],
+      },
     },
     {
-      "files": ["**/*.spec.ts"],
-      "rules": {
+      files: ["**/*.spec.ts"],
+      rules: {
+        "typescript/no-explicit-any": "error",
+        "typescript/no-non-null-assertion": "error",
+        "typescript/no-unsafe-argument": "error",
+        "typescript/no-unsafe-assignment": "error",
+        "typescript/no-unsafe-member-access": "error",
+        "typescript/only-throw-error": "error",
         "no-restricted-imports": [
           "error",
           {
-            "paths": [
+            paths: [
               {
-                "name": "effect",
-                "message": "Import Effect modules from their submodule path so they tree-shake, e.g. `import * as Schema from \"effect/Schema\"`. Bare helpers (pipe, flow, identity) come from \"effect/Function\".",
-                "allowTypeImports": true
+                name: "effect",
+                message:
+                  'Import Effect modules from their submodule path so they tree-shake, e.g. `import * as Schema from "effect/Schema"`. Bare helpers (pipe, flow, identity) come from "effect/Function".',
+                allowTypeImports: true,
               },
               {
-                "name": "@confect/server",
-                "message": "Spec modules are bundled into the client, so anything they import ships to the browser. Move server logic into a `*.impl.ts` module, or use `import type` if you only need the types.",
-                "allowTypeImports": true
-              }
+                name: "@confect/server",
+                message:
+                  "Spec modules are bundled into the client, so anything they import ships to the browser. Move server logic into a `*.impl.ts` module, or use `import type` if you only need the types.",
+                allowTypeImports: true,
+              },
             ],
-            "patterns": [
+            patterns: [
               {
-                "group": ["@effect/*", "!@effect/vitest"],
-                "message": "Import @effect/* modules from their submodule path so they tree-shake, e.g. `import * as Path from \"@effect/platform/Path\"`.",
-                "allowTypeImports": true
-              }
-            ]
-          }
-        ]
-      }
+                group: ["@effect/*", "!@effect/vitest"],
+                message:
+                  'Import @effect/* modules from their submodule path so they tree-shake, e.g. `import * as Path from "@effect/platform/Path"`.',
+                allowTypeImports: true,
+              },
+            ],
+          },
+        ],
+      },
     },
     {
-      "files": ["**/*.test.{ts,tsx,mts,cts}"],
-      "rules": {
+      files: ["**/*.test.{ts,tsx,mts,cts}"],
+      rules: {
+        "vitest/no-standalone-expect": [
+          "error",
+          {
+            additionalTestBlockFunctions: [
+              "it",
+              "it.effect",
+              "it.live",
+              "Effect.gen",
+              "Effect.sync",
+              "Effect.fnUntraced",
+            ],
+          },
+        ],
+        "vitest/expect-expect": [
+          "error",
+          {
+            assertFunctionNames: [
+              "expect",
+              "expectTypeOf",
+              "assert",
+              "assertType",
+              "Testing.expectNoDiagnostics",
+            ],
+          },
+        ],
         "confect/prefer-effect-vitest": "error",
-        "confect/prefer-test-each": "error"
-      }
-    }
-  ]
-}
+        "confect/prefer-test-each": "error",
+      },
+    },
+  ],
+} satisfies OxlintConfig;
