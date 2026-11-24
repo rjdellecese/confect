@@ -317,6 +317,7 @@ export const match: {
     self: QueryResult<A, E>,
     options: MatchOptions<A, E, X, Y, Z>,
   ): MatchReturns<E, X, Y, Z> =>
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- match excludes Z when E is never: only a Failure can invoke onFailure, and its error must be an E.
     Match.value(self).pipe(
       Match.tag("Loading", (loading) => options.onLoading(loading.skipped)),
       Match.tag("Success", (success) => options.onSuccess(success.value)),

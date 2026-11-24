@@ -66,7 +66,7 @@ const make = (
     Ref.Returns<Query>,
     Ref.Error<Query> | HttpClientError | Schema.SchemaError
   > => {
-    const args = (rest[0] ?? {}) as Ref.Args<Query>;
+    const args = Ref.argsOrEmpty<Query>(rest);
     return runQuery(
       Ref.runWithCodec(
         ref,
@@ -85,7 +85,7 @@ const make = (
     Ref.Returns<Mutation>,
     Ref.Error<Mutation> | HttpClientError | Schema.SchemaError
   > => {
-    const args = (rest[0] ?? {}) as Ref.Args<Mutation>;
+    const args = Ref.argsOrEmpty<Mutation>(rest);
     const mutationOptions: HttpMutationOptions = rest[1] ?? {
       skipQueue: false,
     };
@@ -107,7 +107,7 @@ const make = (
     Ref.Returns<Action>,
     Ref.Error<Action> | HttpClientError | Schema.SchemaError
   > => {
-    const args = (rest[0] ?? {}) as Ref.Args<Action>;
+    const args = Ref.argsOrEmpty<Action>(rest);
     return runAction(
       Ref.runWithCodec(
         ref,

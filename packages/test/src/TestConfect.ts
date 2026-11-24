@@ -256,7 +256,7 @@ class TestConfectImplWithoutIdentity<
   > =>
     Ref.runWithCodec(
       queryRef,
-      (args[0] ?? {}) as Ref.Args<QueryRef>,
+      Ref.argsOrEmpty<QueryRef>(args),
       (functionReference, encodedArgs) =>
         this.testConvex.query<FunctionReference<"query", FunctionVisibility>>(
           functionReference,
@@ -273,7 +273,7 @@ class TestConfectImplWithoutIdentity<
   > =>
     Ref.runWithCodec(
       mutationRef,
-      (args[0] ?? {}) as Ref.Args<MutationRef>,
+      Ref.argsOrEmpty<MutationRef>(args),
       (functionReference, encodedArgs) =>
         this.testConvex.mutation<
           FunctionReference<"mutation", FunctionVisibility>
@@ -289,7 +289,7 @@ class TestConfectImplWithoutIdentity<
   > =>
     Ref.runWithCodec(
       actionRef,
-      (args[0] ?? {}) as Ref.Args<ActionRef>,
+      Ref.argsOrEmpty<ActionRef>(args),
       (functionReference, encodedArgs) =>
         this.testConvex.action<FunctionReference<"action", FunctionVisibility>>(
           functionReference,
@@ -464,6 +464,7 @@ export const layer = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
     () =>
       new TestConfectImpl<DatabaseSchema_>(
         tableNames,
+        // oxlint-disable-next-line typescript/no-unsafe-type-assertion, typescript/no-explicit-any, typescript/no-unsafe-argument -- The generated deployment schema retains table names, not field or index types. The public layer pairs it with its Confect schema to restore the mutation context's data model.
         convexTest(convexSchemaDefinition, modules) as any,
       ),
   );

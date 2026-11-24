@@ -4,6 +4,7 @@ import { renderHook } from "@testing-library/react";
 import { ConvexError } from "convex/values";
 import type { Value } from "convex/values";
 import type { FunctionReference } from "convex/server";
+import type { RequestForQueries } from "convex/react";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as Result from "effect/Result";
@@ -64,17 +65,14 @@ const user = (
 
 type WireCall = (args: Record<string, Value>) => Promise<Value>;
 const {
-  useConvexQueryMock,
+  useConvexQueriesMock,
   useConvexMutationMock,
   useConvexActionMock,
   useConvexPaginatedQueryInternalMock,
 } = vi.hoisted(() => ({
-  useConvexQueryMock:
+  useConvexQueriesMock:
     vi.fn<
-      (
-        query: FunctionReference<"query">,
-        args: Record<string, Value> | "skip",
-      ) => Value | undefined
+      (queries: RequestForQueries) => { query?: Value | Error | undefined }
     >(),
   useConvexMutationMock:
     vi.fn<(mutation: FunctionReference<"mutation">) => WireCall>(),
@@ -92,7 +90,7 @@ const {
 }));
 
 vi.mock("convex/react", () => ({
-  useQuery: useConvexQueryMock,
+  useQueries: useConvexQueriesMock,
   useMutation: useConvexMutationMock,
   useAction: useConvexActionMock,
   usePaginatedQuery: () => {
@@ -164,7 +162,7 @@ const actionNoError = Ref.make(
 );
 
 beforeEach(() => {
-  useConvexQueryMock.mockReset();
+  useConvexQueriesMock.mockReset();
   useConvexMutationMock.mockReset();
   useConvexActionMock.mockReset();
   useConvexPaginatedQueryInternalMock.mockReset();
@@ -172,7 +170,7 @@ beforeEach(() => {
 
 describe("useQuery", () => {
   test("returns Loading when convex returns undefined", () => {
-    useConvexQueryMock.mockReturnValue(undefined);
+    useConvexQueriesMock.mockReturnValue({});
 
     const { result } = renderHook(() => useQuery(queryNoError, {}));
 
@@ -181,7 +179,7 @@ describe("useQuery", () => {
   });
 
   test("returns Success with decoded value", () => {
-    useConvexQueryMock.mockReturnValue([{ text: "hello" }]);
+    useConvexQueriesMock.mockReturnValue({ query: [{ text: "hello" }] });
 
     const { result } = renderHook(() => useQuery(queryNoError, {}));
 
@@ -190,8 +188,8 @@ describe("useQuery", () => {
   });
 
   test("Failure carries decoded typed error for a matching ConvexError", () => {
-    useConvexQueryMock.mockImplementation(() => {
-      throw new ConvexError({ _tag: "NotFound", id: "abc" });
+    useConvexQueriesMock.mockReturnValue({
+      query: new ConvexError({ _tag: "NotFound", id: "abc" }),
     });
 
     const { result } = renderHook(() =>
@@ -205,9 +203,7 @@ describe("useQuery", () => {
 
   test("rethrows a non-ConvexError as a defect", () => {
     const transportError = new Error("network down");
-    useConvexQueryMock.mockImplementation(() => {
-      throw transportError;
-    });
+    useConvexQueriesMock.mockReturnValue({ query: transportError });
 
     expect(() =>
       renderHook(() => useQuery(queryWithError, { id: "abc" })),
@@ -216,9 +212,7 @@ describe("useQuery", () => {
 
   test("rethrows a ConvexError from a ref without an error schema", () => {
     const convexError = new ConvexError({ _tag: "Anything", id: "abc" });
-    useConvexQueryMock.mockImplementation(() => {
-      throw convexError;
-    });
+    useConvexQueriesMock.mockReturnValue({ query: convexError });
 
     expect(() => renderHook(() => useQuery(queryNoError, {}))).toThrow(
       convexError,
@@ -226,50 +220,49 @@ describe("useQuery", () => {
   });
 
   test("`skip` on a query with no args returns Loading with skipped true", () => {
-    useConvexQueryMock.mockReturnValue(undefined);
+    useConvexQueriesMock.mockReturnValue({});
 
     const { result } = renderHook(() => useQuery(queryNoError, "skip"));
 
     assert(QueryResult.isLoading(result.current));
     expect(result.current.skipped).toBe(true);
-    expect(useConvexQueryMock).toHaveBeenLastCalledWith(
-      expect.anything(),
-      "skip",
-    );
+    expect(useConvexQueriesMock).toHaveBeenLastCalledWith({});
   });
 
   test("`skip` on a query with required args returns Loading with skipped true", () => {
-    useConvexQueryMock.mockReturnValue(undefined);
+    useConvexQueriesMock.mockReturnValue({});
 
     const { result } = renderHook(() => useQuery(queryWithError, "skip"));
 
     assert(QueryResult.isLoading(result.current));
     expect(result.current.skipped).toBe(true);
-    expect(useConvexQueryMock).toHaveBeenLastCalledWith(
-      expect.anything(),
-      "skip",
-    );
+    expect(useConvexQueriesMock).toHaveBeenLastCalledWith({});
   });
 
   test("preserves QueryResult identity across rerenders for an unchanged convex result", () => {
     const encodedResult = [{ text: "hello" }];
-    useConvexQueryMock.mockReturnValue(encodedResult);
+    useConvexQueriesMock.mockReturnValue({ query: encodedResult });
 
     const { result, rerender } = renderHook(() => useQuery(queryNoError, {}));
     const first = result.current;
 
+    const requests = useConvexQueriesMock.mock.lastCall?.[0];
+    expect(requests).toEqual({
+      query: { query: Ref.getFunctionReference(queryNoError), args: {} },
+    });
     rerender();
+    expect(useConvexQueriesMock.mock.lastCall?.[0]).toBe(requests);
 
     expect(result.current).toBe(first);
   });
 
   test("produces a new QueryResult when the convex result identity changes", () => {
-    useConvexQueryMock.mockReturnValue([{ text: "hello" }]);
+    useConvexQueriesMock.mockReturnValue({ query: [{ text: "hello" }] });
 
     const { result, rerender } = renderHook(() => useQuery(queryNoError, {}));
     const first = result.current;
 
-    useConvexQueryMock.mockReturnValue([{ text: "hello" }]);
+    useConvexQueriesMock.mockReturnValue({ query: [{ text: "hello" }] });
     rerender();
 
     expect(result.current).not.toBe(first);
@@ -278,7 +271,7 @@ describe("useQuery", () => {
   });
 
   test("preserves Loading identity across rerenders while convex returns undefined", () => {
-    useConvexQueryMock.mockReturnValue(undefined);
+    useConvexQueriesMock.mockReturnValue({});
 
     const { result, rerender } = renderHook(() => useQuery(queryNoError, {}));
     const first = result.current;
@@ -290,9 +283,7 @@ describe("useQuery", () => {
 
   test("preserves Failure identity across rerenders for an unchanged ConvexError", () => {
     const convexError = new ConvexError({ _tag: "NotFound", id: "abc" });
-    useConvexQueryMock.mockImplementation(() => {
-      throw convexError;
-    });
+    useConvexQueriesMock.mockReturnValue({ query: convexError });
 
     const { result, rerender } = renderHook(() =>
       useQuery(queryWithError, { id: "abc" }),
@@ -305,8 +296,30 @@ describe("useQuery", () => {
     expect(result.current).toBe(first);
   });
 
+  test("resubscribes with changed arguments and recovers from a declared error", () => {
+    useConvexQueriesMock.mockReturnValue({
+      query: new ConvexError({ _tag: "NotFound", id: "missing" }),
+    });
+    const { result, rerender } = renderHook(
+      ({ id }) => useQuery(queryWithError, { id }),
+      { initialProps: { id: "missing" } },
+    );
+    assert(QueryResult.isFailure(result.current));
+    expect(result.current.error.id).toBe("missing");
+
+    useConvexQueriesMock.mockReturnValue({ query: { text: "found" } });
+    rerender({ id: "present" });
+    expect(useConvexQueriesMock).toHaveBeenLastCalledWith({
+      query: {
+        query: Ref.getFunctionReference(queryWithError),
+        args: { id: "present" },
+      },
+    });
+    expect(result.current).toEqual(QueryResult.succeed({ text: "found" }));
+  });
+
   test("produces a new Loading when `skipped` changes while convex returns undefined", () => {
-    useConvexQueryMock.mockReturnValue(undefined);
+    useConvexQueriesMock.mockReturnValue({});
 
     const { result, rerender } = renderHook(
       ({ args }: { args: Record<string, never> | "skip" }) =>

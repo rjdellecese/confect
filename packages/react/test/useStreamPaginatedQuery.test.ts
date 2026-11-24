@@ -228,6 +228,7 @@ describe("useStreamPaginatedQuery", () => {
       const canLoadMore = current(result);
       assert(canLoadMore._tag === "CanLoadMore");
       canLoadMore.loadMore(2);
+      canLoadMore.loadMore(4);
     });
 
     // The last page is already pinned, so loading more just appends a new

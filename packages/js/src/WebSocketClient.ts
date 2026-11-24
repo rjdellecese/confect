@@ -92,7 +92,7 @@ const make = (
       Ref.Returns<Query>,
       Ref.Error<Query> | WebSocketClientError | Schema.SchemaError
     > => {
-      const args = (rest[0] ?? {}) as Ref.Args<Query>;
+      const args = Ref.argsOrEmpty<Query>(rest);
       return runQuery(
         Ref.runWithCodec(
           ref,
@@ -111,7 +111,7 @@ const make = (
       Ref.Returns<Mutation>,
       Ref.Error<Mutation> | WebSocketClientError | Schema.SchemaError
     > => {
-      const args = (rest[0] ?? {}) as Ref.Args<Mutation>;
+      const args = Ref.argsOrEmpty<Mutation>(rest);
       return runMutation(
         Ref.runWithCodec(
           ref,
@@ -130,7 +130,7 @@ const make = (
       Ref.Returns<Action>,
       Ref.Error<Action> | WebSocketClientError | Schema.SchemaError
     > => {
-      const args = (rest[0] ?? {}) as Ref.Args<Action>;
+      const args = Ref.argsOrEmpty<Action>(rest);
       return runAction(
         Ref.runWithCodec(
           ref,
@@ -157,7 +157,7 @@ const make = (
         Ref.Returns<Query>,
         ReactiveQueryError<Query>
       >;
-      const args = (rest[0] ?? {}) as Ref.Args<Query>;
+      const args = Ref.argsOrEmpty<Query>(rest);
       const functionReference = Ref.getFunctionReference(ref);
       const onError = Ref.decodeErrorOrElse(ref, mapUnknownError);
 

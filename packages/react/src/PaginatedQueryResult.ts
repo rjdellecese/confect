@@ -541,6 +541,7 @@ export const match: {
     self: Variants<Item, E>,
     options: MatchOptions<Item, E, V, W, X, Y, Z>,
   ): MatchReturns<E, V, W, X, Y, Z> =>
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- match excludes Z when E is never: only a Failure can invoke onFailure, and its error must be an E.
     Match.value(self).pipe(
       Match.tag("LoadingFirstPage", (loadingFirstPage_) =>
         options.onLoadingFirstPage(loadingFirstPage_.skipped),

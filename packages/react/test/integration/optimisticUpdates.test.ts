@@ -17,25 +17,50 @@ import { vi } from "vitest";
 
 const Json = Schema.fromJsonString(Schema.Unknown);
 
-class TestSocket {
+class TestSocket extends EventTarget implements WebSocket {
+  static readonly CONNECTING = 0;
+  static readonly OPEN = 1;
+  static readonly CLOSING = 2;
+  static readonly CLOSED = 3;
+  readonly CONNECTING = TestSocket.CONNECTING;
+  readonly OPEN = TestSocket.OPEN;
+  readonly CLOSING = TestSocket.CLOSING;
+  readonly CLOSED = TestSocket.CLOSED;
   static current: TestSocket | undefined;
-  onopen: (() => void) | undefined;
-  onmessage: ((event: { data: string }) => void) | undefined;
-  onclose: (() => void) | undefined;
+  readonly url: string;
+  readonly bufferedAmount = 0;
+  readonly extensions = "";
+  readonly protocol = "";
+  binaryType: BinaryType = "blob";
+  readyState: WebSocket["readyState"] = TestSocket.CONNECTING;
+  onopen: WebSocket["onopen"] = null;
+  onmessage: WebSocket["onmessage"] = null;
+  onclose: WebSocket["onclose"] = null;
+  onerror: WebSocket["onerror"] = null;
   send = vi.fn<WebSocket["send"]>();
 
-  constructor() {
+  constructor(url: string | URL) {
+    super();
+    this.url = String(url);
     TestSocket.current = this;
   }
 
+  open() {
+    this.readyState = TestSocket.OPEN;
+    this.dispatchEvent(new Event("open"));
+  }
+
   receive(message: unknown) {
-    this.onmessage?.({
-      data: Result.getOrThrow(Schema.encodeResult(Json)(message)),
-    });
+    this.dispatchEvent(
+      new MessageEvent("message", {
+        data: Result.getOrThrow(Schema.encodeResult(Json)(message)),
+      }),
+    );
   }
 
   close() {
-    this.onclose?.();
+    this.readyState = TestSocket.CLOSED;
+    this.dispatchEvent(new CloseEvent("close"));
   }
 }
 
@@ -74,7 +99,7 @@ it.effect(
   () =>
     Effect.gen(function* () {
       const client = new ConvexReactClient("https://example.convex.cloud", {
-        webSocketConstructor: TestSocket as unknown as typeof WebSocket,
+        webSocketConstructor: TestSocket,
         unsavedChangesWarning: false,
         logger: false,
       });
@@ -91,7 +116,7 @@ it.effect(
       const unsubscribeSecond = second.onUpdate(vi.fn());
       const socket = TestSocket.current;
       assert(socket !== undefined);
-      socket.onopen?.();
+      socket.open();
       const version0 = { querySet: 0, identity: 0, ts: "AAAAAAAAAAA=" };
       const version1 = { querySet: 2, identity: 0, ts: "AQAAAAAAAAA=" };
       const version2 = { querySet: 2, identity: 0, ts: "AgAAAAAAAAA=" };

@@ -777,6 +777,7 @@ export const make = <Query extends Ref.AnyConfectPublicPaginatedQuery>(
     ...("error" in ref && ref.error !== undefined ? [ref.error] : []),
     ...MiddlewareSpec.errorSchemas(ref.middlewareSpecs),
   ];
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- The public Error<Query> includes FunctionError exactly when the ref or its middleware contributes an error codec below.
   const errorSchema = Schema.Union([
     PaginationError.InvalidCursor,
     Client.WebSocketClientError,
@@ -864,73 +865,34 @@ export const make = <Query extends Ref.AnyConfectPublicPaginatedQuery>(
 
   const init: PaginatedQuery<Query>["init"] = (
     state: Idle,
-    argsOrOptions: UserArgs<Query> | Options,
-    options?: Options,
+    ...params: [options: Options] | [args: UserArgs<Query>, options: Options]
   ): MachineActive<Query> =>
-    Match.value(options).pipe(
-      Match.withReturnType<MachineActive<Query>>(),
-      Match.when(undefined, () =>
-        initialState(
-          state.generation + 1,
-          {} as UserArgs<Query>,
-          argsOrOptions as Options,
-        ),
-      ),
-      Match.when(Match.defined, (definedOptions) =>
-        initialState(
-          state.generation + 1,
-          argsOrOptions as UserArgs<Query>,
-          definedOptions,
-        ),
-      ),
-      Match.exhaustive,
-    );
+    params.length === 2
+      ? initialState(state.generation + 1, params[0], params[1])
+      : // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- Only refs with no user fields expose init(idle, options).
+        initialState(state.generation + 1, {} as UserArgs<Query>, params[0]);
 
   const reinitialize: PaginatedQuery<Query>["reinitialize"] = (
     state: MachineActive<Query>,
-    argsOrOptions?: UserArgs<Query> | Options,
-    options?: Options,
-  ): MachineActive<Query> =>
-    Match.value(options).pipe(
-      Match.withReturnType<MachineActive<Query>>(),
-      Match.when(Match.defined, (definedOptions) =>
-        initialState(
-          state.generation + 1,
-          argsOrOptions as UserArgs<Query>,
-          definedOptions,
-        ),
-      ),
-      Match.when(undefined, () =>
-        Match.value(argsOrOptions).pipe(
-          Match.withReturnType<MachineActive<Query>>(),
-          Match.when(undefined, () =>
-            initialState(state.generation + 1, state.args, state.options),
-          ),
-          Match.when(Match.defined, (definedArgsOrOptions) =>
-            Match.value(hasUserArgs).pipe(
-              Match.withReturnType<MachineActive<Query>>(),
-              Match.when(true, () =>
-                initialState(
-                  state.generation + 1,
-                  definedArgsOrOptions as UserArgs<Query>,
-                  state.options,
-                ),
-              ),
-              Match.when(false, () =>
-                initialState(
-                  state.generation + 1,
-                  state.args,
-                  definedArgsOrOptions as Options,
-                ),
-              ),
-              Match.exhaustive,
-            ),
-          ),
-          Match.exhaustive,
-        ),
-      ),
-      Match.exhaustive,
-    );
+    ...params:
+      | [options?: Options | undefined]
+      | [args: UserArgs<Query>, options?: Options | undefined]
+  ): MachineActive<Query> => {
+    const generation = state.generation + 1;
+    if (params.length === 2) {
+      return initialState(generation, params[0], params[1] ?? state.options);
+    }
+    const [single] = params;
+    if (single === undefined) {
+      return initialState(generation, state.args, state.options);
+    }
+    if (hasUserArgs) {
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- For refs with user fields the single argument is user args, even if those fields look like pagination options.
+      return initialState(generation, single as UserArgs<Query>, state.options);
+    }
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- With no user fields the public reinitialize(active, options?) overload accepts only options here.
+    return initialState(generation, state.args, single as Options);
+  };
 
   return {
     ref,

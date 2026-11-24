@@ -8,7 +8,7 @@
  */
 import { Ref } from "@confect/core";
 import type { OptimisticLocalStore as ConvexOptimisticLocalStore } from "convex/browser";
-import { compareValues, convexToJson } from "convex/values";
+import { compareValues } from "convex/values";
 import type { Value } from "convex/values";
 import * as Option from "effect/Option";
 import * as Array from "effect/Array";
@@ -17,6 +17,7 @@ import * as Result from "effect/Result";
 import * as Record from "effect/Record";
 import type * as Order from "effect/Order";
 import { pipe } from "effect/Function";
+import { toWireArgs } from "./internal/queryArgs";
 import type {
   PaginatedArgs as PaginatedQueryArgs,
   PaginatedItem as PaginatedQueryItem,
@@ -110,7 +111,7 @@ export const make = (
 ): OptimisticLocalStore => ({
   getQuery: (queryRef, ...rest) => {
     const functionReference = Ref.getFunctionReference(queryRef);
-    const args = (rest[0] ?? {}) as Ref.Args<typeof queryRef>;
+    const args = Ref.argsOrEmpty<typeof queryRef>(rest);
     const encodedArgs = Ref.encodeArgsSync(queryRef, args);
     const encoded: unknown = convexLocalStore.getQuery(
       functionReference,
@@ -216,15 +217,10 @@ const Json = Schema.fromJsonString(Schema.Unknown);
 
 const serializedUserArgs = <Query extends Ref.AnyPublicPaginatedQuery>(
   query: Query,
-  args: unknown,
+  args: Omit<Ref.Args<Query>, "paginationOpts"> | PaginatedQueryArgs<Query>,
 ): Result.Result<string, QueryArgsEncodingError> =>
-  Result.try(() =>
-    convexToJson(
-      Ref.encodePaginatedQueryArgsSync(
-        query,
-        args as Omit<Ref.Args<Query>, "paginationOpts">,
-      ) as Value,
-    ),
+  Result.try(
+    () => toWireArgs(Ref.encodePaginatedQueryArgsSync(query, args)).json,
   ).pipe(
     Result.flatMap(Schema.encodeResult(Json)),
     Result.mapError((cause) =>
