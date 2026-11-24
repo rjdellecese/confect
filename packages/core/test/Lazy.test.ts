@@ -1,8 +1,20 @@
-import { assert, describe, expect, test } from "@effect/vitest";
+import { assert, describe, expect, expectTypeOf, test } from "@effect/vitest";
 import * as Lazy from "@confect/core/Lazy";
 import * as MutableRef from "effect/MutableRef";
 
 describe("Lazy.defineProperty", () => {
+  test.each(["other", "another"])(
+    "adds only statically known keys to the target type (%s)",
+    (key) => {
+      const target = {};
+      Lazy.defineProperty(target, "value", () => 7);
+      expectTypeOf(target.value).toEqualTypeOf<number>();
+      Lazy.defineProperty(target, key, () => "dynamic");
+      expectTypeOf<keyof typeof target>().toEqualTypeOf<"value">();
+      expect(target).toEqual({ value: 7, [key]: "dynamic" });
+    },
+  );
+
   test("does not run compute until the property is first accessed", () => {
     const target = {};
     const calls = MutableRef.make(0);

@@ -71,12 +71,9 @@ type FunctionSpecMatchesPredicate<
   FunctionSpec_ extends FunctionSpec.AnyWithProps,
   Predicate extends Ref.Any,
 > =
-  Ref.Ref<
+  Ref.ErasedRef<
     FunctionSpec.GetRuntimeAndFunctionType<FunctionSpec_>,
-    FunctionSpec.GetFunctionVisibility<FunctionSpec_>,
-    any,
-    any,
-    any
+    FunctionSpec.GetFunctionVisibility<FunctionSpec_>
   > extends Predicate
     ? true
     : false;
@@ -137,10 +134,8 @@ export const make = <Spec_ extends Spec.AnyWithProps>(
   spec: Spec_,
 ): FromSpec<Spec_> => {
   const refs = makeHelper(Spec.groups(spec));
-  return {
-    public: refs as Refs<Spec_, Ref.AnyPublic>,
-    internal: refs as Refs<Spec_, Ref.AnyInternal>,
-  };
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- Both generated views share one runtime tree; their mapped types filter the same leaves by spec visibility.
+  return { public: refs, internal: refs } as FromSpec<Spec_>;
 };
 
 const makeHelper = (
