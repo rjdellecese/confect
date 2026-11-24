@@ -56,8 +56,6 @@ The workspace uses the Rust TypeScript compiler, `tsrs`. The root `prepare` scri
 
 Vite+ and standalone Oxlint share `oxlint.config.ts`, which extends Cloudflare's preset and Effect's recommended rules. Confect allows namespace imports for its module-oriented APIs and checks `*.spec.ts` as application code, not as tests.
 
-`oxlint-suppressions.json` records the initial Cloudflare findings by file, rule, and count. Don't regenerate it to make new violations pass. After fixing an existing finding, run `pnpm oxlint --prune-suppressions` from the repository root and commit the reduced counts.
-
 Lint runs through `effect-tsgo --tsrs-lint vp lint` (or `vp check`) so type-aware rules also use Rust. `pnpm oxlint` wraps the standalone linter with the same integration; bare `pnpm exec oxlint` and `pnpm exec vp lint` bypass it. The Zed Oxlint server uses the same wrapper. Keep `@effect/tsgo`, `tsrs`, and Oxlint on versions listed together in Effect's supported-component table. These integrations support Linux glibc x64/ARM64, macOS x64/ARM64, and Windows x64, not Linux musl or Windows ARM64.
 
 Every Effect lint rule except `missing-pipeable-signature`, `unstable-api-usage`, and `api-stability-leak` is explicitly enabled

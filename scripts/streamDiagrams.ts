@@ -34,7 +34,7 @@ const CORNER = "╰";
 
 export class StreamDiagramsError extends Schema.TaggedError<
   StreamDiagramsError,
-  { readonly brand: unique symbol }
+  unknown
 >()("StreamDiagramsError", { reason: Schema.String }) {
   readonly [Runtime.errorReported] = false;
 

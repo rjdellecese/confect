@@ -43,12 +43,7 @@ export default {
   ],
   rules: {
     "import/no-namespace": "off",
-    "react/react-in-jsx-scope": "off",
     "typescript/await-thenable": "error",
-    "typescript/no-empty-object-type": [
-      "error",
-      { allowObjectTypes: "always", allowInterfaces: "with-single-extends" },
-    ],
     "confect/no-schema-codec-wrappers": "error",
     "confect/require-query-stream-experimental": "error",
     "jsdoc-style/check-alignment": "error",
@@ -86,12 +81,8 @@ export default {
       },
     ],
     "no-underscore-dangle": "off",
-    "unicorn/consistent-function-scoping": "off",
     "unicorn/no-array-sort": "off",
-    "oxc/no-accumulating-spread": "off",
     "typescript/consistent-return": "off",
-    "typescript/no-unsafe-type-assertion": "off",
-    "typescript/no-unnecessary-type-assertion": "off",
     "typescript/no-unnecessary-type-arguments": "off",
     "typescript/no-unnecessary-type-parameters": "off",
     "typescript/no-generated-empty-object-type": "off",
@@ -254,7 +245,7 @@ export default {
     {
       files: ["packages/cli/bin/*.mjs"],
       env: { node: true },
-      rules: { "no-console": "off" },
+      rules: { "no-console": "error" },
     },
     {
       files: ["packages/server/test/Document.bench.ts"],
