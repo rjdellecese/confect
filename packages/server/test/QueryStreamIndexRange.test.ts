@@ -176,9 +176,8 @@ describe("QueryStreamIndexRange.apply", () => {
     }
   }
 
-  // Convex exports IndexRange only as a type; the recording fixture supplies
-  // its behavior without access to the SDK's private nominal marker.
   const recordingBuilder = () =>
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- The Convex IndexRange returned by this builder carries a private marker; the recording fixture must expose the same public chaining contract.
     new RecordingBuilder() as RecordingBuilder &
       ConvexIndexRangeBuilder<GenericDocument, Array<string>>;
 

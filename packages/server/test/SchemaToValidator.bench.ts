@@ -8,8 +8,10 @@ import type {
 } from "@confect/core/SchemaToValidator";
 
 // Force module-level instantiations so they are excluded from individual benchmarks.
+// oxlint-disable-next-line typescript/no-explicit-any, typescript/no-unsafe-type-assertion -- Prime the any specialization outside the measured callbacks.
 void ({} as ValueToValidator<any>);
 
+/* oxlint-disable typescript/no-unsafe-type-assertion -- These operands measure compiler instantiations, not runtime validator construction. Replacing the string probe with an optional parameter measures 84 instantiations instead of 99. */
 // --- Primitives and scalars ---
 
 bench("ValueToValidator<string>", () => ({}) as ValueToValidator<string>).types(
@@ -35,6 +37,7 @@ bench("ValueToValidator<null>", () => ({}) as ValueToValidator<null>).types([
 bench("ValueToValidator<ArrayBuffer>", () =>
   ({}) as ValueToValidator<ArrayBuffer>).types([85, "instantiations"]);
 
+// oxlint-disable-next-line typescript/no-explicit-any -- The any specialization is the type under measurement.
 bench("ValueToValidator<any>", () => ({}) as ValueToValidator<any>).types([
   0,
   "instantiations",
@@ -84,6 +87,7 @@ bench("ValueToValidator<string[][]>", () =>
 ]);
 
 bench("ValueToValidator<any[]>", () =>
+  // oxlint-disable-next-line typescript/no-explicit-any -- The any specialization is the type under measurement.
   ({}) as ValueToValidator<Array<any>>).types([247, "instantiations"]);
 
 // --- Objects (small/medium/large) ---
@@ -196,6 +200,8 @@ type RecursiveArr = Array<RecursiveArr>;
 bench("ValueToValidator<RecursiveArr> (recursive array)", () =>
   ({}) as ValueToValidator<RecursiveArr>).types([233, "instantiations"]);
 
+/* oxlint-enable typescript/no-unsafe-type-assertion */
+
 // --- TableSchemaToTableValidator ---
 
 const SmallTableSchema = Schema.Struct({
@@ -206,6 +212,7 @@ const SmallTableSchema = Schema.Struct({
 type SmallTableSchema = typeof SmallTableSchema;
 
 bench("TableSchemaToTableValidator (small struct)", () =>
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- Measure table-validator instantiation without constructing a runtime validator.
   ({}) as TableSchemaToTableValidator<SmallTableSchema>).types([
   10_124,
   "instantiations",
@@ -227,6 +234,7 @@ const MediumTableSchema = Schema.Struct({
 type MediumTableSchema = typeof MediumTableSchema;
 
 bench("TableSchemaToTableValidator (medium struct with optional)", () =>
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- Measure table-validator instantiation without constructing a runtime validator.
   ({}) as TableSchemaToTableValidator<MediumTableSchema>).types([
   11_392,
   "instantiations",
@@ -252,15 +260,18 @@ const LargeTableSchema = Schema.Struct({
 type LargeTableSchema = typeof LargeTableSchema;
 
 bench("TableSchemaToTableValidator (large struct)", () =>
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- Measure table-validator instantiation without constructing a runtime validator.
   ({}) as TableSchemaToTableValidator<LargeTableSchema>).types([
   13_474,
   "instantiations",
 ]);
 
 bench("ValueToValidator<Record<string, any>>", () =>
+  // oxlint-disable-next-line quality/no-unsafe-dictionary-type, typescript/no-explicit-any, typescript/no-unsafe-type-assertion -- Measure the validator for an open record of any, not a narrowed dictionary.
   ({}) as ValueToValidator<Record<string, any>>).types([629, "instantiations"]);
 
 bench("ValueToValidator (optional record)", () =>
+  // oxlint-disable-next-line quality/no-unsafe-dictionary-type, typescript/no-explicit-any, typescript/no-unsafe-type-assertion -- Measure the validator for an open record of any, not a narrowed dictionary.
   ({}) as ValueToValidator<{ metadata?: Record<string, any> }>).types([
   1234,
   "instantiations",
@@ -274,6 +285,7 @@ bench("ValueToValidator (readonly nested output)", () => {
     };
     readonly rows: ReadonlyArray<{ readonly count: number }>;
   }>;
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- Force the projected validator members into the instantiation count.
   return {} as [Vd["type"], Vd["fieldPaths"]];
 }).types([2276, "instantiations"]);
 
@@ -287,5 +299,6 @@ bench("ValueToValidator (shared subtree output)", () => {
     readonly right: Child;
     readonly nested: { readonly child: Child };
   }>;
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- Force the projected validator members into the instantiation count.
   return {} as [Vd["type"], Vd["fieldPaths"]];
 }).types([2143, "instantiations"]);

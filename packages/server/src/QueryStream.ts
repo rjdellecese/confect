@@ -557,7 +557,7 @@ Object.defineProperties(queryStreamPrototype, {
  *
  * @internal
  */
-export type Any = QueryStream<any, any, any, any, any>;
+export type Any = QueryStream<any, any, any, any, any>; // oxlint-disable-line typescript/no-explicit-any -- The exported guard exposes the full stream at every instantiation, including invariant key-label tuples.
 
 /**
  * Checks whether a value is a query stream without reading any documents. An
@@ -642,6 +642,7 @@ export interface ReflectionReader {
   query(tableName: string): {
     withIndex(
       indexName: string,
+      // oxlint-disable-next-line typescript/no-explicit-any -- Reflection readers can supply their own builder and consume its result; neither is required to be a nominal Convex IndexRange.
       indexRange?: (q: any) => any,
     ): {
       order(
@@ -782,17 +783,19 @@ const makeLeaf = <
 
   const encodedDocuments = Stream.fromIterable(indexRanges).pipe(
     Stream.flatMap((indexRange) =>
-      Stream.suspend(() =>
-        Stream.fromAsyncIterable(
+      Stream.suspend(() => {
+        const table: Table.Any = reflection.table;
+        return Stream.fromAsyncIterable(
           reflection.reader
-            .query(reflection.table.tableName)
-            .withIndex(reflection.indexName, (q) =>
-              QueryStreamIndexRange.apply(indexRange, q),
+            .query(table.tableName)
+            .withIndex(
+              reflection.indexName,
+              QueryStreamIndexRange.apply.bind(undefined, indexRange),
             )
             .order(reflection.orderDirection),
           identity,
-        ).pipe(Stream.orDie),
-      ),
+        ).pipe(Stream.orDie);
+      }),
     ),
   );
 
@@ -808,8 +811,10 @@ const makeLeaf = <
         Document.decode(reflection.table)(encoded),
         (doc) =>
           new Element({
+            // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- fromReflection exposes a caller-selected Doc; the retained table codec has decoded it but erases its output type.
             doc: Option.some(doc as Doc),
             keyValues: QueryStreamKeyValues.extract(
+              // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- The budget service yields unknown; this encoded row has already passed the table's document decoder.
               encoded as Record.ReadonlyRecord<string, unknown>,
               keyPaths,
             ),

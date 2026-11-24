@@ -5,8 +5,8 @@ import * as Cron from "effect/Cron";
 import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
 import * as Schema from "effect/Schema";
-import * as Predicate from "effect/Predicate";
-import { assert, describe, expect, test } from "@effect/vitest";
+import { describe, expect, test } from "@effect/vitest";
+import { convexDeploymentExport } from "./convexDeploymentExport";
 import * as CronJob from "@confect/server/CronJob";
 import * as CronJobs from "@confect/server/CronJobs";
 import * as CronWindow from "@confect/server/CronWindow";
@@ -383,11 +383,9 @@ describe("CronJobs.add", () => {
       expect(exported.schedule).not.toHaveProperty("hourUtc");
       expect(exported.schedule).not.toHaveProperty("_tag");
     }
-    assert(Predicate.hasProperty(jobs.convexCronJobs, "export"));
-    assert(Predicate.isFunction(jobs.convexCronJobs.export));
     expect(
-      Schema.decodeUnknownResult(Schema.fromJsonString(Schema.Unknown))(
-        jobs.convexCronJobs.export(),
+      Schema.decodeResult(Schema.fromJsonString(Schema.Unknown))(
+        convexDeploymentExport(jobs.convexCronJobs, "export"),
       ).pipe(Result.getOrThrow),
     ).toEqual(jobs.convexCronJobs.crons);
     expect(builds).toEqual({ args: 1, returns: 0, error: 0 });

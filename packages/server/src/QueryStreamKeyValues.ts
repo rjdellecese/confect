@@ -16,6 +16,7 @@ const KeyValue = Schema.Json.pipe(
     Schema.declare<Value | undefined>(
       (value): value is Value | undefined =>
         value === undefined ||
+        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- The SDK encoder is the validator here; checking nested values first would traverse the same cursor key twice.
         Result.isSuccess(Result.try(() => convexToJson(value as Value))),
     ),
     {
@@ -30,6 +31,7 @@ const KeyValue = Schema.Json.pipe(
               {
                 onSuccess: () => undefined,
                 onFailure: () =>
+                  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- The codec accepts readonly JSON; the SDK takes mutable JSON but only reads it, so no deep copy is needed.
                   jsonToConvex(value as Parameters<typeof jsonToConvex>[0]),
               },
             ),
@@ -109,11 +111,13 @@ export const extract = (
   encoded: Record.ReadonlyRecord<string, unknown>,
   keyPaths: ReadonlyArray<ReadonlyArray<string>>,
 ): QueryStreamKeyValues =>
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- These paths select index values from a stored Convex row; validating nested values again would scan each selected subtree.
   Array.map(keyPaths, (path) =>
     Array.reduce(
       path,
       encoded as unknown,
       (value, segment) =>
+        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- extract accepts unknown-valued records; optional indexing preserves missing paths and indexed properties of scalar values.
         (value as Record.ReadonlyRecord<string, unknown> | undefined)?.[
           segment
         ],

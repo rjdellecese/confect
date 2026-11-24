@@ -1,10 +1,10 @@
-import { describe, expect, expectTypeOf, it } from "@effect/vitest";
+import { assert, describe, expect, expectTypeOf, it } from "@effect/vitest";
 import { assertEquals } from "@effect/vitest/utils";
 import { HttpRouter as HttpRouter_ } from "@confect/server";
 import * as Storage from "@confect/server/Storage";
 import { StorageReader } from "@confect/server/StorageReader";
 import { convexTest } from "convex-test";
-import type { GenericActionCtx, GenericDataModel } from "convex/server";
+import * as Convex from "convex/server";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
@@ -26,9 +26,37 @@ import { NotesApi } from "./fixtures/confect/http";
 import * as TestConfect from "./TestConfect";
 import convexSchema from "./fixtures/confect/_generated/convexSchema";
 
+vi.mock("convex/server", (importOriginal) =>
+  importOriginal<typeof Convex>().then((original) => ({
+    ...original,
+    httpActionGeneric: vi.fn<typeof original.httpActionGeneric>(
+      original.httpActionGeneric,
+    ),
+  })),
+);
+
 it.layer(TestConfect.layer, { buildPerTest: true })("HttpRouter", (test) => {
   test.effect("binds vector search to each request's native context", () =>
     Effect.gen(function* () {
+      const register = vi.mocked(Convex.httpActionGeneric);
+      const original = register.getMockImplementation();
+      assert(original);
+      const calls: Array<string> = [];
+      register.mockImplementationOnce((handler) =>
+        original((ctx, request) => {
+          const actionCtx: typeof ctx = {
+            ...ctx,
+            vectorSearch(table, index, query) {
+              expect(this).toBe(actionCtx);
+              const requestId = request.headers.get("x-request-id");
+              assert(requestId !== null);
+              calls.push(requestId);
+              return ctx.vectorSearch(table, index, query);
+            },
+          };
+          return handler(actionCtx, request);
+        }),
+      );
       const http = HttpRouter_.make(
         HttpRouter.add(
           "GET",
@@ -42,53 +70,25 @@ it.layer(TestConfect.layer, { buildPerTest: true })("HttpRouter", (test) => {
           }),
         ),
       );
-      const endpoint = http.lookup("/search", "GET");
-      expect(endpoint).not.toBeNull();
-      if (endpoint === null) {
-        return;
-      }
-      const action = endpoint[0] as (typeof endpoint)[0] & {
-        _handler: <Model extends GenericDataModel>(
-          ctx: GenericActionCtx<Model>,
-          request: Request,
-        ) => Promise<Response>;
-      };
-      const t = convexTest(
-        convexSchema,
-        import.meta.glob("./fixtures/convex/_generated/*.js"),
-      );
-      const calls: Array<number> = [];
-      const services = yield* Effect.context<never>();
+      const t = convexTest(convexSchema, {
+        ...import.meta.glob("./fixtures/convex/_generated/*.js"),
+        "./fixtures/convex/http.ts": () => Promise.resolve({ default: http }),
+      });
       yield* Effect.forEach(
-        [1, 2],
+        ["first", "second"],
         (requestId) =>
-          Effect.promise(() =>
-            t.action((ctx) =>
-              Effect.gen(function* () {
-                const actionCtx: typeof ctx = {
-                  ...ctx,
-                  vectorSearch(table, index, query) {
-                    expect(this).toBe(actionCtx);
-                    calls.push(requestId);
-                    return ctx.vectorSearch(table, index, query);
-                  },
-                };
-                const response = yield* Effect.promise(() =>
-                  action._handler(
-                    actionCtx,
-                    new Request("https://example.test/search"),
-                  ),
-                );
-                expect(response.status).toBe(200);
-                const matches = yield* Effect.promise(() => response.json());
-                expect(matches).toEqual([]);
-              }).pipe(Effect.runPromiseWith(services)),
-            ),
-          ),
+          Effect.gen(function* () {
+            const response = yield* Effect.promise(() =>
+              t.fetch("/search", { headers: { "x-request-id": requestId } }),
+            );
+            expect(response.status).toBe(200);
+            const matches = yield* Effect.promise(() => response.json());
+            expect(matches).toEqual([]);
+          }),
         { concurrency: "unbounded" },
       );
       expect(calls).toHaveLength(2);
-      expect(calls).toEqual(expect.arrayContaining([1, 2]));
+      expect(calls).toEqual(expect.arrayContaining(["first", "second"]));
     }),
   );
 

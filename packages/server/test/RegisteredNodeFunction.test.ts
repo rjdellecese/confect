@@ -10,6 +10,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 import { vi } from "vitest";
+import { convexDeploymentExport } from "./convexDeploymentExport";
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -56,20 +57,16 @@ it.each([
   expect(compileArgs).not.toHaveBeenCalled();
   expect(compileReturns).not.toHaveBeenCalled();
 
-  const exported = registered as unknown as {
-    exportArgs: () => string;
-    exportReturns: () => string;
-  };
   expect(
     Schema.decodeResult(Schema.fromJsonString(Schema.Unknown))(
-      exported.exportReturns(),
+      convexDeploymentExport(registered, "exportReturns"),
     ).pipe(Result.getOrThrow),
   ).toEqual({ type: "boolean" });
   expect(compileReturns).toHaveBeenCalledOnce();
   expect(compileArgs).not.toHaveBeenCalled();
   expect(
     Schema.decodeResult(Schema.fromJsonString(Schema.Unknown))(
-      exported.exportArgs(),
+      convexDeploymentExport(registered, "exportArgs"),
     ).pipe(Result.getOrThrow),
   ).toEqual({
     type: "object",
@@ -80,8 +77,8 @@ it.each([
       },
     },
   });
-  exported.exportReturns();
-  exported.exportArgs();
+  convexDeploymentExport(registered, "exportReturns");
+  convexDeploymentExport(registered, "exportArgs");
   expect(compileArgs).toHaveBeenCalledOnce();
   expect(compileReturns).toHaveBeenCalledOnce();
 });

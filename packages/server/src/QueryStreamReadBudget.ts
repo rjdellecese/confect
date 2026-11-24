@@ -131,6 +131,7 @@ const record = (
   bytesRead: Array.reduce(
     documents,
     counts.bytesRead,
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- The budget accepts a Stream<unknown> of encoded rows; separately validating every field before sizing would traverse every document twice.
     (bytes, document) => bytes + getDocumentSize(document as GenericDocument),
   ),
 });

@@ -43,7 +43,7 @@ export const QueryStreamCursor = Cursor;
  *
  * @internal
  */
-export interface QueryStreamCursor extends Cursor {}
+export interface QueryStreamCursor extends Cursor {} // oxlint-disable-line typescript/no-empty-object-type -- Keep the exported cursor interface augmentable while deriving every field from the codec.
 
 /**
  * @experimental

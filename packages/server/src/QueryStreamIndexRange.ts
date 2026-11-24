@@ -276,6 +276,7 @@ export const apply = (
   // supports further equality calls, even when the SDK type has lost the tuple.
   const prefix = Array.reduce(
     equalities,
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- apply accepts dynamically named fields; the SDK types eq on string[] as terminal, even before all equality fields have been applied.
     q as ConvexRangeBuilder,
     (target, { fieldPath, value }) => target.eq(fieldPath, value),
   );

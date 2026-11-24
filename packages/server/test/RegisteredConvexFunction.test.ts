@@ -16,6 +16,7 @@ import * as Convex from "convex/server";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import { vi } from "vitest";
+import { convexDeploymentExport } from "./convexDeploymentExport";
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -136,17 +137,15 @@ describe("make", () => {
       ).toMatchObject({
         get: expect.any(Function),
       });
-      const exported = registered as unknown as {
-        exportArgs: () => string;
-        exportReturns: () => string;
-      };
-      const argsJson = exported.exportArgs();
+      const argsJson = convexDeploymentExport(registered, "exportArgs");
       expect(compileArgs).toHaveBeenCalledOnce();
       expect(compileReturns).not.toHaveBeenCalled();
-      const returnsJson = exported.exportReturns();
+      const returnsJson = convexDeploymentExport(registered, "exportReturns");
       expect(compileReturns).toHaveBeenCalledOnce();
-      expect(exported.exportArgs()).toBe(argsJson);
-      expect(exported.exportReturns()).toBe(returnsJson);
+      expect(convexDeploymentExport(registered, "exportArgs")).toBe(argsJson);
+      expect(convexDeploymentExport(registered, "exportReturns")).toBe(
+        returnsJson,
+      );
       expect(compileArgs).toHaveBeenCalledOnce();
       expect(compileReturns).toHaveBeenCalledOnce();
       expect(
