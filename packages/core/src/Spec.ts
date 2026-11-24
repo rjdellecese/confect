@@ -18,15 +18,30 @@ export const isSpec = (u: unknown): u is AnyWithProps =>
   Predicate.hasProperty(u, TypeId);
 
 /**
- * A Confect spec: a flat container of function groups. Groups may be of any
- * runtime—a group built with `GroupSpec.makeNode()` (a Node action group) sits
- * alongside `GroupSpec.make()` groups in the same namespace. The runtime of a
- * group lives on the group itself (`GroupSpec.runtime`) and on each function's
- * `RuntimeAndFunctionType`; the spec does not carry a runtime of its own.
+ * The generated project spec that describes function groups and their
+ * middleware. Import the codegen-assembled spec rather than constructing it by
+ * hand; it does not describe the database schema.
+ *
+ * For the application's complete contract, use `typeof spec` with a type-only
+ * default import from `confect/_generated/spec`. Specify the group record
+ * explicitly for a handwritten subset.
+ *
+ * **Details**
+ *
+ * A spec can contain both Convex groups and Node.js action groups. The runtime
+ * belongs to each group and its functions, not to the project spec.
+ *
+ * @category Models
  */
 export interface Spec<
   Groups_ extends Record.ReadonlyRecord<string, GroupSpec.AnyWithProps> = {},
 > {
+  /**
+   * The generated group record, preserving each group's precise declaration
+   * type.
+   *
+   * @category Models
+   */
   readonly [TypeId]: Readonly<Groups_>;
 }
 
@@ -60,6 +75,9 @@ export const groups = <Spec_ extends AnyWithProps>(
 ): Spec_[TypeId] => self[TypeId];
 
 /**
+ * Assembles named groups for the generated project contract. Default-import
+ * `confect/_generated/spec` rather than building the root directly.
+ *
  * @internal
  */
 export const fromGroups = (

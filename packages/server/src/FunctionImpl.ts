@@ -11,7 +11,18 @@ import type * as Handler from "./Handler";
 import { setNestedProperty } from "./internal/utils";
 import * as FunctionRegistryItem from "./FunctionRegistryItem";
 
+/**
+ * Service that marks a named function in a group as implemented. A group's
+ * layer requires one such service for each function in its spec.
+ *
+ * @category Services
+ */
 export interface FunctionImpl<Name_ extends string> {
+  /**
+   * Name of the implemented function within its group.
+   *
+   * @category Models
+   */
   readonly name: Name_;
 }
 
@@ -21,11 +32,38 @@ export interface FunctionImpl<Name_ extends string> {
 export const FunctionImpl = <Name_ extends string>({ name }: { name: Name_ }) =>
   Context.Service<FunctionImpl<Name_>>(`@confect/server/FunctionImpl/${name}`);
 
+/**
+ * Application-typed function builder exported as `FunctionImpl` by
+ * `_generated/server`. Its handlers see the database services for the
+ * application's schema.
+ *
+ * @remarks
+ *   Codegen support: this interface names the generated builder shape; do not
+ *   import it directly. Use `FunctionImpl.make` from
+ *   `confect/_generated/server`; to name the builder's type, use `typeof
+ *   FunctionImpl`.
+ *
+ * @category Models
+ */
 export interface Builder<DatabaseSchema_ extends DatabaseSchema.AnyWithProps> {
   /**
-   * Register a function in its group's isolated registry under its local name.
-   * The function may require the services available in its runtime and those
-   * provided by middleware attached to the group or the function.
+   * Creates an implementation layer for one named function in a group spec.
+   *
+   * **Details**
+   *
+   * A Confect handler accepts decoded arguments and returns an Effect with the
+   * spec's declared result and error types. It can use the services available
+   * in its runtime and those provided by middleware attached to the group or
+   * function.
+   *
+   * @category Layers
+   *
+   * @param group - Group declaration from the sibling `.spec.ts` module.
+   * @param name - Name of the function to implement within the group.
+   * @param handler - Effect handler for a Confect function, or the native
+   *   registered function for a plain Convex function.
+   *
+   * @returns A layer to provide to `GroupImpl.make(group)` before finalization.
    */
   readonly make: <
     Group extends GroupSpec.AnyWithProps,
@@ -48,7 +86,9 @@ export interface Builder<DatabaseSchema_ extends DatabaseSchema.AnyWithProps> {
 }
 
 /**
- * Bind the application's data model without loading any of its table modules.
+ * Binds the application's database type without loading its tables. Use
+ * `FunctionImpl.make` from `confect/_generated/server` instead of binding the
+ * builder directly.
  *
  * @internal
  */
@@ -81,7 +121,17 @@ export const forSchema = <
   },
 });
 
-export const { make } = forSchema<DatabaseSchema.AnyWithProps>();
+export const {
+  /**
+   * Creates a function implementation layer without specializing its database
+   * services to an application schema. Import `FunctionImpl` from
+   * `_generated/server` to use its schema-typed `FunctionImpl.make` method with
+   * the same arguments.
+   *
+   * @category Layers
+   */
+  make,
+} = forSchema<DatabaseSchema.AnyWithProps>();
 
 /**
  * Get the function implementation service type for a specific function name.

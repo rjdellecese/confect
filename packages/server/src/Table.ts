@@ -8,10 +8,33 @@ export {
   TypeId,
   isTable,
   isUnnamedTable,
+  /**
+   * Creates a lazy table definition from a callback returning the user-field
+   * codec. Default-export the definition from a table file. Application specs
+   * can import the same constructor from `@confect/core/Table` without
+   * depending on the server package.
+   *
+   * @category Constructors
+   */
   make,
+  /**
+   * Bound table handle used by database readers and writers. Import an
+   * application handle from `_generated/tables/<name>` or a read-only system
+   * handle, {@link _storage} or {@link _scheduled_functions}, from this
+   * module.
+   *
+   * @category Models
+   */
   type Table,
   type Any,
   type AnyWithProps,
+  /**
+   * Immutable table definition before code generation binds its name. The
+   * `index`, `searchIndex`, and `vectorIndex` methods each return a new
+   * definition without changing the original.
+   *
+   * @category Models
+   */
   type UnnamedTable,
   type UnnamedAny,
   type UnnamedAnyWithProps,
@@ -42,6 +65,10 @@ const tableDefinitionCache = new WeakMap<
 >();
 
 /**
+ * Constructs a native table definition for the generated deployment schema. For
+ * deployment or test setup, default-import `confect/_generated/convexSchema`
+ * rather than calling the converter directly.
+ *
  * @internal
  */
 export const tableDefinition = <Table extends Table_.AnyWithProps>(
@@ -95,6 +122,14 @@ export const tableDefinition = <Table extends Table_.AnyWithProps>(
 // System tables
 // -----------------------------------------------------------------------------
 
+/**
+ * Read-only system table for scheduled calls, including the function name,
+ * arguments, scheduled time, and execution state. Pass this handle to
+ * `reader.table` to query or look up a scheduled call. Use the scheduler to
+ * schedule or cancel calls.
+ *
+ * @category System tables
+ */
 export const _scheduled_functions = Table_.make(() =>
   Schema.Struct({
     name: Schema.String,
@@ -114,6 +149,13 @@ export const _scheduled_functions = Table_.make(() =>
   }),
 )("_scheduled_functions");
 
+/**
+ * Read-only system table for stored file metadata. Pass this handle to
+ * `reader.table` to look up a storage ID's SHA-256 hash, size in bytes, and
+ * optional content type. Use a storage service to access the file contents.
+ *
+ * @category System tables
+ */
 export const _storage = Table_.make(() =>
   Schema.Struct({
     sha256: Schema.String,

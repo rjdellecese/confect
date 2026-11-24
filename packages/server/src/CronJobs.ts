@@ -23,6 +23,13 @@ export const TypeId = "~@confect/server/CronJobs";
  */
 export type TypeId = typeof TypeId;
 
+/**
+ * Immutable collection of recurring jobs to default-export from
+ * `confect/crons.ts`. Start with {@link make} and keep the collection returned
+ * by each `add` call.
+ *
+ * @category Models
+ */
 export interface CronJobs {
   /**
    * @internal
@@ -33,10 +40,35 @@ export interface CronJobs {
    */
   readonly cronJobs: Record<string, CronJob.CronJob>;
   /**
+   * Supplies the generated Convex deployment entry point. Default-export
+   * `CronJobs.make().add(job)` from `confect/crons.ts` instead of accessing
+   * this property directly.
+   *
    * @internal
    */
   readonly convexCronJobs: Crons;
 
+  /**
+   * Returns a new collection containing the job, encoding its arguments for
+   * Convex without changing this collection.
+   *
+   * **Gotchas**
+   *
+   * Convex evaluates cron expressions in UTC; omit the time zone or use UTC,
+   * and leave seconds at the default of zero. Use a positive duration in whole
+   * seconds for fixed intervals, including sub-minute schedules. For a calendar
+   * window, Convex validates the day and hour here, not when you construct the
+   * window.
+   *
+   * @category Combinators
+   *
+   * @param cron - Job description created with `CronJob.make`.
+   *
+   * @returns A collection with the new job alongside the existing jobs.
+   *
+   * @throws If argument encoding fails, the identifier is invalid or already
+   *   registered, or the schedule cannot be represented.
+   */
   add(cron: CronJob.CronJob): CronJobs;
 }
 
@@ -130,6 +162,14 @@ const makeProto = (
     convexCronJobs,
   });
 
+/**
+ * Creates an empty collection of recurring jobs for `confect/crons.ts`.
+ *
+ * @category Constructors
+ *
+ * @returns A collection to extend with `add` and default-export for code
+ *   generation. The CLI emits the matching Convex cron entry.
+ */
 export const make = (): CronJobs => makeProto({}, makeConvexCrons());
 
 /**

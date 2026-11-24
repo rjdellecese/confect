@@ -9,6 +9,14 @@ import type * as DataModel from "./DataModel";
 import type * as TableInfo from "./TableInfo";
 import type * as Table from "./Table";
 
+/**
+ * Decoded document type for one application table, including `_id` and
+ * `_creationTime`. Use the generated named types from `confect/_generated/docs`
+ * when available, or select a table in an annotation such as `Document<typeof
+ * schema, "notes">`.
+ *
+ * @category Models
+ */
 export type Document<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
   TableName extends DatabaseSchema.TableNames<DatabaseSchema_>,
@@ -17,6 +25,13 @@ export type Document<
   TableName
 >;
 
+/**
+ * Decoded user fields for an insert or a full replacement. This type omits
+ * `_id` and `_creationTime` from each union member and preserves the
+ * optionality of all other fields.
+ *
+ * @category Utility types
+ */
 export type WithoutSystemFields<Doc> = Doc extends unknown
   ? Omit<Doc, "_creationTime" | "_id">
   : never;
@@ -116,14 +131,41 @@ export const encode = Function.dual<
     ),
 );
 
+/**
+ * Typed failure from reading a stored document that its table's `Doc` codec
+ * cannot decode. It identifies the table and document ID and carries the schema
+ * diagnostic as text rather than the original document or `SchemaError`.
+ *
+ * @category Errors
+ */
 export class DocumentDecodeError extends Schema.TaggedError<
   DocumentDecodeError,
   {}
 >()("DocumentDecodeError", {
+  /**
+   * Name of the table whose document codec rejected the stored value.
+   *
+   * @category Getters
+   */
   tableName: Schema.String,
+  /**
+   * `_id` copied from the stored document.
+   *
+   * @category Getters
+   */
   id: Schema.String,
+  /**
+   * Diagnostic message from the underlying schema error.
+   *
+   * @category Getters
+   */
   parseError: Schema.String,
 }) {
+  /**
+   * Returns the table, document ID, and decoding diagnostic in one message.
+   *
+   * @category Getters
+   */
   override get message(): string {
     return documentErrorMessage({
       id: this.id,
@@ -133,14 +175,47 @@ export class DocumentDecodeError extends Schema.TaggedError<
   }
 }
 
+/**
+ * Typed failure declared by writes when decoded user fields cannot be encoded
+ * by the table's `Fields` codec. `parseError` contains the schema diagnostic as
+ * text.
+ *
+ * **Gotchas**
+ *
+ * The error requires the input's `_id`. If encoding an insert or replacement
+ * without `_id` fails, the effect dies while constructing this error instead of
+ * returning it as a typed failure.
+ *
+ * @category Errors
+ */
 export class DocumentEncodeError extends Schema.TaggedError<
   DocumentEncodeError,
   {}
 >()("DocumentEncodeError", {
+  /**
+   * Name of the table whose field codec rejected the decoded input.
+   *
+   * @category Getters
+   */
   tableName: Schema.String,
+  /**
+   * `_id` copied from the input; required when constructing this error.
+   *
+   * @category Getters
+   */
   id: Schema.String,
+  /**
+   * Diagnostic message from the underlying schema error.
+   *
+   * @category Getters
+   */
   parseError: Schema.String,
 }) {
+  /**
+   * Returns the table, input ID, and encoding diagnostic in one message.
+   *
+   * @category Getters
+   */
   override get message(): string {
     return documentErrorMessage({
       id: this.id,
