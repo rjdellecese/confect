@@ -1,5 +1,19 @@
 # @confect/foldkit
 
+## 11.0.0
+
+### Minor Changes
+
+- 9c11ad9: Add `QueryResult` for storing reactive query state in Foldkit Models, with `Loading`, `Success`, and `Failure` variants, constructors, matching, predicates, and a `QueryResult.QueryResult` schema constructor for Model encoding and decoding. Values support piping and Effect equality and hashing, including after decoding. Subscription eligibility stays separate from the query result.
+
+### Patch Changes
+
+- f8315d4: Add API documentation for public functions, service methods, result types, and generated helpers.
+- Updated dependencies [f8315d4]
+- Updated dependencies [4aa2d12]
+  - @confect/core@11.0.0
+  - @confect/js@11.0.0
+
 ## 10.6.0
 
 No changes in this release.
