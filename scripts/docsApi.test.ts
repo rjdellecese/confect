@@ -347,7 +347,8 @@ test("renders public functions, overloads, classes, types, and inferred service 
   expect(pages.get("api/reference/core/PaginationError.mdx")).toContain(
     '<span id="api-invalidcursor"></span>',
   );
-  expect(pages.get("api/reference/core/GenericId.mdx")).toContain("GenericId");
+  expect(pages.has("api/reference/core/GenericId.mdx")).toBe(false);
+  expect(pages.has("api/reference/core/Refs.mdx")).toBe(false);
   expect(pages.get("api/reference/server/ActionRunner.mdx")).toContain(
     "Runs a generated action with decoded arguments",
   );

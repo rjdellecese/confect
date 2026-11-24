@@ -119,13 +119,11 @@
                 "pages": [
                   "api/reference/core/index",
                   "api/reference/core/FunctionSpec",
-                  "api/reference/core/GenericId",
                   "api/reference/core/GroupSpec",
                   "api/reference/core/MiddlewareSpec",
                   "api/reference/core/PaginationError",
                   "api/reference/core/PaginationResult",
                   "api/reference/core/Ref",
-                  "api/reference/core/Refs",
                   "api/reference/core/Spec",
                   "api/reference/core/SystemFields",
                   "api/reference/core/Table"
