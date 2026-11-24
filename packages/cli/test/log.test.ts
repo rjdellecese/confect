@@ -21,10 +21,40 @@ it("formats partial esbuild diagnostics without altering the original plugin pay
   expect(errors[0]?.location).toEqual({ file: "config.ts", line: 3 });
 });
 
+it("ignores enumerable symbol metadata on messages, notes, and locations", () => {
+  const metadata = Symbol("plugin metadata");
+  const withMetadata = <A extends object>(fields: A) => ({
+    ...fields,
+    get [metadata]() {
+      throw new Error("Unexpected metadata read");
+    },
+  });
+  const location = withMetadata({ file: "config.ts", line: 3 });
+  const note = withMetadata({ text: "Declared here", location });
+  const message = withMetadata({
+    text: "Invalid export",
+    notes: [note],
+    location,
+  });
+
+  const rendered = renderBuildError(
+    BundleFailedError.make({ file: "config.ts", errors: [message] }),
+  );
+
+  expect(rendered).toContain("Invalid export");
+  expect(rendered).toContain("Declared here");
+  expect(rendered).toContain("config.ts:3");
+  for (const value of [message, note, location]) {
+    expect(metadata in value).toBe(true);
+  }
+});
+
 it.each([
   [{ text: 1 }],
   [{ notes: [{ location: { line: "3" } }] }],
   [{ text: "message", invalidOption: true }],
+  [{ notes: [{ invalidOption: true }] }],
+  [{ location: { invalidOption: true } }],
 ])(
   "reports malformed esbuild diagnostics without printing arbitrary plugin details",
   (message) => {

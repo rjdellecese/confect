@@ -6,6 +6,7 @@ import * as Match from "effect/Match";
 import * as Option from "effect/Option";
 import * as Path from "effect/Path";
 import * as Predicate from "effect/Predicate";
+import * as Record from "effect/Record";
 import * as Schema from "effect/Schema";
 import * as Result from "effect/Result";
 import * as String from "effect/String";
@@ -173,7 +174,21 @@ const DiagnosticString = Schema.String.pipe(
 const DiagnosticOffset = Schema.Finite.check(Schema.isInt32()).pipe(
   Schema.withDecodingDefault(Effect.succeed(0)),
 );
-const DiagnosticLocation = Schema.Struct({
+const diagnosticStruct = <Fields extends Schema.Struct.Fields>(
+  fields: Fields,
+) =>
+  Schema.ObjectKeyword.check(
+    Schema.makeFilter((input) => {
+      for (const key in input) {
+        if (!Record.has(fields, key)) {
+          return false;
+        }
+      }
+      return true;
+    }),
+  ).pipe(Schema.decodeTo(Schema.Struct(fields)));
+
+const DiagnosticLocation = diagnosticStruct({
   file: DiagnosticString,
   namespace: DiagnosticString,
   line: DiagnosticOffset,
@@ -182,16 +197,16 @@ const DiagnosticLocation = Schema.Struct({
   lineText: DiagnosticString,
   suggestion: DiagnosticString,
 }).pipe(Schema.NullOr, Schema.withDecodingDefault(Effect.succeed(null)));
-const DiagnosticNote = Schema.Struct({
+const diagnosticNoteFields = {
   text: DiagnosticString,
   location: DiagnosticLocation,
-});
+};
 const DiagnosticMessages = Schema.Array(
-  Schema.Struct({
-    ...DiagnosticNote.fields,
+  diagnosticStruct({
+    ...diagnosticNoteFields,
     id: DiagnosticString,
     pluginName: DiagnosticString,
-    notes: DiagnosticNote.pipe(
+    notes: diagnosticStruct(diagnosticNoteFields).pipe(
       Schema.Array,
       Schema.mutable,
       Schema.withDecodingDefault(Effect.succeed([])),
@@ -208,9 +223,7 @@ const DiagnosticMessages = Schema.Array(
  */
 const renderBundleFailedError = (error: BundleFailedError): string => {
   const header = `${cross} ${formatPath(error.file)}: build errors`;
-  const decoded = Schema.decodeUnknownResult(DiagnosticMessages, {
-    onExcessProperty: "error",
-  })(error.errors);
+  const decoded = Schema.decodeUnknownResult(DiagnosticMessages)(error.errors);
   if (Result.isFailure(decoded)) {
     return `${header}\n${withErrorGutterBlock("The module reported malformed esbuild diagnostics.")}`;
   }
