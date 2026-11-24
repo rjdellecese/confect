@@ -1,0 +1,74 @@
+{
+  "name": "@confect/platform",
+  "description": "Effect clients for the Convex management and deployment APIs",
+  "version": "10.6.0",
+  "author": "RJ Dellecese",
+  "bugs": {
+    "url": "https://github.com/rjdellecese/confect/issues"
+  },
+  "dependencies": {
+    "@convex-dev/platform": "0.1.11"
+  },
+  "devDependencies": {
+    "@effect/vitest": "4.1.0",
+    "@types/node": "26.6.6",
+    "effect": "4.1.0",
+    "openapi-fetch": "0.17.0",
+    "openapi-typescript-helpers": "0.1.0",
+    "tsdown": "0.23.7",
+    "tsrs": "7.1.0-beta.tsrs3",
+    "unrun": "0.3.1",
+    "vitest": "5.1.0"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./*": {
+      "types": "./dist/*.d.ts",
+      "default": "./dist/*.js"
+    },
+    "./package.json": "./package.json",
+    "./internal/*": null
+  },
+  "files": [
+    "CHANGELOG.md",
+    "LICENSE",
+    "README.md",
+    "dist",
+    "!dist/*.tsbuildinfo",
+    "package.json",
+    "src"
+  ],
+  "homepage": "https://confect.dev",
+  "keywords": [
+    "convex",
+    "effect",
+    "platform"
+  ],
+  "license": "ISC",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "peerDependencies": {
+    "effect": "^4.1.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rjdellecese/confect.git",
+    "directory": "packages/platform"
+  },
+  "scripts": {
+    "clean": "shx rm -rf dist coverage node_modules",
+    "dev": "tsdown --watch --no-clean --config-loader unrun",
+    "test": "vitest run",
+    "typecheck": "tsrs -b tsconfig.src.json",
+    "typecheck:inexact": "tsrs --noEmit --project tsconfig.json --exactOptionalPropertyTypes false"
+  },
+  "sideEffects": false,
+  "type": "module",
+  "types": "./dist/index.d.ts"
+}

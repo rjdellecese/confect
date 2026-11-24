@@ -1,0 +1,145 @@
+---
+title: "Platform clients"
+description: "Call the Convex management and deployment APIs with typed Effect clients."
+---
+
+Use `@confect/platform` for administrative operations such as listing a team's projects or inspecting a deployment. To run application queries, mutations, and actions, use the [JavaScript HTTP client](/clients/js/http) instead.
+
+```sh
+pnpm add @confect/platform effect
+```
+
+## Call the management API
+
+Read an access token from your server or CI secret store. Call a named method on `ManagementClient` to work with teams, projects, deployments, or credentials. Pass the resource ID and a typed options object; the client supplies the HTTP method, path, and authentication.
+
+```ts
+import { ManagementClient } from "@confect/platform";
+import * as Config from "effect/Config";
+import * as Effect from "effect/Effect";
+
+const firstPage = Effect.gen(function* () {
+  const token = yield* Config.Redacted("CONVEX_ACCESS_TOKEN");
+  const teamId = yield* Config.Number("CONVEX_TEAM_ID");
+  const client = ManagementClient.make(token);
+  return yield* client.listProjects(teamId, { limit: 20 });
+});
+```
+
+Use `listProjects` when you want one page and its continuation cursor. Use `streamProjects` when you want projects rather than pages. The stream requests another page only when the consumer needs it:
+
+```ts
+import { ManagementClient } from "@confect/platform";
+import * as Effect from "effect/Effect";
+import * as Stream from "effect/Stream";
+
+const firstTenNames = (teamId: number) =>
+  Effect.gen(function* () {
+    const client = yield* ManagementClient.ManagementClient;
+    return yield* client.streamProjects(teamId).pipe(
+      Stream.map((project) => project.name),
+      Stream.take(10),
+      Stream.runCollect,
+    );
+  });
+```
+
+By default the upstream SDK uses `https://api.convex.dev/v1`, or the host configured by `CONVEX_PROVISION_HOST`. To select the destination explicitly, pass `{ baseUrl: "https://api.convex.dev/v1" }` to `ManagementClient.make`. Only use trusted URLs and fetch implementations: they receive the access token.
+
+When inviting a member, pass a built-in `role` (`"admin"` or `"developer"`) without `customRoles`, or pass `role: "custom"` with a non-empty `customRoles` list. For an existing member, pass `{ memberId, role: "developer" }` to assign a built-in role, or `{ memberId, customRoles: [roleId] }` to assign custom roles.
+
+When creating a deployment, only `"dev"` and `"prod"` accept an `isDefault` flag. Omit it for `"preview"` and `"custom"`, even if you would otherwise set it to `false`.
+
+## Call a deployment API
+
+Use the full URL returned by Convex for a regional deployment. A bare deployment name selects the US East cloud URL. Supply a deployment credential with permission for the operation; don't put administrative credentials in browser code.
+
+```ts
+import { DeploymentClient } from "@confect/platform";
+import * as Config from "effect/Config";
+import * as Effect from "effect/Effect";
+
+const deploymentInfo = Effect.gen(function* () {
+  const url = yield* Config.String("CONVEX_URL");
+  const key = yield* Config.Redacted("CONVEX_DEPLOY_KEY");
+  const client = DeploymentClient.make(url, key);
+  return yield* client.getDeploymentInfo;
+});
+```
+
+Operations with no inputs, such as `getDeploymentInfo` and `listEnvironmentVariables`, are lazy Effect values. Yielding the same value again sends a fresh request. `syncData` returns one export page rather than a stream that polls forever: use the returned status and cursor to decide when to request the next page.
+
+Data-sync revision timestamps (`values[].ts`, `status.snapshotTs`, and active-sync `status.syncedTs`) are `bigint` values, so you can compare consecutive revisions without losing precision. Use `.toString()` if you need to store one in JSON. These operations require a runtime with JSON parse source access, such as Node.js 24 or later. Wall-clock milliseconds such as `lastUpdated` and numbers inside exported documents remain JavaScript numbers.
+
+Use `createLogStream` to configure a log destination. The separate `ConvexEventLog` type describes delivered events by `topic`; it isn't a subscription or a runtime webhook validator.
+
+### Select data for sync or S3 export
+
+Use `default` for unlisted names and put overrides in `components`, `tables`, or `columns`. The empty component name selects the root component. The following selection exports the root `posts` table except for its `draftNotes` column; everything else is excluded.
+
+```ts
+import type { DeploymentClient } from "@confect/platform";
+
+const posts = {
+  default: "excluded",
+  components: {
+    "": {
+      default: "excluded",
+      tables: {
+        posts: { default: "included", columns: { draftNotes: "excluded" } },
+      },
+    },
+  },
+} satisfies DeploymentClient.Selection;
+```
+
+Pass `{ selection: posts }` to `syncData`, or use the same `selection` when creating or updating an S3 log stream. Use `"excluded"` to omit a named table or component entirely; to include it, supply a nested selection. Convex always includes the `_id` column of an exported document. The client handles Convex's `_other` wire key.
+
+## Provide a client to other Effects
+
+Yield the client's service tag instead of constructing a client in each operation. Provide its layer once at the boundary of your program:
+
+```ts
+import { ManagementClient } from "@confect/platform";
+import * as Config from "effect/Config";
+import * as Effect from "effect/Effect";
+
+const projectById = (projectId: number) =>
+  Effect.gen(function* () {
+    const client = yield* ManagementClient.ManagementClient;
+    return yield* client.getProject(projectId);
+  });
+
+const program = Effect.gen(function* () {
+  const token = yield* Config.Redacted("CONVEX_ACCESS_TOKEN");
+  return yield* projectById(42).pipe(
+    Effect.provide(ManagementClient.layer(token)),
+  );
+});
+```
+
+## Handle a failed operation
+
+Each method exposes the errors it can return. Convex reserves `createTeam` for integrations it has approved to create teams on behalf of users; an ordinary management token doesn't grant that permission. For an approved integration, this example returns the new team's slug, or `null` for an invalid name or region. Permission and transport errors stay in the error channel:
+
+```ts
+import { ManagementClient } from "@confect/platform";
+import * as Effect from "effect/Effect";
+
+const tryCreateTeam = (name: string) =>
+  Effect.gen(function* () {
+    const client = yield* ManagementClient.ManagementClient;
+    return yield* client
+      .createTeam({ name, defaultRegion: "aws-us-east-1" })
+      .pipe(
+        Effect.map((team) => team.slug),
+        Effect.catchTag("InvalidTeamConfiguration", () => Effect.succeed(null)),
+      );
+  });
+```
+
+The clients use the contracts shipped with `@convex-dev/platform@0.1.11`. That version documents three operation-specific failures: `InvalidTeamConfiguration` (400) and `TeamCreationForbidden` (403) for `createTeam`, and `TeamAccessTokenForbidden` (403) for `createTeamAccessToken`. Other non-success statuses produce `HttpError` with the operation name and status. The upstream contracts don't specify error body formats, so none of these failures capture a server message or guess a cause from its text.
+
+`InvalidRequest` means the request couldn't be constructed; `TransportError` means the fetch failed. `InvalidResponse` means Convex returned a success status but the body didn't match the operation's response schema. A cursor stream fails with `InvalidPagination` if the server promises another page without giving a new cursor. Interrupting the fiber aborts the request; neither client follows redirects or retries mutations.
+
+Issued credentials such as the `deployKey` returned by `createDeployKey`, and values from `listEnvironmentVariables`, are `Redacted`. Keep them redacted until you need their values at a trusted boundary.

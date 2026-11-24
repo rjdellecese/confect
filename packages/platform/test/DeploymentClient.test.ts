@@ -1,0 +1,805 @@
+import type { DeploymentApi } from "@confect/platform";
+import * as DeploymentClient from "@confect/platform/DeploymentClient";
+import type { RequestFailure } from "@confect/platform/PlatformError";
+import { expect, expectTypeOf, it } from "@effect/vitest";
+import * as Array from "effect/Array";
+import * as Context from "effect/Context";
+import * as Deferred from "effect/Deferred";
+import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
+import * as Fiber from "effect/Fiber";
+import * as Layer from "effect/Layer";
+import * as Record from "effect/Record";
+import * as Redacted from "effect/Redacted";
+import * as Schema from "effect/Schema";
+import * as Stream from "effect/Stream";
+import { vi } from "vitest";
+
+const token = Redacted.make("test-deployment-key");
+
+it.effect.each([
+  { address: "http-otter-123", base: "https://http-otter-123.convex.cloud" },
+  {
+    address: "https://test-123.eu-west-1.convex.cloud/",
+    base: "https://test-123.eu-west-1.convex.cloud",
+  },
+  {
+    address: "http://localhost:3210/prefix/",
+    base: "http://localhost:3210/prefix",
+  },
+])("resolves the deployment base $address", ({ address, base }) =>
+  Effect.gen(function* () {
+    const fetch = vi.fn((_request: Request) =>
+      Promise.resolve(new Response(null)),
+    );
+    yield* DeploymentClient.make(address, token, { fetch }).pauseDeployment;
+    const [[request]] = fetch.mock.calls;
+    expect(request.url).toBe(`${base}/api/v1/pause_deployment`);
+  }),
+);
+
+it.effect(
+  "fails the request without sending a wiped deployment credential",
+  () =>
+    Effect.gen(function* () {
+      const credential = Redacted.make("test-forgotten-key");
+      const fetch = vi.fn(() => Promise.resolve(new Response(null)));
+      const client = DeploymentClient.make("test-123", credential, { fetch });
+      Redacted.wipeUnsafe(credential);
+      const error = yield* Effect.flip(client.pauseDeployment);
+      expect(error).toMatchObject({
+        _tag: "InvalidRequest",
+        operation: "pauseDeployment",
+      });
+      expect(fetch).not.toHaveBeenCalled();
+    }),
+);
+const Json = Schema.fromJsonString(Schema.Unknown);
+const selection = {
+  default: "included",
+  components: {
+    "": {
+      default: "excluded",
+      tables: {
+        posts: { default: "excluded" },
+        users: {
+          default: "included",
+          columns: {
+            _id: "included",
+            ssn: "excluded",
+            ["__proto__"]: "excluded",
+          },
+        },
+        constructor: "excluded",
+      },
+    },
+    ["__proto__"]: "excluded",
+  },
+} as const;
+const wireSelection = {
+  _other: "included",
+  "": {
+    _other: "excluded",
+    posts: { _other: "excluded" },
+    users: {
+      _other: "included",
+      _id: "included",
+      ssn: "excluded",
+      ["__proto__"]: "excluded",
+    },
+    constructor: "excluded",
+  },
+  ["__proto__"]: "excluded",
+} as const;
+const withTables = <T>(tables: T) =>
+  ({
+    default: "included",
+    components: { "": { default: "included", tables } },
+  }) as const;
+const withColumns = <T>(columns: T) =>
+  withTables({ users: { default: "excluded", columns } } as const);
+const limit = {
+  metric: "functionCalls",
+  window: "day",
+  limitType: "warning",
+  limit: 1000,
+  enabled: true,
+} satisfies DeploymentApi.UsageLimitConfigRequest;
+
+it.effect(
+  "posts a usage limit to the regional deployment, not the management host",
+  () =>
+    Effect.gen(function* () {
+      const deployment = "https://test-123.eu-west-1.convex.cloud";
+      const response = { usageLimit: { ...limit, id: "first" } };
+      const fetch = vi.fn((_request: Request) =>
+        Promise.resolve(Response.json(response)),
+      );
+      const context = yield* Layer.build(
+        DeploymentClient.layer(deployment, token, { fetch }),
+      );
+      const client = Context.get(context, DeploymentClient.DeploymentClient);
+      const options = {
+        baseUrl: "https://other.example.test",
+        headers: { Authorization: "unexpected" },
+        redirect: "follow",
+      };
+      // @ts-expect-error Extra arguments from JavaScript cannot override the authenticated transport.
+      const update = client.updateUsageLimit("first", limit, options);
+      expectTypeOf(update).toEqualTypeOf<
+        Effect.Effect<DeploymentApi.UsageLimitResponse, RequestFailure>
+      >();
+      const result = yield* update;
+      expect(result).toEqual(response);
+      expect(fetch).toHaveBeenCalledTimes(1);
+      const [[request]] = fetch.mock.calls;
+      expect(request.method).toBe("POST");
+      expect(request.url).toBe(deployment + "/api/v1/update_usage_limit/first");
+      expect(request.headers.get("Authorization")).toBe(
+        "Convex test-deployment-key",
+      );
+      expect(request.headers.get("Content-Type")).toBe("application/json");
+      expect(request.headers.get("Convex-Client")).toMatch(/^convex-platform-/);
+      expect(request.redirect).not.toBe("follow");
+      const body: unknown = yield* Effect.promise(() => request.json());
+      expect(body).toEqual(limit);
+    }),
+);
+
+it.effect.each([200, 204])(
+  "returns no value for an empty %i on a bare deployment name",
+  (status) =>
+    Effect.gen(function* () {
+      const fetch = vi.fn((_request: Request) =>
+        Promise.resolve(new Response(null, { status })),
+      );
+      const client = DeploymentClient.make("test-123", token, { fetch });
+      const pause = client.pauseDeployment;
+      expectTypeOf<Effect.Success<typeof pause>>().not.toBeNever();
+      expectTypeOf<Effect.Success<typeof pause>>().toExtend<void>();
+      expect(fetch).not.toHaveBeenCalled();
+      const result = yield* pause;
+      expect(result).toBeUndefined();
+      yield* pause;
+      expect(fetch).toHaveBeenCalledTimes(2);
+      const [[request]] = fetch.mock.calls;
+      expect(request.url).toBe(
+        "https://test-123.convex.cloud/api/v1/pause_deployment",
+      );
+    }),
+);
+
+it.effect("aborts an in-flight HTTP request when the owning scope closes", () =>
+  Effect.gen(function* () {
+    const entered = yield* Deferred.make<AbortSignal>();
+    const client = DeploymentClient.make("test-123", token, {
+      fetch: (request) => {
+        const pending = Promise.withResolvers<Response>();
+        request.signal.addEventListener(
+          "abort",
+          () => pending.reject(request.signal.reason),
+          { once: true },
+        );
+        Deferred.doneUnsafe(entered, Effect.succeed(request.signal));
+        return pending.promise;
+      },
+    });
+    const pendingRequest = yield* Effect.gen(function* () {
+      const fiber = yield* client.getCanonicalUrls.pipe(Effect.forkScoped);
+      const signal = yield* Deferred.await(entered);
+      expect(signal.aborted).toBe(false);
+      return { fiber, signal };
+    }).pipe(Effect.scoped);
+    expect(pendingRequest.signal.aborted).toBe(true);
+    const exit = yield* Fiber.await(pendingRequest.fiber);
+    expect(Exit.hasInterrupts(exit)).toBe(true);
+  }),
+);
+
+it("checks deployment request bodies and does not expose per-request transport controls", () => {
+  const check = (client: ReturnType<typeof DeploymentClient.make>) => {
+    expectTypeOf(selection).toExtend<DeploymentClient.Selection>();
+    const reserved = { _other: "excluded" } as const;
+    expectTypeOf({
+      default: "included",
+      components: reserved,
+    } as const).not.toExtend<DeploymentClient.Selection>();
+    expectTypeOf(
+      withTables(reserved),
+    ).not.toExtend<DeploymentClient.Selection>();
+    expectTypeOf(
+      withColumns(reserved),
+    ).not.toExtend<DeploymentClient.Selection>();
+    expectTypeOf(
+      withColumns({ _id: "excluded" } as const),
+    ).not.toExtend<DeploymentClient.Selection>();
+    // @ts-expect-error Updating a usage limit requires the replacement body.
+    expectTypeOf(client.updateUsageLimit("first"));
+    const invalid = { ...limit, enabled: "yes" };
+    // @ts-expect-error An update must use the endpoint's write schema.
+    expectTypeOf(client.updateUsageLimit("first", invalid));
+    expectTypeOf(client).not.toHaveProperty("request");
+    expectTypeOf(client).not.toHaveProperty("getTokenDetails");
+    expectTypeOf(
+      // @ts-expect-error Callers cannot override a client's authenticated destination.
+      client.getCanonicalUrls({ baseUrl: "https://other.example.test" }),
+    );
+    // @ts-expect-error Deployment audit queries must include their starting timestamp.
+    expectTypeOf(client.listAuditLogEvents({ limit: 4 }));
+    expectTypeOf(client.listActiveSyncs()).toEqualTypeOf<
+      Effect.Effect<DeploymentClient.ActiveSyncsPage, RequestFailure>
+    >();
+  };
+  expectTypeOf(check).toBeFunction();
+});
+
+it.effect(
+  "keeps environment values redacted until writes execute, including empty strings and deletions",
+  () =>
+    Effect.gen(function* () {
+      const fetch = vi
+        .fn((_request: Request) => Promise.resolve(new Response(null)))
+        .mockResolvedValueOnce(
+          Response.json({
+            environmentVariables: { TOKEN: "test-secret", EMPTY: "" },
+          }),
+        );
+      const client = DeploymentClient.make("test-123", token, { fetch });
+      const { environmentVariables } = yield* client.listEnvironmentVariables;
+      expectTypeOf(environmentVariables).toEqualTypeOf<
+        Record<string, Redacted.Redacted<string>>
+      >();
+      expect(Redacted.value(environmentVariables.TOKEN)).toBe("test-secret");
+      expect(Redacted.value(environmentVariables.EMPTY)).toBe("");
+      const serialized = yield* Schema.encodeEffect(Json)(environmentVariables);
+      expect(serialized).not.toContain("test-secret");
+
+      const changes = [
+        { name: "SECRET", value: environmentVariables.TOKEN },
+        { name: "EMPTY", value: "" },
+        { name: "DELETE" },
+        { name: "DELETE_TOO", value: null },
+      ] as const;
+      yield* client.updateEnvironmentVariables({ changes });
+      const [, [write]] = fetch.mock.calls;
+      expect(new URL(write.url).pathname).toBe(
+        "/api/v1/update_environment_variables",
+      );
+      const body: unknown = yield* Effect.promise(() => write.json());
+      expect(body).toEqual({
+        changes: [
+          { name: "SECRET", value: "test-secret" },
+          { name: "EMPTY", value: "" },
+          { name: "DELETE" },
+          { name: "DELETE_TOO", value: null },
+        ],
+      });
+      expect(Redacted.isRedacted(changes[0].value)).toBe(true);
+      const forgotten = Redacted.make("forgotten");
+      const writeForgotten = client.updateEnvironmentVariables({
+        changes: [{ name: "LOST", value: forgotten }],
+      });
+      Redacted.wipeUnsafe(forgotten);
+      const failure = yield* Effect.flip(writeForgotten);
+      expect(failure).toMatchObject({
+        _tag: "InvalidRequest",
+        operation: "updateEnvironmentVariables",
+      });
+      expect(fetch).toHaveBeenCalledTimes(2);
+    }),
+);
+
+it.effect(
+  "reuses an S3 selection without dropping prototype-named entries and rejects an excluded document ID on read",
+  () =>
+    Effect.gen(function* () {
+      const config = {
+        logStreamType: "s3Export",
+        id: "s3",
+        status: { type: "active" },
+        bucket: "bucket",
+        region: "region",
+        accessKeyId: "test-access-id",
+        period: "daily",
+        selection: wireSelection,
+      };
+      const fetch = vi
+        .fn<NonNullable<DeploymentClient.Options["fetch"]>>()
+        .mockResolvedValueOnce(Response.json(config))
+        .mockResolvedValueOnce(new Response(null))
+        .mockResolvedValueOnce(
+          Response.json(
+            [
+              {
+                ...config,
+                selection: {
+                  _other: "included",
+                  "": {
+                    _other: "included",
+                    users: { _other: "excluded", _id: "excluded" },
+                  },
+                },
+              },
+            ],
+            { status: 206 },
+          ),
+        );
+      const client = DeploymentClient.make("test-123", token, { fetch });
+      const stream = yield* client.getLogStream("s3");
+      if (stream.logStreamType !== "s3Export") return expect.unreachable();
+      expect(stream.selection).toStrictEqual(selection);
+      yield* client.updateLogStream("s3", {
+        logStreamType: "s3Export",
+        selection: stream.selection,
+      });
+      const body: unknown = yield* Effect.promise(() =>
+        fetch.mock.calls[1][0].json(),
+      );
+      expect(body).toStrictEqual({
+        logStreamType: "s3Export",
+        selection: wireSelection,
+      });
+      const error = yield* Effect.flip(client.listLogStreams);
+      expect(error).toMatchObject({
+        _tag: "InvalidResponse",
+        operation: "listLogStreams",
+        status: 206,
+      });
+    }),
+);
+
+it.effect(
+  "rejects reserved dynamic names and malformed selections without broadening a data export",
+  () =>
+    Effect.gen(function* () {
+      const fetch = vi.fn(() => Promise.resolve(new Response(null)));
+      const client = DeploymentClient.make("test-123", token, { fetch });
+      const key: string = "_other";
+      const collision = { [key]: "excluded" } as const;
+      for (const value of [
+        { default: "included", components: collision } as const,
+        withTables(collision),
+        withColumns(collision),
+        withColumns({ ["_id" as string]: "excluded" } as const),
+      ]) {
+        const error = yield* Effect.flip(client.syncData({ selection: value }));
+        expect(error).toMatchObject({
+          _tag: "InvalidRequest",
+          operation: "syncData",
+        });
+      }
+      for (const value of [
+        wireSelection,
+        { default: "included", secretComponent: "excluded" },
+        {
+          default: "included",
+          components: { "": { default: "included", users: "excluded" } },
+        },
+        withTables({ users: { default: "included", ssn: "excluded" } }),
+        { default: "included", components: new Map([["secret", "excluded"]]) },
+      ]) {
+        // @ts-expect-error JavaScript callers can pass legacy shapes and non-record maps.
+        const error = yield* Effect.flip(client.syncData({ selection: value }));
+        expect(error).toMatchObject({
+          _tag: "InvalidRequest",
+          operation: "syncData",
+        });
+      }
+      expect(fetch).not.toHaveBeenCalled();
+    }),
+);
+
+it.effect(
+  "redacts log stream destinations, access keys and HMAC secrets while preserving variant fields",
+  () =>
+    Effect.gen(function* () {
+      const webhook = {
+        id: "hook",
+        status: { type: "active" },
+        logStreamType: "webhook",
+        format: "json",
+        hmacSecret: "secret-hmac",
+        url: "https://test.example/secret-path",
+      } satisfies DeploymentApi.LogStreamConfig;
+      const streams = [
+        webhook,
+        {
+          id: "s3",
+          status: { type: "pending" },
+          logStreamType: "s3Export",
+          bucket: "bucket",
+          region: "region",
+          period: "daily",
+          selection: { _other: "excluded" },
+          accessKeyId: "secret-access-id",
+        },
+        {
+          id: "axiom",
+          status: { type: "pending" },
+          logStreamType: "axiom",
+          datasetName: "dataset",
+          attributes: [],
+          ingestUrl: "https://test.example/secret-axiom",
+        },
+        {
+          id: "posthog",
+          status: { type: "pending" },
+          logStreamType: "postHogLogs",
+          host: "https://test.example/secret-posthog",
+        },
+        {
+          id: "error-tracker",
+          status: { type: "pending" },
+          logStreamType: "postHogErrorTracking",
+          host: null,
+        },
+        {
+          id: "datadog",
+          status: { type: "active" },
+          logStreamType: "datadog",
+          siteLocation: "US1",
+          ddTags: ["test"],
+        },
+        {
+          id: "sentry",
+          status: { type: "active" },
+          logStreamType: "sentry",
+          tags: { environment: "test" },
+        },
+      ] satisfies DeploymentApi.LogStreamConfig[];
+      const fetch = vi
+        .fn((_request: Request) => Promise.resolve(new Response(null)))
+        .mockResolvedValueOnce(
+          Response.json(
+            Array.map(streams, (config) =>
+              config.logStreamType === "sentry"
+                ? { ...config, dsn: "secret-undeclared" }
+                : config,
+            ),
+          ),
+        )
+        .mockResolvedValueOnce(Response.json(webhook))
+        .mockResolvedValueOnce(
+          Response.json({
+            id: webhook.id,
+            hmacSecret: webhook.hmacSecret,
+            logStreamType: "webhook",
+          }),
+        )
+        .mockResolvedValueOnce(
+          Response.json({
+            logStreamType: "webhook",
+            hmacSecret: "secret-rotated",
+          }),
+        );
+      const client = DeploymentClient.make("test-123", token, { fetch });
+      const listed = yield* client.listLogStreams;
+      const serialized = yield* Schema.encodeEffect(Json)(listed);
+      expect(serialized).not.toContain("secret-");
+      const s3 = listed[1];
+      if (s3.logStreamType !== "s3Export") return expect.unreachable();
+      expectTypeOf(s3.selection).toEqualTypeOf<DeploymentClient.Selection>();
+      expect(s3.selection).toEqual({ default: "excluded" });
+      expect(Redacted.value(s3.accessKeyId)).toBe("secret-access-id");
+      expect(listed[4]).toMatchObject({ host: null });
+      expect(listed[5]).toEqual(streams[5]);
+      expect(listed[6]).toEqual(streams[6]);
+
+      const stream = yield* client.getLogStream(webhook.id);
+      if (stream.logStreamType !== "webhook") return expect.unreachable();
+      expect(Redacted.value(stream.hmacSecret)).toBe(webhook.hmacSecret);
+      expect(Redacted.value(stream.url)).toBe(webhook.url);
+
+      const created = yield* client.createLogStream({
+        logStreamType: "webhook",
+        url: stream.url,
+        format: "json",
+      });
+      if (created.logStreamType !== "webhook") return expect.unreachable();
+      expect(Redacted.value(created.hmacSecret)).toBe(webhook.hmacSecret);
+      const rotated = yield* client.rotateWebhookSecret(webhook.id);
+      expect(Redacted.value(rotated.hmacSecret)).toBe("secret-rotated");
+      const serializedSecrets = yield* Schema.encodeEffect(Json)([
+        stream,
+        created,
+        rotated,
+      ]);
+      expect(serializedSecrets).not.toContain("secret-");
+
+      yield* client.updateLogStream("s3", {
+        logStreamType: "s3Export",
+        secretAccessKey: Redacted.make("secret-key"),
+        accessKeyId: null,
+        selection,
+      });
+      const createRequest = fetch.mock.calls[2][0];
+      const createBody: unknown = yield* Effect.promise(() =>
+        createRequest.json(),
+      );
+      expect(createBody).toEqual({
+        logStreamType: "webhook",
+        format: "json",
+        url: webhook.url,
+      });
+      const updateRequest = fetch.mock.calls[4][0];
+      const updateBody: unknown = yield* Effect.promise(() =>
+        updateRequest.json(),
+      );
+      expect(updateBody).toEqual({
+        logStreamType: "s3Export",
+        secretAccessKey: "secret-key",
+        accessKeyId: null,
+        selection: wireSelection,
+      });
+    }),
+);
+
+it.effect(
+  "streams audit entries on demand and preserves the original filters and opaque cursor",
+  () =>
+    Effect.gen(function* () {
+      const cursor = "next&after=now";
+      const fetch = vi.fn((request: Request) => {
+        const last = new URL(request.url).searchParams.get("cursor") === cursor;
+        return Promise.resolve(
+          Response.json({
+            items: [
+              {
+                actor: { kind: "system" },
+                action: "pause_deployment",
+                createTime: last ? 16 : 14,
+                metadata: {},
+              },
+            ],
+            pagination: last
+              ? { hasMore: false }
+              : { hasMore: true, nextCursor: cursor },
+          }),
+        );
+      });
+      const client = DeploymentClient.make("test-123", token, { fetch });
+      const stream = client.streamAuditLogEvents({
+        from: 10,
+        limit: 1,
+        cursor: "resume",
+      });
+      expect(fetch).not.toHaveBeenCalled();
+      const one = yield* stream.pipe(Stream.take(1), Stream.runCollect);
+      expect(Array.map(one, (entry) => entry.createTime)).toEqual([14]);
+      expect(fetch).toHaveBeenCalledTimes(1);
+      const all = yield* Stream.runCollect(stream);
+      expect(Array.map(all, (entry) => entry.createTime)).toEqual([14, 16]);
+      expect(
+        Array.map(fetch.mock.calls, ([request]) =>
+          Record.fromEntries(new URL(request.url).searchParams),
+        ),
+      ).toEqual([
+        { from: "10", limit: "1", cursor: "resume" },
+        { from: "10", limit: "1", cursor: "resume" },
+        { from: "10", limit: "1", cursor },
+      ]);
+    }),
+);
+
+it.effect(
+  "follows empty active-sync pages but returns the data-sync protocol response as one step",
+  () =>
+    Effect.gen(function* () {
+      const sync = {
+        syncId: "abc",
+        status: {
+          type: "stale",
+          totalTables: 1,
+          numDocumentsSynced: 1,
+          syncedTs: 20,
+        },
+        lastUpdated: 21,
+      } satisfies DeploymentApi.ActiveDataSync;
+      const response = {
+        syncId: "abc",
+        status: { type: "upToDate", snapshotTs: 20 },
+        truncates: [{ component: "", table: "messages" }],
+        values: [
+          {
+            component: "",
+            table: "messages",
+            ts: 20,
+            deleted: false,
+            value: { message: "hello" },
+          },
+        ],
+        pagination: { hasMore: true, nextCursor: "persistent-cursor" },
+      };
+      const fetch = vi
+        .fn((_request: Request) => Promise.resolve(new Response(null)))
+        .mockResolvedValueOnce(
+          Response.json({
+            syncs: [],
+            pagination: { hasMore: true, nextCursor: "page-2" },
+          }),
+        )
+        .mockResolvedValueOnce(
+          Response.json({ syncs: [sync], pagination: { hasMore: false } }),
+        )
+        .mockResolvedValueOnce(Response.json(response));
+      const client = DeploymentClient.make("test-123", token, { fetch });
+      const syncs = yield* Stream.runCollect(client.streamActiveSyncs());
+      expect(syncs).toEqual([
+        { ...sync, status: { ...sync.status, syncedTs: 20n } },
+      ]);
+      const step = yield* client.syncData({
+        cursor: "persistent-cursor",
+        selection,
+      });
+      expectTypeOf(step.values[0].value.message).toEqualTypeOf<Schema.Json>();
+      expect(step.values[0].value.message).toBe("hello");
+      expect(step).toEqual({
+        ...response,
+        status: { ...response.status, snapshotTs: 20n },
+        values: [{ ...response.values[0], ts: 20n }],
+      });
+      expect(fetch).toHaveBeenCalledTimes(3);
+      expect(new URL(fetch.mock.calls[0][0].url).search).toBe("");
+      expect(new URL(fetch.mock.calls[1][0].url).search).toBe("?cursor=page-2");
+      const syncBody: unknown = yield* Effect.promise(() =>
+        fetch.mock.calls[2][0].json(),
+      );
+      expect(syncBody).toStrictEqual({
+        cursor: "persistent-cursor",
+        selection: wireSelection,
+      });
+    }),
+);
+
+const rawSyncPage = (ts: string) => `{
+  "syncId":"abc","pagination":{"hasMore":false},"truncates":[],
+  "status":{"type":"stale","snapshotTs":1700000000000000002},
+  "values":[
+    {"component":"","table":"posts","ts":1700000000000000000,"deleted":false,"value":{}},
+    {"component":"","table":"posts","ts":${ts},"deleted":false,"value":{
+      "ts":0.5,"status":{"snapshotTs":13},"syncs":[{"status":{"syncedTs":14}}]
+    }}
+  ]
+}`;
+
+const rawActiveSync = `{"syncId":"abc","lastUpdated":1700000000000,
+  "status":{"type":"upToDate","totalTables":1,"numDocumentsSynced":2,"syncedTs":1700000000000000001}}`;
+
+it.effect("preserves exact wire ticks only at sync metadata paths", () =>
+  Effect.gen(function* () {
+    const fetch = vi
+      .fn<NonNullable<DeploymentClient.Options["fetch"]>>()
+      .mockResolvedValueOnce(new Response(rawSyncPage("1700000000000000001")))
+      .mockResolvedValueOnce(new Response(rawActiveSync))
+      .mockResolvedValueOnce(
+        new Response(
+          `{"syncs":[${rawActiveSync}],"pagination":{"hasMore":false}}`,
+        ),
+      );
+    const client = DeploymentClient.make("test-123", token, { fetch });
+    const page = yield* client.syncData({});
+    expectTypeOf(page.values[0].ts).toEqualTypeOf<bigint>();
+    expect(Array.map(page.values, ({ ts }) => ts)).toEqual([
+      1700000000000000000n,
+      1700000000000000001n,
+    ]);
+    expect(page.status).toEqual({
+      type: "stale",
+      snapshotTs: 1700000000000000002n,
+    });
+    expect(page.values[1].value).toEqual({
+      ts: 0.5,
+      status: { snapshotTs: 13 },
+      syncs: [{ status: { syncedTs: 14 } }],
+    });
+    const active = yield* client.getActiveSync(page.syncId);
+    expectTypeOf(active.lastUpdated).toEqualTypeOf<number>();
+    expect(active.lastUpdated).toBe(1700000000000);
+    if (active.status.type !== "upToDate") return expect.unreachable();
+    expectTypeOf(active.status.syncedTs).toEqualTypeOf<bigint>();
+    expect(active.status.syncedTs).toBe(1700000000000000001n);
+    const listed = yield* client.listActiveSyncs();
+    expect(listed.syncs).toEqual([active]);
+  }),
+);
+
+it.effect.each([
+  '"1700000000000000001"',
+  "1700000000000000000.1",
+  "9223372036854775808",
+  "null",
+  "{",
+])("rejects malformed sync timestamps without exposing the body: %s", (ts) =>
+  Effect.gen(function* () {
+    const client = DeploymentClient.make("test-123", token, {
+      fetch: () => Promise.resolve(new Response(rawSyncPage(ts))),
+    });
+    const error = yield* client.syncData({}).pipe(Effect.flip);
+    expect(error).toMatchObject({
+      _tag: "InvalidResponse",
+      operation: "syncData",
+      status: 200,
+    });
+    expect(String(error)).not.toContain("1700000000000000000");
+  }),
+);
+
+it.effect(
+  "accepts S3 export selection defaults and rejects a bare included component or table before sending",
+  () =>
+    Effect.gen(function* () {
+      const fetch = vi.fn((_request: Request) =>
+        Promise.resolve(Response.json({ id: "s3", logStreamType: "s3Export" })),
+      );
+      const client = DeploymentClient.make("test-123", token, { fetch });
+      const s3 = {
+        logStreamType: "s3Export",
+        bucket: "bucket",
+        region: "region",
+        accessKeyId: "test-id",
+        secretAccessKey: Redacted.make("test-key"),
+        period: "daily",
+        selection,
+      } satisfies DeploymentClient.CreateLogStreamInput;
+      yield* client.createLogStream(s3);
+      const body: unknown = yield* Effect.promise(() =>
+        fetch.mock.calls[0][0].json(),
+      );
+      expect(body).toMatchObject({
+        selection: wireSelection,
+        secretAccessKey: "test-key",
+      });
+      const invalid = {
+        default: "included",
+        components: { root: "included" },
+      } as const;
+      const badSync = yield* Effect.flip(
+        // @ts-expect-error A named component cannot be included without an object.
+        client.syncData({ selection: invalid }),
+      );
+      const badCreate = yield* Effect.flip(
+        // @ts-expect-error S3 selections use the same component rules as syncData.
+        client.createLogStream({ ...s3, selection: invalid }),
+      );
+      const badUpdate = yield* Effect.flip(
+        client.updateLogStream("s3", {
+          logStreamType: "s3Export",
+          // @ts-expect-error A named table cannot be included without an object.
+          selection: withTables({ todos: "included" } as const),
+        }),
+      );
+      expect(badSync).toMatchObject({
+        _tag: "InvalidRequest",
+        operation: "syncData",
+      });
+      expect(badCreate).toMatchObject({
+        _tag: "InvalidRequest",
+        operation: "createLogStream",
+      });
+      expect(badUpdate).toMatchObject({
+        _tag: "InvalidRequest",
+        operation: "updateLogStream",
+      });
+      const wrongVariant = yield* Effect.flip(
+        client.updateLogStream("hook", {
+          logStreamType: "webhook",
+          // @ts-expect-error A webhook update has no data-selection field.
+          selection: invalid,
+        }),
+      );
+      expect(wrongVariant).toMatchObject({
+        _tag: "InvalidRequest",
+        operation: "updateLogStream",
+      });
+      expect(fetch).toHaveBeenCalledTimes(1);
+      for (const input of [
+        { logStreamType: "s3Export" },
+        { logStreamType: "s3Export", selection: null },
+      ] as const) {
+        yield* client.updateLogStream("s3", input);
+        const [request] = fetch.mock.calls[fetch.mock.calls.length - 1];
+        const sent: unknown = yield* Effect.promise(() => request.json());
+        expect(sent).toStrictEqual(input);
+      }
+    }),
+);
