@@ -11,6 +11,11 @@ import * as Struct from "effect/Struct";
 import type * as DatabaseSchema from "./DatabaseSchema";
 import * as Table from "./Table";
 
+/**
+ * The table name and scoped, table-typed ID returned together by `identify`.
+ *
+ * @category Models
+ */
 type IdentifiedId<
   Name extends string,
   Scope extends IdScope.IdScope,
@@ -18,16 +23,82 @@ type IdentifiedId<
   ? { readonly table: Name; readonly id: GenericId<Name, Scope> }
   : never;
 
+/**
+ * Service for checking untrusted ID strings against this database's user and
+ * system table names without reading documents. Yield the generated
+ * `DocumentIds` tag in a query, mutation, or middleware restricted to those
+ * contexts. Actions and HTTP handlers can call a query to check an ID.
+ *
+ * **Gotchas**
+ *
+ * A valid ID does not prove the document exists, the caller can read it, or it
+ * came from this installation or deployment. Confect types the returned ID in
+ * the current scope without changing the string. Native runtime failures are
+ * defects, not `None`.
+ *
+ * **Example** (Checking an untrusted note ID)
+ *
+ * ```ts
+ * import * as Effect from "effect/Effect";
+ * import { DocumentIds } from "confect/_generated/services";
+ *
+ * export const parseNoteId = (input: string) =>
+ *   Effect.gen(function* () {
+ *     const ids = yield* DocumentIds;
+ *     return yield* ids.parse("notes", input);
+ *   });
+ * ```
+ *
+ * @remarks
+ *   Codegen support: this interface names the generated service shape; do not
+ *   import it directly. Yield `DocumentIds` from `confect/_generated/services`
+ *   and call `ids.parse` or `ids.identify`.
+ *
+ * @category Services
+ */
 export interface DocumentIdsService<
   AppTableName extends string,
   Scope extends IdScope.IdScope = IdScope.App,
 > {
+  /**
+   * Checks whether the input is already a current-format ID for the named
+   * table. A string that would normalize to a different ID is not accepted.
+   *
+   * @category Decoding
+   *
+   * @param table - A user-defined table name, `"_storage"`, or
+   *   `"_scheduled_functions"`. Unlike `reader.table`, this takes a string, not
+   *   a table handle.
+   * @param input - The string to validate without modification.
+   *
+   * @returns An effect yielding `Some(id)` if Convex normalizes the input for
+   *   this table to exactly the same string, or `None` otherwise.
+   *
+   * @see `ids.identify` when the table name is unknown.
+   */
   readonly parse: <
     const Name extends AppTableName | DatabaseSchema.SystemTableNames,
   >(
     table: Name,
     input: string,
   ) => Effect.Effect<Option.Option<GenericId<Name, Scope>>>;
+  /**
+   * Identifies the first known table for which the input is a current-format
+   * ID. It checks this database's generated table names, then the system
+   * tables, without loading codecs or fetching documents.
+   *
+   * @category Decoding
+   *
+   * @param input - Untrusted ID string to check against user and system tables.
+   *
+   * @returns An effect yielding `Some({ table, id })` for the first matching
+   *   table, or `None` when none matches. Both fields are readonly and
+   *   correlated: narrowing `table` also narrows the ID's table type. This uses
+   *   runtime ID lookups, not document scans, and cannot discover other
+   *   components' tables.
+   *
+   * @see `ids.parse` when the table name is known.
+   */
   readonly identify: (
     input: string,
   ) => Effect.Effect<
@@ -37,6 +108,14 @@ export interface DocumentIdsService<
   >;
 }
 
+/**
+ * Service requirement for validating IDs against the tables of a particular
+ * database schema. Import the `DocumentIds` type from
+ * `confect/_generated/services` to describe that requirement for your
+ * application or component.
+ *
+ * @category Services
+ */
 export type DocumentIds<DatabaseSchema_ extends DatabaseSchema.AnyWithProps> =
   DocumentIdsService<
     DatabaseSchema.TableNames<DatabaseSchema_>,
@@ -44,6 +123,10 @@ export type DocumentIds<DatabaseSchema_ extends DatabaseSchema.AnyWithProps> =
   >;
 
 /**
+ * Annotates the generated `DocumentIds` tag. For an Effect requirement, import
+ * the type `DocumentIds` from `confect/_generated/services` instead of naming
+ * this tag type.
+ *
  * @internal
  */
 export type DocumentIdsTag<
@@ -56,6 +139,10 @@ const tag = <AppTableName extends string, Scope extends IdScope.IdScope>() =>
   );
 
 /**
+ * Constructs the schema-specific tag for generated services. Import
+ * `DocumentIds` from `confect/_generated/services` and yield it rather than
+ * calling this factory.
+ *
  * @internal
  */
 export const DocumentIds = <

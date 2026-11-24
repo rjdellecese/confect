@@ -19,6 +19,10 @@
  * `convex/server`); it lives here for now because the React hook is its only
  * consumer—a second client (e.g. `@confect/foldkit`) should prompt a move down
  * to `@confect/js`.
+ *
+ * @module
+ *
+ * @internal
  */
 import type { PaginationResult } from "convex/server";
 import * as Array from "effect/Array";

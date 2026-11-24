@@ -1,3 +1,12 @@
+/**
+ * Adapts handlers for generated Convex registrations. Use `FunctionImpl.make`
+ * from `confect/_generated/server` rather than importing this subpath.
+ *
+ * @module
+ *
+ * @internal
+ */
+
 import {
   compileArgsSchema,
   compileReturnsSchema,
@@ -147,6 +156,10 @@ export const make = (
   register(prepare(tableNames, item, resolvedMiddlewares, target));
 
 /**
+ * Generated deployment modules register each group's handlers. In `.impl.ts`
+ * use `FunctionImpl.make` and `GroupImpl.finalize` from
+ * `confect/_generated/server` rather than registering functions directly.
+ *
  * @internal
  */
 export const register = (self: Definition): RegisteredFunction.Any =>

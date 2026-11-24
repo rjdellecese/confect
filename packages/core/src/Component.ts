@@ -1,3 +1,8 @@
+/**
+ * Publish a component's function contract, bind it to an installed Convex
+ * component, and use the resulting refs and ID schemas in its caller.
+ */
+
 import type { DefaultFunctionArgs, FunctionReference } from "convex/server";
 import { getFunctionAddress } from "convex/server";
 import type { GenericId as ConvexId } from "convex/values";
@@ -22,6 +27,13 @@ const TypeId = "~@confect/core/Component";
 const BoundTypeId = "~@confect/core/BoundComponent";
 declare const MountNameId: unique symbol;
 
+/**
+ * Preserves the literal installation name in the generated registry, even when
+ * the component exports no functions. Select the installed component from
+ * `confect/_generated/components` rather than adding the marker by hand.
+ *
+ * @internal
+ */
 export type Mounted<Api_, Name extends string> = Api_ & {
   readonly [MountNameId]: Name;
 };
@@ -86,6 +98,15 @@ type ApiGroup<
   >;
 };
 
+/**
+ * The native Convex reference tree expected by a Confect contract. It includes
+ * only public exports, with their encoded call types and backend-only
+ * visibility. Database IDs cross the native component boundary as strings.
+ *
+ * @category Utility types
+ *
+ * @see {@link Bound} for the references returned after attaching codecs.
+ */
 export type Api<
   Spec_ extends Spec.AnyWithProps,
   Name extends string | undefined = string | undefined,
@@ -142,21 +163,39 @@ interface Tree {
   readonly [key: string]: Tree | Ref.Any;
 }
 
+/**
+ * A component's function contract before installation. A package can publish
+ * one contract for multiple hosts or multiple installations in the same host.
+ * Each caller supplies its own installed reference to {@link bind}.
+ *
+ * @category Models
+ */
 export interface Component<
   Spec_ extends Spec.AnyWithProps,
   Scope extends IdScope.IdScope,
   Tables extends string = string,
 > {
+  /**
+   * @internal
+   */
   readonly [TypeId]: {
     readonly refs: Tree;
     readonly scope: Scope;
     readonly tables: ReadonlyArray<Tables>;
   };
+  /**
+   * The function spec carried at the type level; not a runtime property.
+   *
+   * @category Models
+   */
   readonly "~Spec": Spec_;
 }
 
 /**
- * An opaque identity: its string representation is not part of the API.
+ * The database scope of a component installed under a particular parent and
+ * mount name. Its string representation is not part of the API.
+ *
+ * @category Models
  */
 export type MountScope<
   Parent extends IdScope.IdScope,
@@ -202,6 +241,15 @@ type BindRefs<
       >
   : { [Key in keyof RefTree]: BindRefs<RefTree[Key], From, To> };
 
+/**
+ * A component's exported functions as backend-only refs for one installation.
+ * Confect functions use decoded arguments, results, and failures with IDs
+ * scoped to that installation. Plain Convex functions retain their wire types.
+ *
+ * @category References
+ *
+ * @see {@link bind}
+ */
 export type Bound<
   Spec_ extends Spec.AnyWithProps,
   From extends IdScope.IdScope,
@@ -216,7 +264,52 @@ export type Bound<
 };
 
 /**
- * Build a publishable contract containing only exported functions and codecs.
+ * Creates a publishable contract from the public functions in a spec without
+ * evaluating their schema factories. The table names determine which IDs the
+ * caller can refer to with {@link id}.
+ *
+ * **When to use**
+ *
+ * Use to wrap an existing Convex component: describe its native module and
+ * function names, using codecs whose encoded arguments and results match the
+ * native functions. A Confect-authored component already has a generated
+ * contract in `confect/_generated/component`.
+ *
+ * **Example** (Publishing a wrapper for a native counter mutation)
+ *
+ * ```ts
+ * import {
+ *   Component,
+ *   FunctionSpec,
+ *   GenericId,
+ *   GroupSpec,
+ *   IdScope,
+ *   Spec,
+ * } from "@confect/core";
+ * import * as Schema from "effect/Schema";
+ *
+ * const scope = IdScope.component("@example/counter");
+ * const counter = GroupSpec.make().addFunction(
+ *   FunctionSpec.publicMutation({
+ *     name: "create",
+ *     args: () => ({ count: Schema.FiniteFromString }),
+ *     returns: () => GenericId.GenericId("counters", scope),
+ *   }),
+ * );
+ *
+ * export default Component.make(
+ *   { [Spec.TypeId]: { counter: GroupSpec.withName("counter", counter) } },
+ *   scope,
+ *   ["counters"],
+ * );
+ * ```
+ *
+ * @category Constructors
+ *
+ * @throws If the scope is empty, or a group and a function share a name under
+ *   the same parent.
+ *
+ * @see {@link bind} to use the published contract in a caller.
  */
 export const make = <
   Spec_ extends Spec.AnyWithProps,
@@ -266,7 +359,30 @@ export const make = <
 };
 
 /**
- * Bind the published contract to an actual installed component reference.
+ * Binds a component contract to an installed entry from
+ * `confect/_generated/components`. Pass the returned function refs to backend
+ * runners or the scheduler. Binding preserves native call destinations and does
+ * not install a component or evaluate the function schemas.
+ *
+ * **Details**
+ *
+ * Confect refs apply the contract's codecs and typed failures. IDs belonging to
+ * the component or its descendants acquire types specific to the installation.
+ * A child installed inside another component needs `{ parentScope: scope }`,
+ * using that parent's generated `scope` from `confect/_generated/id`. Omit the
+ * options when binding in the application.
+ *
+ * **Gotchas**
+ *
+ * Keep the registry entry's inferred type. Widening away its literal mount name
+ * can make IDs from two installations interchangeable in TypeScript.
+ *
+ * @category Constructors
+ *
+ * @throws If the native argument has no installed component reference.
+ *
+ * @see {@link id} for a schema for one of the installation's table IDs.
+ * @see {@link schema} for rebinding a component's exported codec.
  */
 export const bind = <
   Spec_ extends Spec.AnyWithProps,
@@ -389,7 +505,18 @@ export const bind = <
 };
 
 /**
- * Reference an installed component's table ID in host schemas.
+ * Creates an ID schema for one of a bound component's tables. Use it in host
+ * functions or tables that refer to documents in this installation, rather than
+ * the host's generated `Id` for a same-named local table.
+ *
+ * **Gotchas**
+ *
+ * The value on the wire is still a string. Decoding a foreign ID does not prove
+ * that the document exists or belongs to the installation.
+ *
+ * @category Schemas
+ *
+ * @see {@link schema} to reuse a codec containing several scoped fields.
  */
 export const id = <
   From extends IdScope.IdScope,
@@ -408,8 +535,14 @@ export const id = <
 ) => GenericId.GenericId(table, component[BoundTypeId].scope);
 
 /**
- * Reuse a component's codec in a host function or table without losing its
- * scope.
+ * Rebinds a component's exported codec for use in a host function or table. IDs
+ * belonging to the component and its descendants acquire the bound
+ * installation's scope on both the decoded and encoded sides. IDs from
+ * unrelated scopes, wire values, and codec transformations are preserved.
+ *
+ * @category Schemas
+ *
+ * @see {@link id} when only a table ID schema is needed.
  */
 export const schema = <
   From extends IdScope.IdScope,

@@ -138,6 +138,7 @@ const rootGroupTypeMember = (node: SpecAssemblyNode): string =>
 
 export const render = Effect.fnUntraced(function* (
   nodes: ReadonlyArray<SpecAssemblyNode>,
+  target: "application" | "component" = "application",
 ) {
   const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
 
@@ -160,6 +161,13 @@ export const render = Effect.fnUntraced(function* (
 
   yield* cbw.blankLine();
 
+  yield* cbw.writeLine(`/**
+ * Function contract for the ${target}, assembled from its group specs. Use it
+ * to inspect the complete function tree without loading handler implementations
+ * or evaluating the functions' schema factories.
+ *
+ * @category models
+ */`);
   yield* cbw.write("const spec: ");
   yield* Array.match(nodes, {
     onEmpty: () => cbw.write("Spec.Spec"),

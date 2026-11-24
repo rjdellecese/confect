@@ -1,3 +1,12 @@
+/**
+ * Builds deployment registrations. Implement handlers with `FunctionImpl.make`
+ * from `confect/_generated/server` rather than importing this subpath.
+ *
+ * @module
+ *
+ * @internal
+ */
+
 import type * as DatabaseSchema from "./DatabaseSchema";
 import * as ConvexFunctionDefinitions from "./ConvexFunctionDefinitions";
 import type * as FunctionSpec from "@confect/core/FunctionSpec";
@@ -37,14 +46,10 @@ type RegisteredFunctionsOf<Group extends GroupSpec.AnyWithProps> = {
 };
 
 /**
- * The registered-functions record for a single group, derived from the group's
- * own `GroupSpec`: its declared functions, plus any nested subgroups it carries
- * directly. This is the node that `buildForGroup` returns—computed from the
- * leaf `GroupSpec` itself rather than by navigating the project-wide assembled
- * `Spec` to a dot-path, so the per-group registry's type depends only on its
- * own leaf. For the filesystem layout a leaf `GroupSpec` carries no subgroups
- * (subdirectory children are assembled separately into `_generated/spec.ts`),
- * so this resolves to just the leaf's functions.
+ * Types one group's generated deployment exports from its leaf spec, without
+ * depending on the project-wide contract. For an application function, name the
+ * reference instead: for example, `typeof refs.public.notes.list` with the
+ * default import from `confect/_generated/refs`.
  *
  * @internal
  */
@@ -85,6 +90,10 @@ export interface AnyWithProps {
  * `ConvexFunctionDefinitions.buildForGroup` and add local forwarding handlers
  * before shared registration. Node groups use
  * `RegisteredNodeFunction.buildForGroup` from the Node entry.
+ *
+ * Generated deployment modules register each group's handlers. In `.impl.ts`
+ * use `FunctionImpl.make` and `GroupImpl.finalize` from
+ * `confect/_generated/server` rather than registering functions directly.
  *
  * @internal
  */

@@ -255,15 +255,20 @@ type ApplySystemFields<
       : never;
 
 /**
- * Extend a table schema with Convex system fields at the type level.
+ * The codec type of a bound table's `Doc` field. Both decoded and encoded
+ * documents include an `_id` branded for `TableName` in `Scope` and a numeric
+ * `_creationTime` in milliseconds since the Unix epoch.
  *
- * This mirrors the runtime {@link extendWithSystemFields}: a `Struct` gains the
- * system fields directly (matching `Schema.fieldsAssign`), and a `Union` has
- * them distributed across its members (matching
- * `union.mapMembers(Tuple.map(Schema.fieldsAssign(...)))`). The
- * `Struct`/`Union` structure is preserved rather than collapsed to a bare
- * `Codec`; any other schema falls back to a `Codec` carrying the system-field
- * document shape, matching the runtime's AST-level extension.
+ * **Details**
+ *
+ * A struct retains its field map with the system fields added. A union extends
+ * each member separately and preserves the union. Other codecs expose the
+ * extended decoded and encoded document types without promising a struct or
+ * union API.
+ *
+ * @category Schemas
+ *
+ * @see {@link WithSystemFields} for the corresponding document value type.
  */
 export type ExtendWithSystemFields<
   TableName extends string,
@@ -287,11 +292,13 @@ export type ExtendWithSystemFields<
     : ApplySystemFields<TableName, TableSchema, Scope>;
 
 /**
- * The decoded/encoded document shape: a table's fields plus Convex's system
- * fields. Deliberately a bare intersection (no `Expand`/`Simplify`)—flattening
- * it with a homomorphic mapped type collapses to `{ [x: string]: any }` when
- * `Document` is still an unresolved generic, which breaks structural
- * comparability in the database reader/writer plumbing.
+ * A document value with the table's fields plus Convex's system fields.
+ * `TableName` and `Scope` brand the `_id` string for that table and database;
+ * `_creationTime` is a number of milliseconds since the Unix epoch. Apply the
+ * type to either a decoded or encoded document shape. Union members retain
+ * their own fields.
+ *
+ * @category Utility types
  */
 export type WithSystemFields<
   TableName extends string,

@@ -1,3 +1,13 @@
+/**
+ * Prepares definitions for generated Convex registrations. Implement handlers
+ * with `FunctionImpl.make` from `confect/_generated/server` rather than
+ * importing this subpath.
+ *
+ * @module
+ *
+ * @internal
+ */
+
 import type * as DatabaseSchema from "./DatabaseSchema";
 import type * as Layer from "effect/Layer";
 import * as Match from "effect/Match";
@@ -72,6 +82,10 @@ export const register = <Group extends GroupSpec.AnyWithProps>(
   ) as RegisteredFunctions.RegisteredFunctionsForGroupSpec<Group>;
 
 /**
+ * Generated deployment modules register each group's handlers. In `.impl.ts`
+ * use `FunctionImpl.make` and `GroupImpl.finalize` from
+ * `confect/_generated/server` rather than registering functions directly.
+ *
  * @internal
  */
 export const buildForGroup = <Group extends GroupSpec.AnyWithProps>(

@@ -36,6 +36,11 @@ export interface AnyWithProps extends DataModel<
 > {}
 
 /**
+ * Types the generated native context and vector search tags. Import `QueryCtx`,
+ * `MutationCtx`, `ActionCtx`, or `VectorSearch` from
+ * `confect/_generated/services` instead of reconstructing the application's
+ * model.
+ *
  * @internal
  */
 export type FromDatabaseSchema<
@@ -50,6 +55,11 @@ export type FromTables<Tables_ extends Table.AnyWithProps> = DataModel<
 >;
 
 /**
+ * Types the schema-specific native context tags. Yield `QueryCtx`,
+ * `MutationCtx`, or `ActionCtx` from `confect/_generated/services`; for the
+ * native application model type, import `DataModel` from
+ * `convex/_generated/dataModel`.
+ *
  * @internal
  */
 export type ToConvexDataModel<DataModel_ extends AnyWithProps> = {
@@ -117,6 +127,12 @@ export type DocumentByName<
   TableName extends TableNames<DataModel_>,
 > = DocumentWithName<DataModel_, TableName>;
 
+/**
+ * Types IDs returned by database operations and vector searches. Use the
+ * generated `Id<TableName>` type from `confect/_generated/id` in handlers.
+ *
+ * @internal
+ */
 export type Id<
   DataModel_ extends AnyWithProps,
   TableName extends TableNames<DataModel_>,

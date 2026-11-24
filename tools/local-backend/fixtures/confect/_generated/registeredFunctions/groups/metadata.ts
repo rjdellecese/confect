@@ -6,6 +6,14 @@ const forward = <Ctx, Args, Returns>(handler: (ctx: Ctx, args: Args) => Promise<
 
 const definitions = ConvexFunctionDefinitions.buildForGroup<typeof import("../../../groups/metadata.spec")["default"]>(tableNames, groupLayer);
 
+/**
+ * Registration tree consumed by the generated Convex entry point. Implement
+ * handlers with `FunctionImpl.make` from `confect/_generated/server`. To invoke
+ * a function, pass a leaf from `confect/_generated/refs` to a client or runner
+ * rather than importing this tree.
+ *
+ * @internal
+ */
 export default {
 ["queryMetadata"]: RegisteredConvexFunction.register({ ...definitions["queryMetadata"], handler: forward(definitions["queryMetadata"].handler) }),
 ["mutationMetadata"]: RegisteredConvexFunction.register({ ...definitions["mutationMetadata"], handler: forward(definitions["mutationMetadata"].handler) }),

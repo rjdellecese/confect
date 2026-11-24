@@ -12,10 +12,33 @@ export {
   TypeId,
   isTable,
   isUnnamedTable,
+  /**
+   * Creates a lazy table definition from a callback returning the user-field
+   * codec. Default-export the definition from a table file. Application specs
+   * can import the same constructor from `@confect/core/Table` without
+   * depending on the server package.
+   *
+   * @category Constructors
+   */
   make,
+  /**
+   * Bound table handle used by database readers and writers. Import a handle
+   * from `_generated/tables/<name>`. For system reads, use an application
+   * handle ({@link _storage} or {@link _scheduled_functions}) or select a
+   * component-scoped handle with {@link systemTablesForScope}.
+   *
+   * @category Models
+   */
   type Table,
   type Any,
   type AnyWithProps,
+  /**
+   * Immutable table definition before code generation binds its name. The
+   * `index`, `searchIndex`, and `vectorIndex` methods each return a new
+   * definition without changing the original.
+   *
+   * @category Models
+   */
   type UnnamedTable,
   type UnnamedAny,
   type UnnamedAnyWithProps,
@@ -65,6 +88,10 @@ type CompiledTable<Table extends Table_.AnyWithProps> =
     : never;
 
 /**
+ * Constructs a native table definition for the generated deployment schema. For
+ * deployment or test setup, default-import `confect/_generated/convexSchema`
+ * rather than calling the converter directly.
+ *
  * @internal
  */
 export const tableDefinition = <Table extends Table_.AnyWithProps>(
@@ -130,9 +157,14 @@ const storage = Table_.make(() =>
 );
 
 /**
- * In a component, pass `systemTablesForScope(componentScope)._storage` or
- * `._scheduled_functions` to the database reader. Applications can use the
- * exported `_storage` and `_scheduled_functions` handles directly.
+ * Returns read-only handles for the storage and scheduled-function system
+ * tables in the supplied ID scope. In a component, pass its generated `scope`
+ * from `_generated/id` and use the returned `_storage` or
+ * `_scheduled_functions` with `reader.table`.
+ *
+ * @category System tables
+ *
+ * @see {@link _storage} and {@link _scheduled_functions} for the application handles.
  */
 export const systemTablesForScope = <const Scope_ extends IdScope.IdScope>(
   scope: Scope_,
@@ -146,7 +178,26 @@ export const systemTablesForScope = <const Scope_ extends IdScope.IdScope>(
  * @internal
  */
 export const systemTables = systemTablesForScope(IdScope.app);
-export const { _scheduled_functions, _storage } = systemTables;
+export const {
+  /**
+   * Read-only application system table for scheduled calls, including the
+   * function name, arguments, scheduled time, and execution state. Pass this
+   * handle to `reader.table` to query or look up a scheduled call. Use the
+   * scheduler to schedule or cancel calls.
+   *
+   * @category System tables
+   */
+  _scheduled_functions,
+  /**
+   * Read-only application system table for stored file metadata. Pass this
+   * handle to `reader.table` to look up a storage ID's SHA-256 hash, size in
+   * bytes, and optional content type. Use a storage service to access the file
+   * contents.
+   *
+   * @category System tables
+   */
+  _storage,
+} = systemTables;
 
 /**
  * @internal

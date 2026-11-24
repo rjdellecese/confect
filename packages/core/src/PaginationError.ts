@@ -6,11 +6,21 @@ import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 
 /**
- * A Convex pagination cursor that no longer describes the current query.
+ * A pagination failure that Foldkit reports when Convex rejects a cursor for
+ * the current query. Match on `_tag: "InvalidCursor"` and restart pagination
+ * rather than retrying the rejected cursor. The `cause` field retains the
+ * original failure or error data.
+ *
+ * @category Errors
  */
 export class InvalidCursor extends Schema.TaggedError<InvalidCursor, {}>()(
   "InvalidCursor",
   {
+    /**
+     * The original Convex failure or error data, retained for diagnosis.
+     *
+     * @category Errors
+     */
     cause: Schema.Defect(),
   },
 ) {}

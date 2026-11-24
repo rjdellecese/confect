@@ -7,6 +7,14 @@ const forward = <Ctx, Args, Returns>(handler: (ctx: Ctx, args: Args) => Promise<
 
 const definitions = ConvexFunctionDefinitions.buildForGroup<typeof import("../../parent.spec")["default"]>(tableNames, groupLayer, target);
 
+/**
+ * Registration tree consumed by the generated Convex entry point. Implement
+ * handlers with `FunctionImpl.make` from `confect/_generated/server`. To invoke
+ * a function, pass a leaf from `confect/_generated/refs` to a runner inside this component
+ * rather than importing this tree.
+ *
+ * @internal
+ */
 export default {
 ["create"]: RegisteredConvexFunction.register({ ...definitions["create"], handler: forward(definitions["create"].handler) }),
 ["list"]: RegisteredConvexFunction.register({ ...definitions["list"], handler: forward(definitions["list"].handler) }),

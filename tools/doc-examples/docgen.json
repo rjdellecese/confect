@@ -1,0 +1,20 @@
+{
+  "srcDir": "../../packages",
+  "outDir": "dist/docgen",
+  "exclude": ["../../packages/*/!(src)/**", "../../packages/*/*.ts"],
+  "tscExecutable": "tsrs",
+  "runExamples": false,
+  "examplesCompilerOptions": {
+    "strict": true,
+    "exactOptionalPropertyTypes": true,
+    "skipLibCheck": true,
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "target": "ESNext",
+    "paths": {
+      "confect/_generated/*": [
+        "../../../../../apps/example/confect/_generated/*"
+      ]
+    }
+  }
+}

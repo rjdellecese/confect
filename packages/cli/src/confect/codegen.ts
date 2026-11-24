@@ -113,6 +113,14 @@ export const codegen = Command.make("codegen", DirectoryOptions.flags, () =>
   ),
 );
 
+const isComponent = Effect.map(ConvexDirectory.target, (target) =>
+  Match.value(target.kind).pipe(
+    Match.when("app", () => false),
+    Match.when("component", () => true),
+    Match.exhaustive,
+  ),
+);
+
 const runCodegen = Effect.gen(function* () {
   yield* validateComponentConfiguration;
   yield* generateConfectGeneratedDirectory;
@@ -129,7 +137,7 @@ const runCodegen = Effect.gen(function* () {
   // cross-table id refs, so it must exist on disk first.
   const tableModules = yield* TableModule.discover;
   yield* warnIfNoTables(tableModules);
-  const component = (yield* ConvexDirectory.target).kind === "component";
+  const component = yield* isComponent;
   const switchingTarget =
     (yield* fs.exists(path.join(generated, "id.ts"))) &&
     (yield* fs.exists(path.join(generated, "component.ts"))) !== component;
@@ -138,7 +146,10 @@ const runCodegen = Effect.gen(function* () {
   } else {
     const registry = path.join(generated, "components.ts");
     if (!(yield* fs.exists(registry))) {
-      const contents = yield* templates.components({ components: [] });
+      const contents = yield* templates.components({
+        components: [],
+        component,
+      });
       yield* writeFileStringAndLog(registry, contents);
     }
   }
@@ -339,7 +350,10 @@ const generateAssembledSpecs = Effect.fnUntraced(function* (
   // file is runtime-agnostic. Always emit it (even empty) so downstream
   // readers (`loadGeneratedSpec`, `generateRefs`) always find a spec module.
   const nodes = assemblyNodesFromLeaves(leaves);
-  const specContents = yield* templates.assembledSpec({ nodes });
+  const specContents = yield* templates.assembledSpec({
+    nodes,
+    component: yield* isComponent,
+  });
   yield* writeFileStringAndLog(
     path.join(confectDirectory, generatedSpecPath),
     specContents,
@@ -351,7 +365,7 @@ const generateGroupRegisteredFunctions = Effect.fnUntraced(function* (
 ) {
   const path = yield* Path.Path;
   const confectDirectory = yield* ConfectDirectory.get;
-  const component = (yield* ConvexDirectory.target).kind === "component";
+  const component = yield* isComponent;
 
   yield* Effect.forEach(
     leaves,
@@ -600,11 +614,11 @@ const generateTableNamesAndIds = Effect.fnUntraced(function* (
     tableModules,
     (tableModule) => tableModule.tableName,
   );
+  const target = yield* ConvexDirectory.target;
   yield* writeFileStringAndLog(
     path.join(confectDirectory, GENERATED_DIRNAME, "tableNames.ts"),
-    templates.tableNames(tableNames),
+    templates.tableNames(tableNames, target.kind === "component"),
   );
-  const target = yield* ConvexDirectory.target;
   const id = yield* templates.id(
     target.kind === "component" ? target.scope : undefined,
   );
@@ -642,11 +656,7 @@ const generateTableWrappers = Effect.fnUntraced(function* (
       const contents = yield* templates.tableWrapper({
         tableName: tableModule.tableName,
         unnamedImportPath,
-        component: Match.value((yield* ConvexDirectory.target).kind).pipe(
-          Match.when("app", () => false),
-          Match.when("component", () => true),
-          Match.exhaustive,
-        ),
+        component: yield* isComponent,
       });
       yield* writeFileStringAndLog(wrapperPath, contents);
     }),
@@ -708,11 +718,7 @@ const generateRuntimeSchema = Effect.fnUntraced(function* (
   const bindings = yield* tableModuleBindings(tableModules, schemaPath);
   const contents = yield* templates.runtimeSchema({
     tableModules: bindings,
-    component: Match.value((yield* ConvexDirectory.target).kind).pipe(
-      Match.when("app", () => false),
-      Match.when("component", () => true),
-      Match.exhaustive,
-    ),
+    component: yield* isComponent,
   });
 
   yield* writeFileStringAndLog(schemaPath, contents);
@@ -730,7 +736,10 @@ const generateConvexSchema = Effect.fnUntraced(function* (
   );
 
   const bindings = yield* tableModuleBindings(tableModules, convexSchemaPath);
-  const contents = yield* templates.convexSchema({ tableModules: bindings });
+  const contents = yield* templates.convexSchema({
+    tableModules: bindings,
+    component: yield* isComponent,
+  });
 
   yield* writeFileStringAndLog(convexSchemaPath, contents);
 });
@@ -753,6 +762,7 @@ const generateConvexSchemaReexport = Effect.gen(function* () {
 
   const schemaContents = yield* templates.schema({
     convexSchemaImportPath,
+    component: yield* isComponent,
   });
 
   yield* writeFileStringAndLog(convexSchemaPath, schemaContents);
@@ -775,11 +785,7 @@ const generateServices = Effect.gen(function* () {
 
   const servicesContentsString = yield* templates.services({
     schemaImportPath,
-    component: Match.value((yield* ConvexDirectory.target).kind).pipe(
-      Match.when("app", () => false),
-      Match.when("component", () => true),
-      Match.exhaustive,
-    ),
+    component: yield* isComponent,
   });
 
   yield* writeFileStringAndLog(servicesPath, servicesContentsString);
@@ -788,9 +794,10 @@ const generateServices = Effect.gen(function* () {
 const generateServerBuilders = Effect.gen(function* () {
   const path = yield* Path.Path;
   const confectDirectory = yield* ConfectDirectory.get;
+  const component = yield* isComponent;
   yield* writeFileStringAndLog(
     path.join(confectDirectory, GENERATED_DIRNAME, "server.ts"),
-    templates.serverBuilders,
+    templates.serverBuilders(component),
   );
 });
 
@@ -840,6 +847,7 @@ const generateDocs = Effect.fnUntraced(function* (
 
   const docsContentsString = yield* templates.docs({
     schemaImportPath,
+    component: yield* isComponent,
     tables: Array.map(tableModules, (tableModule) => ({
       tableName: tableModule.tableName,
       docName: DocName.fromTableName(tableModule.tableName),
@@ -862,7 +870,10 @@ const generateRefs = Effect.gen(function* () {
     path.relative(refsDir, path.join(confectDirectory, generatedSpecPath)),
   );
 
-  const refsContents = yield* templates.refs({ specImportPath });
+  const refsContents = yield* templates.refs({
+    specImportPath,
+    component: yield* isComponent,
+  });
 
   yield* writeFileStringAndLog(refsPath, refsContents);
 });
@@ -913,6 +924,7 @@ export const generateComponents = Effect.gen(function* () {
     : [];
 
   const contents = yield* templates.components({
+    component: kind === "component",
     components: Array.map(
       installedComponents,
       ({ name, componentDefinitionPath }) => ({

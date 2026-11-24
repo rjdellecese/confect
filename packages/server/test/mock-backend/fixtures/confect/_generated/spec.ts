@@ -14,6 +14,13 @@ import groups_schedulingSpec from "../groups/scheduling.spec";
 import groups_typedErrorsSpec from "../groups/typedErrors.spec";
 import typedErrorsNodeSpec from "../typedErrorsNode.spec";
 
+/**
+ * Function contract for the application, assembled from its group specs. Use it
+ * to inspect the complete function tree without loading handler implementations
+ * or evaluating the functions' schema factories.
+ *
+ * @category models
+ */
 const spec: Spec.Spec<{
   readonly databaseReader: GroupSpec_.NamedAt<typeof databaseReaderSpec, "databaseReader">;
   readonly groups: GroupSpec_.NamedAt<GroupSpec_.GroupSpec<"Convex", "groups", never, GroupSpec_.NamedAt<typeof groups_aliasImporterSpec, "aliasImporter"> | GroupSpec_.NamedAt<typeof groups_cjsImporterSpec, "cjsImporter"> | GroupSpec_.NamedAt<typeof groups_middlewareSpec, "middleware"> | GroupSpec_.NamedAt<typeof groups_middlewareHelpersSpec, "middlewareHelpers"> | GroupSpec_.NamedAt<typeof groups_middlewareOptionsSpec, "middlewareOptions"> | GroupSpec_.NamedAt<typeof groups_middlewareOrderSpec, "middlewareOrder"> | GroupSpec_.NamedAt<typeof groups_notesSpec, "notes"> | GroupSpec_.NamedAt<GroupSpec_.AddGroups<typeof groups_randomSpec, GroupSpec_.NamedAt<typeof groups_random_statsSpec, "stats">>, "random"> | GroupSpec_.NamedAt<typeof groups_runnersSpec, "runners"> | GroupSpec_.NamedAt<typeof groups_schedulingSpec, "scheduling"> | GroupSpec_.NamedAt<typeof groups_typedErrorsSpec, "typedErrors">>, "groups">;

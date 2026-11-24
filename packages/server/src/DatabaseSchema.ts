@@ -16,13 +16,32 @@ export const TypeId = "~@confect/server/DatabaseSchema";
  */
 export type TypeId = typeof TypeId;
 
+/**
+ * Types the default application target. Use the generated schema's `target`
+ * property type to name its target.
+ *
+ * @internal
+ */
 export interface AppTarget {
   readonly kind: "app";
   readonly scope: IdScope.App;
 }
 
+/**
+ * Supplies the default target for application registrations and
+ * `HttpRouter.make`. A component instead exports its own `target` from
+ * `_generated/id`.
+ *
+ * @internal
+ */
 export const appTarget: AppTarget = { kind: "app", scope: IdScope.app };
 
+/**
+ * Types the generated component target. Import `target` from the component's
+ * `confect/_generated/id` rather than constructing it.
+ *
+ * @internal
+ */
 export interface ComponentTarget<
   Scope_ extends IdScope.IdScope = IdScope.IdScope,
 > {
@@ -30,12 +49,31 @@ export interface ComponentTarget<
   readonly scope: Scope_;
 }
 
+/**
+ * Types the runtime descriptor used in registrations. Use the generated
+ * schema's `target` property type to preserve its specific kind and scope.
+ *
+ * @internal
+ */
 export type Target = AppTarget | ComponentTarget;
 
+/**
+ * Types registration arguments so a component-specific schema requires an
+ * explicit target. An omitted target always selects the application.
+ *
+ * @internal
+ */
 export type TargetArgs<Target_ extends Target> =
   | [target: Target_]
   | (AppTarget extends Target_ ? [target?: undefined] : never);
 
+/**
+ * Error raised when the target kind and ID scope disagree. An application
+ * requires the empty app scope; a component requires a nonempty scope. The
+ * error records the supplied `kind` and `scope`.
+ *
+ * @category Errors
+ */
 export class InvalidDatabaseTargetError extends Schema.TaggedError<
   InvalidDatabaseTargetError,
   {}
@@ -63,6 +101,12 @@ const validateTarget = <Target_ extends Target>(
         }),
       );
 
+/**
+ * Validates a target before registration. Use the component's generated
+ * `target` or the application default rather than constructing a target.
+ *
+ * @internal
+ */
 export const checkedTarget = <const Target_ extends Target>(
   target: Target_,
 ): Target_ => Result.getOrThrowWith(validateTarget(target), identity);
@@ -81,17 +125,30 @@ export const isDatabaseSchema = (u: unknown): u is Any =>
   Predicate.hasProperty(u, TypeId);
 
 /**
- * A schema definition holding a record of bound `Table`s keyed by table name.
- * Codegen emits a single static `DatabaseSchema.make({ ... })` call; laziness
- * lives entirely on each `Table` (its `Fields` and `Doc` are lazy memoised
- * getters), so this layer is a plain record indirection with no module-loading
- * or async machinery.
+ * Registry of the application or component's bound tables, default-exported
+ * from `_generated/schema`. Each table's name matches its registry key, and its
+ * ID scope matches the registry's target. Assembling the registry does not
+ * evaluate table codecs or construct Convex deployment validators.
+ *
+ * **Gotchas**
+ *
+ * A value import loads every table module in the registry. Use `typeof schema`
+ * with a type-only default import for annotations and import individual handles
+ * from `_generated/tables/<name>` in handlers. `_generated/convexSchema`
+ * supplies the separate Convex schema for deployment and test setup.
+ *
+ * @category Models
  */
 export interface DatabaseSchema<
   Tables_ extends Readonly<Record<string, Table.AnyWithProps>> = {},
   Target_ extends Target = AppTarget,
 > {
   readonly [TypeId]: Readonly<Tables_>;
+  /**
+   * Identifies the application or component that owns the tables. A component
+   * also exports `target` from `_generated/id`, so passing the target to its
+   * HTTP router does not require loading any table definitions.
+   */
   readonly target: Target_;
 }
 
@@ -103,8 +160,21 @@ export interface AnyWithProps extends DatabaseSchema<
   Target
 > {}
 
+/**
+ * Restricts application-only APIs to an app schema. Use `typeof schema` with a
+ * type-only import from `confect/_generated/schema` for a specific schema.
+ *
+ * @internal
+ */
 export type AnyApp = AnyWithProps & { readonly target: AppTarget };
 
+/**
+ * Extracts the ID scope for generated service types. For the scope itself,
+ * import `scope` from a component's `confect/_generated/id` or use the
+ * application scope, `IdScope.app`.
+ *
+ * @internal
+ */
 export type Scope<DatabaseSchema_ extends AnyWithProps> =
   DatabaseSchema_["target"]["scope"];
 
@@ -131,7 +201,20 @@ export type Tables<DatabaseSchema_ extends AnyWithProps> =
   DatabaseSchema_[TypeId][keyof DatabaseSchema_[TypeId]];
 
 /**
- * The bound table record, without evaluating any table schemas.
+ * Returns the registry's bound tables by name without evaluating their codecs.
+ *
+ * **When to use**
+ *
+ * Use when inspecting the handles for the application or component's own
+ * tables. For a list of names alone, default-import `_generated/tableNames` to
+ * avoid loading the table modules.
+ *
+ * @category Getters
+ *
+ * @param self - The registry from `_generated/schema`.
+ *
+ * @returns A readonly record keyed by table name. The system tables are not
+ *   part of this record.
  */
 export const tables = <DatabaseSchema_ extends AnyWithProps>(
   self: DatabaseSchema_,
@@ -165,6 +248,13 @@ export type TableWithName<
   TableName extends TableNames<DatabaseSchema_>,
 > = Extract<Tables<DatabaseSchema_>, { readonly tableName: TableName }>;
 
+/**
+ * Error raised when a table's bound name or ID scope does not match the
+ * registry. Compare `recordKey` with `tableName` and `targetScope` with
+ * `tableScope` to identify the mismatch.
+ *
+ * @category Errors
+ */
 export class InvalidTableBindingError extends Schema.TaggedError<
   InvalidTableBindingError,
   {}
@@ -201,9 +291,9 @@ const validateTables = <
 };
 
 /**
- * Construct a database schema from its bound table record. The record's keys
- * must match their tables' names. Table schemas remain lazy; construction only
- * stores the record. The empty case is `make({})`.
+ * Builds the application registry without evaluating table codecs. An omitted
+ * target selects the application. Default-import `confect/_generated/schema`
+ * rather than constructing a registry directly.
  *
  * @internal
  */
@@ -211,6 +301,10 @@ export function make<
   const TablesRecord extends Readonly<Record<string, Table.AnyWithProps>>,
 >(tableRecord: TablesRecord, target?: AppTarget): DatabaseSchema<TablesRecord>;
 /**
+ * Builds the registry for an explicit target. A component requires its
+ * generated target; default-import its registry from
+ * `confect/_generated/schema`.
+ *
  * @internal
  */
 export function make<

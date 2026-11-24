@@ -23,9 +23,26 @@ import * as Lazy from "./Lazy";
 import * as MiddlewareSpec from "./MiddlewareSpec";
 import type * as RuntimeAndFunctionType from "./RuntimeAndFunctionType";
 
+/**
+ * The runtime identifier shared by Confect and plain Convex refs.
+ *
+ * @category Type IDs
+ */
 export const TypeId = "~@confect/core/Ref";
+/**
+ * The type of the runtime identifier on every ref.
+ *
+ * @category Type IDs
+ */
 export type TypeId = typeof TypeId;
 
+/**
+ * The common contract of a function ref. Its generic parameters track runtime,
+ * visibility, decoded args, decoded returns, and typed failures. A ref retains
+ * its native destination when it cannot be called by local name.
+ *
+ * @category Models
+ */
 export interface Base<
   RuntimeAndFunctionType_ extends RuntimeAndFunctionType.RuntimeAndFunctionType,
   FunctionVisibility_ extends FunctionVisibility,
@@ -33,24 +50,78 @@ export interface Base<
   Returns_,
   Error_ = never,
 > {
+  /**
+   * Identifies a ref at runtime.
+   *
+   * @category Type IDs
+   */
   readonly [TypeId]: TypeId;
+  /**
+   * The runtime and function kind carried only at the type level.
+   *
+   * @category Models
+   */
   readonly "~RuntimeAndFunctionType": RuntimeAndFunctionType_;
+  /**
+   * The function visibility carried only at the type level.
+   *
+   * @category Models
+   */
   readonly "~FunctionVisibility": FunctionVisibility_;
+  /**
+   * Decoded call-argument types; not a runtime property.
+   *
+   * @category Models
+   */
   readonly "~Args": Args_;
+  /**
+   * Decoded result type; not a runtime property.
+   *
+   * @category Models
+   */
   readonly "~Returns": Returns_;
+  /**
+   * The union of declared function and covering middleware failures; not a
+   * runtime property.
+   *
+   * @category Models
+   */
   readonly "~Error": Error_;
+  /**
+   * The function name, such as `notes:list`, or an address label for an adapted
+   * native reference. For component refs and handles this string need not be a
+   * callable local name.
+   *
+   * @category Models
+   */
   readonly convexFunctionName: string;
   /**
-   * Preserved for component references and function handles, which have no
-   * local name.
+   * The native reference used for calls when present. This preserves the
+   * destination of component references and function handles.
+   *
+   * @category References
    */
   readonly functionReference?: ConvexFunctionReference<any, any>;
 }
 
 /**
- * A reference to a single Convex function, as callers see it: the wire name
- * plus the data needed to encode args, decode returns, and decode typed errors.
- * A ref is one of two shapes, keyed by the spec's provenance.
+ * A reference that identifies a Convex function by name or native reference.
+ * Its type parameters describe the arguments callers supply, the result they
+ * receive, and any declared failures.
+ *
+ * **When to use**
+ *
+ * Use with a client, function runner, or scheduler: pass a ref rather than
+ * calling it as a function. For local functions, use a leaf from the generated
+ * `refs` module. For an installed component, use its bound refs on the
+ * backend.
+ *
+ * **Details**
+ *
+ * A `Confect` ref carries codecs for its arguments, result, and declared
+ * failures. A `Convex` ref passes arguments and results through unchanged.
+ *
+ * @category Models
  */
 export type Ref<
   RuntimeAndFunctionType_ extends RuntimeAndFunctionType.RuntimeAndFunctionType,
@@ -75,6 +146,21 @@ export type Ref<
       Error_
     >;
 
+/**
+ * A generated reference to a function declared with Effect codecs. Its argument
+ * type comes from the field map, its result type from the return codec, and its
+ * failure type from both the function and its middleware.
+ *
+ * **Details**
+ *
+ * The `args`, `returns`, and optional `error` codecs are lazy. The `error`
+ * field contains only the function's own failure codec; the middleware
+ * declarations carry their failure codecs separately.
+ *
+ * @category Models
+ *
+ * @see {@link ConvexRef} for a registered Convex function without Confect codecs.
+ */
 export type ConfectRef<
   RuntimeAndFunctionType_ extends RuntimeAndFunctionType.RuntimeAndFunctionType,
   FunctionVisibility_ extends FunctionVisibility,
@@ -111,15 +197,65 @@ interface ConfectRefWithTypes<
   Returns_,
   Error_
 > {
+  /**
+   * Identifies a ref whose args, returns, and typed failures use Effect codecs.
+   *
+   * @category Models
+   */
   readonly _tag: "Confect";
+  /**
+   * The lazy argument codec and its field map; includes `paginationOpts` for
+   * paginated queries.
+   *
+   * @category Schemas
+   */
   readonly args: FunctionProvenance.ArgsSchema<ArgsFields_>;
+  /**
+   * The lazy result codec, including the page wrapper for paginated queries.
+   *
+   * @category Schemas
+   */
   readonly returns: Schema.Codec<any, any>;
+  /**
+   * Whether the declaration is standard or paginated; paginated metadata
+   * retains user-argument and item codecs separately from the wire-level page
+   * shape.
+   *
+   * @category Models
+   */
   readonly kind: FunctionProvenance.ConfectKind;
+  /**
+   * Covering middleware in execution order: group attachments, then function
+   * attachments.
+   *
+   * @category Middleware
+   */
   readonly middlewareSpecs: ReadonlyArray<MiddlewareSpec.AnyMiddlewareSpec>;
+  /**
+   * Covering middleware paired with its client-safe attachment values.
+   *
+   * @category Middleware
+   */
   readonly middlewareAttachments: ReadonlyArray<MiddlewareAttachment.MiddlewareAttachment>;
+  /**
+   * The function's own lazy failure codec, absent if none was declared.
+   * Middleware failure codecs are stored on their declarations, not merged
+   * here.
+   *
+   * @category Schemas
+   */
   readonly error?: Schema.Codec<any, any>;
 }
 
+/**
+ * A ref for a plain Convex function. It carries the function's destination and
+ * inferred call types, but no Effect argument, return, or error codecs. Confect
+ * callers pass its args and results through without codec conversion.
+ *
+ * @category Models
+ *
+ * @see {@link ConfectRef} for a function declared with Effect codecs.
+ */
 export interface ConvexRef<
   RuntimeAndFunctionType_ extends RuntimeAndFunctionType.RuntimeAndFunctionType,
   FunctionVisibility_ extends FunctionVisibility,
@@ -133,6 +269,11 @@ export interface ConvexRef<
   Returns_,
   Error_
 > {
+  /**
+   * Identifies a plain Convex ref with no Effect codec conversion.
+   *
+   * @category Models
+   */
   readonly _tag: "Convex";
 }
 
@@ -142,7 +283,12 @@ export interface ConvexRef<
 export type Any = Ref<any, any, any, any, any>;
 
 /**
- * Recognizes references by their runtime type identity.
+ * Narrows an unknown value to a Confect or plain Convex ref by its runtime
+ * identifier. A native Convex function reference must be adapted first.
+ *
+ * @category Guards
+ *
+ * @see {@link fromFunctionReference}
  */
 export const isRef = (value: unknown): value is Any =>
   Predicate.hasProperty(value, TypeId);
@@ -394,6 +540,10 @@ export type FunctionReference<Ref_ extends Any> = ConvexFunctionReference<
 >;
 
 /**
+ * Computes the type of a leaf in the generated ref tree. Use `typeof
+ * refs.public.group.fn` or `typeof refs.internal.group.fn` from the default
+ * `confect/_generated/refs` import for a concrete function.
+ *
  * @internal
  */
 export type FromFunctionSpec<
@@ -450,6 +600,10 @@ type FromFunctionSpecHelper<
         >;
 
 /**
+ * Builds a leaf in the generated ref tree. Pass the corresponding `refs.public`
+ * or `refs.internal` leaf from `confect/_generated/refs` to a client, runner,
+ * or scheduler instead of constructing it.
+ *
  * @internal
  */
 export const make = <FunctionSpec_ extends FunctionSpec.AnyWithProps>(
@@ -535,7 +689,35 @@ export const getFunctionReference = <Ref_ extends Any>(
 };
 
 /**
- * Adapt a native reference without assigning Confect codecs or typed errors.
+ * Adapts a native Convex function reference for a Confect runner or scheduler.
+ * The original reference remains the call destination, including for component
+ * functions and handles that have no local function name.
+ *
+ * **Gotchas**
+ *
+ * Arguments and results keep their native wire types. This adapter adds no
+ * codecs or typed failures. Use `Component.bind` if the component publishes a
+ * Confect contract and you want its decoded types.
+ *
+ * **Example** (Reading native Workpool status with a query runner)
+ *
+ * ```ts
+ * import { Ref } from "@confect/core";
+ * import { components } from "confect/_generated/components";
+ * import { QueryRunner } from "confect/_generated/services";
+ * import * as Effect from "effect/Effect";
+ *
+ * const status = Ref.fromFunctionReference(components.workpool.lib.status);
+ * const readStatus = (id: string) =>
+ *   Effect.gen(function* () {
+ *     const { runQuery } = yield* QueryRunner;
+ *     return yield* runQuery(status, { id });
+ *   });
+ * ```
+ *
+ * @category Converting
+ *
+ * @see {@link ConvexRef}
  */
 export const fromFunctionReference = <
   Type extends "query" | "mutation" | "action",

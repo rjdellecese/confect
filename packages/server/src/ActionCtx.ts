@@ -6,6 +6,10 @@ import * as RequestMetadata from "./RequestMetadata";
 import * as Layer from "effect/Layer";
 
 /**
+ * Annotates the generated `ActionCtx` tag. For an Effect requirement, import
+ * the type `ActionCtx` from `confect/_generated/services` instead of naming
+ * this tag type.
+ *
  * @internal
  */
 export type ActionCtxTag<
@@ -19,6 +23,10 @@ export type ActionCtxTag<
 >;
 
 /**
+ * Constructs the schema-specific tag for generated services. Import `ActionCtx`
+ * from `confect/_generated/services` and yield it rather than calling this
+ * factory.
+ *
  * @internal
  */
 export const ActionCtx = <
@@ -27,6 +35,23 @@ export const ActionCtx = <
 >(): ActionCtxTag<DataModel, Scope> =>
   Context.Service("@confect/server/ActionCtx");
 
+/**
+ * Effect requirement for access to the Convex action context. Yield the
+ * generated `ActionCtx` tag in an action or an HTTP route built with
+ * `HttpRouter.forSchema`.
+ *
+ * **When to use**
+ *
+ * Use when an integration expects encoded arguments and native promises rather
+ * than Confect Effects.
+ *
+ * **Gotchas**
+ *
+ * In a component, storage, scheduling, and vector search use scoped IDs,
+ * `ctx.auth` is absent, and request metadata returns a null `authToken`.
+ *
+ * @category Services
+ */
 export type ActionCtx<
   DataModel extends GenericDataModel,
   Scope extends IdScope.IdScope = IdScope.App,
@@ -34,6 +59,11 @@ export type ActionCtx<
   ? GenericActionCtx<DataModel>
   : ComponentCtx.Identifier<"action", DataModel, Scope>;
 
+/**
+ * Provides the generated `ActionCtx` tag with the invocation's scoped context.
+ *
+ * @internal
+ */
 export const layer = <
   DataModel extends GenericDataModel,
   Scope extends IdScope.IdScope,

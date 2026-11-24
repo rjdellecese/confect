@@ -1,3 +1,9 @@
+/**
+ * Document IDs for hand-authored component contracts. For your own project's
+ * tables, use `Id` from `confect/_generated/id`, which already knows their
+ * names and scope.
+ */
+
 import type { GenericId as ConvexGenericId } from "convex/values";
 import * as Array from "effect/Array";
 import { memoize } from "effect/Function";
@@ -12,9 +18,11 @@ const ConvexId = "~@confect/core/ConvexId";
 const ConvexIdScope = "~@confect/core/ConvexIdScope";
 
 /**
- * Scoping changes only the TypeScript identity, never the stored string. The
- * qualified table brand prevents a component ID from also being assignable to a
- * vanilla application ID with the same table name.
+ * A document ID for one table in one database scope. In the application scope
+ * it is the native Convex ID type. Component IDs stay distinct from application
+ * IDs even for tables with the same name. The stored string is unchanged.
+ *
+ * @category Models
  */
 export type GenericId<
   TableName extends string,
@@ -28,6 +36,19 @@ export type GenericId<
       };
     };
 
+/**
+ * Creates an ID schema for a table in a hand-authored component contract. Pass
+ * the component's definition scope so that binding the contract can distinguish
+ * IDs from different installations. Omitting the scope creates an application
+ * ID schema.
+ *
+ * **Gotchas**
+ *
+ * Decoding accepts any string. It does not check the ID's format, table
+ * membership, or existence.
+ *
+ * @category Schemas
+ */
 export const GenericId = <
   TableName extends string,
   const Scope extends IdScope.IdScope = IdScope.App,
@@ -43,6 +64,11 @@ export const GenericId = <
     Schema.toType,
   );
 
+/**
+ * Reads the scope used to select a Convex validator for an ID codec.
+ *
+ * @internal
+ */
 export const scope = (ast: SchemaAST.AST): IdScope.IdScope =>
   (ast.annotations?.[ConvexIdScope] as IdScope.IdScope | undefined) ??
   SchemaAST.resolveAt<IdScope.IdScope>(ConvexIdScope)(ast) ??
@@ -59,7 +85,10 @@ type WithOriginalIdBrands<Id, Original> =
     : never;
 
 /**
- * Rebind only IDs owned by `From`; IDs belonging to other scopes survive.
+ * The ID types of a bound component's values. Use the types inferred by
+ * `Component.bind` or `Component.schema` instead of rebasing them by hand.
+ *
+ * @internal
  */
 export type Rebase<
   A,
@@ -111,8 +140,11 @@ export type Rebase<
                   : A;
 
 /**
- * Scope annotations belong to both sides of a codec. Keep its transformations,
- * checks, optional fields and declaration parsers intact while rebinding IDs.
+ * Rebinds scope annotations on both sides of a codec while retaining its
+ * transformations, checks, optional fields, and declaration parsers. Use
+ * `Component.schema` to bind a component's exported codec.
+ *
+ * @internal
  */
 export const rebase = <
   Schema_ extends Schema.ConstraintCodec<any, any, never, never>,

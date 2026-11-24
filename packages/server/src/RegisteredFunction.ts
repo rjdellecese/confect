@@ -353,6 +353,12 @@ export const actionFunctionBase = <
     }).pipe(runHandlerPromise(combineErrorSchemas(error, resolvedMiddlewares))),
 });
 
+/**
+ * Types the services provided at action registration. Use the generated service
+ * tags from `confect/_generated/services` in an action handler.
+ *
+ * @internal
+ */
 export type ActionServices<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
 > = Handler.ActionServices<DatabaseSchema_>;

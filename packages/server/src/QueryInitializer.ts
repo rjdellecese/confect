@@ -47,15 +47,57 @@ type TableInfoFor<
   TableName extends DataModel.TableNames<DataModel_>,
 > = DataModel.TableInfoWithName_<DataModel_, TableName>;
 
+/**
+ * Lookup and query builders for the table selected by `reader.table(handle)`.
+ * Lookups return decoded documents; index and search callbacks compare the
+ * stored field values.
+ *
+ * @category Models
+ */
 export interface QueryInitializer<
   DataModel_ extends DataModel.AnyWithProps,
   TableName extends DataModel.TableNames<DataModel_>,
   Doc = DataModel.DocumentWithName<DataModel_, TableName>,
 > {
+  /**
+   * Reads one decoded document by ID or by its unique combination of index
+   * field values. A missing document is a typed failure, not `None`.
+   *
+   * **Gotchas**
+   *
+   * A call with a single argument always looks up a document ID, even if the
+   * argument is a built-in index name. Use `get(id)` for an ID and
+   * `index("by_creation_time", range)` to query by creation time.
+   *
+   * @category Reading
+   */
   readonly get: {
+    /**
+     * Reads the document with the supplied ID.
+     *
+     * @category Reading
+     *
+     * @param id - Document ID for the selected table in this database's scope.
+     *
+     * @returns An effect yielding the document, or failing with
+     *   `GetByIdFailure` when absent or `DocumentDecodeError` when decoding
+     *   fails.
+     */
     (
       id: DataModel.Id<DataModel_, TableName>,
     ): Effect.Effect<Doc, Document.DocumentDecodeError | GetByIdFailure>;
+    /**
+     * Reads the unique document matching the supplied index values.
+     *
+     * @category Reading
+     *
+     * @param indexName - Standard index used for an exact lookup.
+     * @param indexFieldValues - Positional stored values in index-field order.
+     *
+     * @returns An effect yielding the unique matching document, or failing with
+     *   `GetByIndexFailure` when absent or `DocumentDecodeError` when decoding
+     *   fails. More than one match is a native uniqueness defect.
+     */
     <
       IndexName extends keyof Indexes<
         ConvexTableInfoFor<DataModel_, TableName>
@@ -69,7 +111,32 @@ export interface QueryInitializer<
       >
     ): Effect.Effect<Doc, Document.DocumentDecodeError | GetByIndexFailure>;
   };
+  /**
+   * Creates an ordered standard-index query without fetching documents. Use
+   * `index(name)` to scan the whole index ascending or `index(name, "desc")` to
+   * scan descending. Every table has `by_creation_time` and `by_id` indexes.
+   *
+   * @category Reading
+   *
+   * @see {@link QueryInitializer.stream} for queries that need ordered composition.
+   */
   readonly index: {
+    /**
+     * Creates an ordered query over the index entries selected by a native
+     * Convex range callback.
+     *
+     * @category Reading
+     *
+     * @param indexName - Standard index name.
+     * @param indexRange - Optional native Convex range callback. Apply `eq` to
+     *   successive index fields, then optional lower/upper bounds on the next
+     *   field. Values use their stored representation, not decoded codec
+     *   output.
+     * @param order - `"asc"` by default, or `"desc"`.
+     *
+     * @returns An OrderedQuery exposing first, take, collect, stream, and
+     *   paginate.
+     */
     <
       IndexName extends keyof Indexes<
         ConvexTableInfoFor<DataModel_, TableName>
@@ -85,6 +152,18 @@ export interface QueryInitializer<
       order?: OrderDirection,
     ): OrderedQuery.OrderedQuery<TableInfoFor<DataModel_, TableName>, Doc>;
   } & FullIndexScan<TableInfoFor<DataModel_, TableName>, Doc>["index"];
+  /**
+   * Creates a full-text search query ordered by descending relevance.
+   *
+   * @category Reading
+   *
+   * @param indexName - Search index declared on the table.
+   * @param searchFilter - Native Convex callback: call `search(field, text)` on
+   *   the configured search field, then `eq(field, value)` for equality filters
+   *   permitted by the index. Values use the stored representation.
+   *
+   * @returns An OrderedQuery whose consumers decode the matching documents.
+   */
   readonly search: <
     IndexName extends keyof SearchIndexes<
       ConvexTableInfoFor<DataModel_, TableName>
@@ -99,23 +178,40 @@ export interface QueryInitializer<
     ) => SearchFilter,
   ) => OrderedQuery.OrderedQuery<TableInfoFor<DataModel_, TableName>, Doc>;
   /**
-   * EXPERIMENTAL—stream-first querying (see `notes/stream-based-querying.md`).
+   * Creates a reusable {@link QueryStream.QueryStream} over a standard index.
+   * Each run reads and decodes documents in index order; constructing or
+   * composing the stream does not read them.
    *
-   * Like `index`, but returns a {@link QueryStream.QueryStream}: a genuine
-   * Effect `Stream` of documents in index order that stays mergeable and
-   * paginable.
+   * **When to use**
    *
-   * In SQL terms: an index range scan—`SELECT * FROM table WHERE <range> ORDER
-   * BY <index fields> [DESC]`; `eq` calls are the equality predicates, the
-   * bound calls are the range predicates. The value is a reusable description
-   * of a query: each run re-runs the index query. * The typed range builder
-   * consumes `eq`-pinned fields from the index's field tuple at the type level,
-   * so the stream's visible label type is exactly the fields that still vary
-   * (the `ORDER BY` columns left after the equality predicates). The order
-   * direction is part of the type too: omitted, it is `"asc"`; a literal is
-   * tracked as that literal, and a value known only at runtime as the union.
-   * The order parameter is either absent or a direction—never `undefined`—so
-   * the type can't claim a literal the runtime default would contradict.
+   * Use to merge index ranges, join documents, or paginate the result after
+   * filtering or mapping it.
+   *
+   * **Details**
+   *
+   * Apply `eq` to successive leading index fields. Each equality removes that
+   * field from the stream's visible ordering labels. Finish with `gt` or `gte`,
+   * `lt` or `lte`, or a lower then an upper bound on the same field; these
+   * bounds keep the field in the key. The arguments are stored field values,
+   * not decoded values. The type tracks the remaining labels and the order
+   * (`"asc"` by default).
+   *
+   * @category Reading
+   *
+   * @param indexName - Standard index name, not a full-text search index.
+   * @param indexRange - Optional typed range callback; omit it for the full
+   *   index.
+   * @param order - Optional direction, defaulting to `"asc"`. Without a range
+   *   callback, supply the direction as the second argument.
+   *
+   * @returns A reusable QueryStream of decoded documents, with
+   *   `DocumentDecodeError` in its error channel and no additional service
+   *   requirements. Keep callback effects deterministic and read-only when
+   *   composing.
+   *
+   * @experimental
+   *
+   * @see {@link QueryInitializer.index} for a native ordered query.
    */
   readonly stream: {
     <
@@ -416,13 +512,35 @@ export const getById =
       Effect.andThen(Document.decode(table)),
     );
 
+/**
+ * Typed failure from `get(id)` or the initial read in `patch` when the selected
+ * table contains no document with that ID. Validating the ID's format does not
+ * establish that the document exists.
+ *
+ * @category Errors
+ */
 export class GetByIdFailure extends Schema.TaggedError<GetByIdFailure, {}>()(
   "GetByIdFailure",
   {
+    /**
+     * The requested document ID.
+     *
+     * @category Getters
+     */
     id: Schema.String,
+    /**
+     * The selected table's name.
+     *
+     * @category Getters
+     */
     tableName: Schema.String,
   },
 ) {
+  /**
+   * Returns a message identifying the table and missing document ID.
+   *
+   * @category Getters
+   */
   override get message(): string {
     return Document.documentErrorMessage({
       id: this.id,
@@ -432,14 +550,42 @@ export class GetByIdFailure extends Schema.TaggedError<GetByIdFailure, {}>()(
   }
 }
 
+/**
+ * Typed failure from `get(indexName, ...indexFieldValues)` when no document
+ * matches the indexed values. If several documents match, the native uniqueness
+ * check produces a defect instead.
+ *
+ * @category Errors
+ */
 export class GetByIndexFailure extends Schema.TaggedError<
   GetByIndexFailure,
   {}
 >()("GetByIndexFailure", {
+  /**
+   * The selected table's name.
+   *
+   * @category Getters
+   */
   tableName: Schema.String,
+  /**
+   * The standard index used for lookup.
+   *
+   * @category Getters
+   */
   indexName: Schema.String,
+  /**
+   * Requested values in index-field order, before any document decoding.
+   *
+   * @category Getters
+   */
   indexFieldValues: Schema.Array(Schema.Unknown),
 }) {
+  /**
+   * Returns a message identifying the table, index, and values that had no
+   * match.
+   *
+   * @category Getters
+   */
   override get message(): string {
     const fieldValues = Result.getOrThrowWith(
       Schema.encodeResult(

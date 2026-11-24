@@ -5,11 +5,17 @@ import * as Logger from "effect/Logger";
 import * as Match from "effect/Match";
 
 /**
- * Writes structured Effect logs through Convex's severity-aware console
- * methods. Trace and Debug use `console.debug`, Info uses `console.info`, Warn
- * uses `console.warn`, and Error and Fatal use `console.error`. The payload
- * retains the original Effect level, cause, annotations, spans, timestamp, and
- * fiber ID.
+ * Logger that sends structured Effect entries to Convex's console at the
+ * corresponding severity, retaining the Effect level, cause, annotations,
+ * spans, timestamp, and fiber ID.
+ *
+ * **Details**
+ *
+ * Trace and Debug use `console.debug`, Info uses `console.info`, Warn uses
+ * `console.warn`, and Error and Fatal use `console.error`. All and None use
+ * `console.log`.
+ *
+ * @category Logging
  */
 export const logger: Logger.Logger<unknown, void> = Logger.make((options) => {
   const console = options.fiber.getRef(Console.Console);
@@ -25,9 +31,11 @@ export const logger: Logger.Logger<unknown, void> = Logger.make((options) => {
 });
 
 /**
- * Replaces Effect's default console logger without changing custom loggers,
- * tracing, or the minimum log level. Confect installs this layer automatically
- * for function handlers and HTTP routes.
+ * Layer that replaces Effect's default console logger with {@link logger} for
+ * Convex function handlers and HTTP routes. Confect installs it automatically
+ * and leaves custom loggers, tracing, and the minimum log level unchanged.
+ *
+ * @category Layers
  */
 export const layer: Layer.Layer<never> = Layer.effect(
   Logger.CurrentLoggers,

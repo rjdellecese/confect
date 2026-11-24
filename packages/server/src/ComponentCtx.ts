@@ -1,3 +1,13 @@
+/**
+ * Types the raw contexts exposed by component handlers. Yield the generated
+ * `QueryCtx`, `MutationCtx`, or `ActionCtx` from `confect/_generated/services`
+ * rather than importing this subpath.
+ *
+ * @module
+ *
+ * @internal
+ */
+
 import type * as IdScope from "@confect/core/IdScope";
 import type * as Types from "effect/Types";
 import type { GenericId, Rebase } from "@confect/core/GenericId";

@@ -82,11 +82,18 @@ layer(NodeServices.layer)("component codegen", (it) => {
         expect(services).toContain("Scheduler_.forScope<typeof scope>()");
         expect(services).toContain("Storage_.Storage.forScope<typeof scope>()");
         expect(services).toContain("MutationCtx_.MutationCtx<");
+        expect(services).toContain("`authToken` is always `null`");
         const contract = yield* fs.readFileString(
           `${directory}/confect/_generated/component.ts`,
         );
         expect(contract).toContain("Component.make(spec, scope,");
         expect(contract).not.toContain("impl");
+        expect(contract).toContain("`Component.bind`");
+        const refs = yield* fs.readFileString(
+          `${directory}/confect/_generated/refs.ts`,
+        );
+        expect(refs).not.toContain("client-callable");
+        expect(refs).toContain("Internal functions stay private.");
         const before = yield* generatedModificationTimes(directory);
         yield* codegenHandler.pipe(Effect.provideContext(dirs));
         const after = yield* generatedModificationTimes(directory);
@@ -95,9 +102,9 @@ layer(NodeServices.layer)("component codegen", (it) => {
     { timeout: 30000 },
   );
 
-  it.effect(
-    "preserves scoped IDs on a rejected target and cleans obsolete outputs on target switches",
-    () =>
+  it.effect.each(["current", "legacy"] as const)(
+    "preserves scoped IDs on a rejected target and cleans the %s auth shim on a target switch",
+    (version) =>
       Effect.gen(function* () {
         const directory = yield* freshFixture;
         const fs = yield* FileSystem.FileSystem;
@@ -148,12 +155,22 @@ layer(NodeServices.layer)("component codegen", (it) => {
         yield* app;
         const appFiles = yield* targetFiles;
         expect(appFiles).toEqual({ contract: false, authConfig: true });
+        if (version === "legacy") {
+          yield* fs.writeFileString(
+            authConfig,
+            'import auth from "../confect/auth";\n\nexport default auth;\n',
+          );
+        }
+        const shim = yield* fs.readFileString(authConfig);
         yield* fs.remove(auth);
         yield* fs.writeFileString(config, original);
         yield* component;
         const componentFiles = yield* targetFiles;
         expect(componentFiles).toEqual({ contract: true, authConfig: false });
-        const customAuth = "export default { providers: [] };";
+        const customAuth =
+          version === "legacy"
+            ? `/** Managed separately. */\n${shim}`
+            : "export default { providers: [] };";
         yield* fs.writeFileString(authConfig, customAuth);
         yield* component;
         const preserved = yield* fs.readFileString(authConfig);

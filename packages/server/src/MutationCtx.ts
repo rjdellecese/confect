@@ -6,6 +6,10 @@ import * as RequestMetadata from "./RequestMetadata";
 import * as Layer from "effect/Layer";
 
 /**
+ * Annotates the generated `MutationCtx` tag. For an Effect requirement, import
+ * the type `MutationCtx` from `confect/_generated/services` instead of naming
+ * this tag type.
+ *
  * @internal
  */
 export type MutationCtxTag<
@@ -19,6 +23,10 @@ export type MutationCtxTag<
 >;
 
 /**
+ * Constructs the schema-specific tag for generated services. Import
+ * `MutationCtx` from `confect/_generated/services` and yield it rather than
+ * calling this factory.
+ *
  * @internal
  */
 export const MutationCtx = <
@@ -27,6 +35,22 @@ export const MutationCtx = <
 >(): MutationCtxTag<DataModel, Scope> =>
   Context.Service("@confect/server/MutationCtx");
 
+/**
+ * Effect requirement for access to the Convex mutation context. Yield the
+ * generated `MutationCtx` tag inside a mutation.
+ *
+ * **When to use**
+ *
+ * Use when an integration needs encoded documents and native promises rather
+ * than Confect's decoded values and Effects.
+ *
+ * **Gotchas**
+ *
+ * In a component, database, storage, and scheduling operations use scoped IDs,
+ * `ctx.auth` is absent, and request metadata returns a null `authToken`.
+ *
+ * @category Services
+ */
 export type MutationCtx<
   DataModel extends GenericDataModel,
   Scope extends IdScope.IdScope = IdScope.App,
@@ -34,6 +58,12 @@ export type MutationCtx<
   ? GenericMutationCtx<DataModel>
   : ComponentCtx.Identifier<"mutation", DataModel, Scope>;
 
+/**
+ * Provides the generated `MutationCtx` tag with the invocation's scoped
+ * context.
+ *
+ * @internal
+ */
 export const layer = <
   DataModel extends GenericDataModel,
   Scope extends IdScope.IdScope,

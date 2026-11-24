@@ -57,6 +57,20 @@ export const isUnnamedTable = (u: unknown): u is UnnamedAny =>
 // value-imports `convex/server`) is produced separately by
 // `@confect/server/Table.tableDefinition`.
 
+/**
+ * A named table with document codecs and index metadata. Default-import it from
+ * `confect/_generated/tables/<name>`. Pass the handle to `reader.table` or
+ * `writer.table` in a handler, or use its `Doc` and `Fields` codecs in a spec.
+ * Author the unnamed definition with {@link make}.
+ *
+ * **Details**
+ *
+ * `Name_` is the filename-derived table name, and `TableSchema_` describes the
+ * decoded user fields and their stored representation. Importing the handle
+ * does not construct either schema: the first access builds and caches it.
+ *
+ * @category Models
+ */
 export interface Table<
   Name_ extends string,
   TableSchema_ extends Schema.Codec<any, any>,
@@ -71,9 +85,35 @@ export interface Table<
    * @internal
    */
   readonly [TypeId]: TypeId;
+  /**
+   * The table name assigned by the generated wrapper from its filename.
+   *
+   * @category Getters
+   */
   readonly tableName: Name_;
+  /**
+   * The database scope of the table's document IDs. A component table and an
+   * application table can have the same name without sharing an ID type.
+   *
+   * @category Getters
+   */
   readonly scope: Scope_;
+  /**
+   * The user-field codec, evaluated on first access. Use `typeof
+   * table.Fields.Type` for its decoded TypeScript type; system fields are not
+   * included.
+   *
+   * @category Getters
+   */
   readonly Fields: TableSchema_;
+  /**
+   * The user-field codec extended with `_id` and `_creationTime`, evaluated on
+   * first access. The ID belongs to this table's scope. Use the codec for
+   * document returns and `typeof table.Doc.Type` for the decoded document
+   * type.
+   *
+   * @category Getters
+   */
   readonly Doc: SystemFields.ExtendWithSystemFields<
     Name_,
     TableSchema_,
@@ -131,6 +171,14 @@ export type AnyWithProps = Table<
 // wrapper file per user-authored table that simply invokes the unnamed
 // callable with the filename basename.
 
+/**
+ * An immutable table definition returned by {@link make}, before codegen
+ * assigns its filename-derived name. Default-export it from
+ * `confect/tables/<name>.ts`. Chain index builders to return new definitions
+ * without evaluating the schema callback or changing earlier definitions.
+ *
+ * @category Models
+ */
 export interface UnnamedTable<
   TableSchema_ extends Schema.Codec<any, any>,
   TableValidator_ extends GenericValidator =
@@ -140,6 +188,10 @@ export interface UnnamedTable<
   VectorIndexes_ extends GenericTableVectorIndexes = {},
 > {
   /**
+   * Binds the filename-derived table name in a generated wrapper.
+   * Default-import the handle from `confect/_generated/tables/<name>` rather
+   * than calling the unnamed table directly.
+   *
    * @internal
    */
   <
@@ -179,6 +231,19 @@ export interface UnnamedTable<
    */
   readonly "~TableValidator": TableValidator_;
 
+  /**
+   * Adds an ordered index for looking up documents by the specified field
+   * paths.
+   *
+   * @category Indexes
+   *
+   * @param name - Index name used by the table reader's `index`, `get`, or
+   *   `stream`.
+   * @param fields - Nonempty field-path tuple in index order, including nested
+   *   paths when needed. Convex supplies the creation-time tiebreaker.
+   *
+   * @returns A new definition with the index added; the original is unchanged.
+   */
   index<
     IndexName extends string,
     FirstFieldPath extends ExtractFieldPaths<TableValidator_>,
@@ -200,6 +265,17 @@ export interface UnnamedTable<
     VectorIndexes_
   >;
 
+  /**
+   * Adds a full-text index for the table reader's `search` method.
+   *
+   * @category Indexes
+   *
+   * @param name - Search index name.
+   * @param indexConfig - `searchField` selects the text field; `filterFields`
+   *   lists fields available for equality filtering in a search callback.
+   *
+   * @returns A new definition with the search index added.
+   */
   searchIndex<
     IndexName extends string,
     SearchField extends ExtractFieldPaths<TableValidator_>,
@@ -224,6 +300,18 @@ export interface UnnamedTable<
     VectorIndexes_
   >;
 
+  /**
+   * Adds an index for finding similar vectors with the generated `VectorSearch`
+   * service.
+   *
+   * @category Indexes
+   *
+   * @param name - Vector index name.
+   * @param indexConfig - `vectorField` selects the embedding, `dimensions` sets
+   *   its length, and `filterFields` lists fields available to search filters.
+   *
+   * @returns A new definition with the vector index added.
+   */
   vectorIndex<
     IndexName extends string,
     VectorField extends ExtractFieldPaths<TableValidator_>,
@@ -315,6 +403,9 @@ export type Doc<TableDef extends AnyWithProps> = TableDef["Doc"];
  * @internal
  */
 export type Fields<TableDef extends AnyWithProps> = TableDef["Fields"];
+/**
+ * @internal
+ */
 export type Scope<TableDef extends AnyWithProps> = TableDef["scope"];
 
 /**
@@ -510,6 +601,32 @@ const makeUnnamed = <
   }) as UnnamedTable_;
 };
 
+/**
+ * Creates an unnamed table definition from a lazy codec for its user fields.
+ * Chain index declarations before default-exporting it from your table module.
+ *
+ * **Example** (Defining a table indexed by text)
+ *
+ * ```ts
+ * import { Table } from "@confect/core";
+ * import * as Schema from "effect/Schema";
+ *
+ * export default Table.make(() =>
+ *   Schema.Struct({ text: Schema.String }),
+ * ).index("by_text", ["text"]);
+ * ```
+ *
+ * @category Constructors
+ *
+ * @param lazyFields - Callback constructing the field codec. It runs only when
+ *   a bound table's `Fields` or `Doc` is first accessed, not during definition,
+ *   index chaining, or generated name binding. Decoding and encoding must
+ *   require no Effect services, and the encoded fields must be representable in
+ *   Convex.
+ *
+ * @returns An unnamed definition to default-export from
+ *   `confect/tables/<name>.ts`. Codegen binds the filename as its table name.
+ */
 export const make = <const TableSchema_ extends Schema.Codec<any, any>>(
   lazyFields: () => TableSchema_,
 ): UnnamedTable<TableSchema_, TableSchemaToTableValidator<TableSchema_>> => {

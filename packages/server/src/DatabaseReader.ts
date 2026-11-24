@@ -60,10 +60,62 @@ type TableReader<Table_ extends Table.AnyWithProps, Docs> =
         >
     : SingleTableReader<Table_, Docs>;
 
+/**
+ * Service for reading decoded documents in queries and mutations. Yield the
+ * generated `DatabaseReader` tag and pass a bound table handle to `table`; the
+ * handle supplies the codec, and `Docs` optionally supplies named document
+ * types.
+ *
+ * **Example** (Reading the ten newest notes)
+ *
+ * ```ts
+ * import * as Effect from "effect/Effect";
+ * import { DatabaseReader } from "confect/_generated/services";
+ * import notesTable from "confect/_generated/tables/notes";
+ *
+ * export const latestNotes = Effect.gen(function* () {
+ *   const reader = yield* DatabaseReader;
+ *   return yield* reader
+ *     .table(notesTable)
+ *     .index("by_creation_time", "desc")
+ *     .take(10);
+ * });
+ * ```
+ *
+ * @remarks
+ *   Codegen support: this interface names the generated service shape; do not
+ *   import it directly. Yield `DatabaseReader` from
+ *   `confect/_generated/services` and call `reader.table(handle)`.
+ *
+ * @category Services
+ */
 export interface DatabaseReaderService<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
   Docs = {},
 > {
+  /**
+   * Selects a table in this database's scope for lookups and queries without
+   * reading any documents.
+   *
+   * **Gotchas**
+   *
+   * If the handle can refer to several tables, `index(name, order?)` accepts
+   * shared index names, but `stream(name, order?)` also requires identical
+   * fields in the same order. Narrow the handle by `tableName` before using a
+   * table-specific index, range callback, or ID.
+   *
+   * @category Reading
+   *
+   * @param table - A bound handle from `_generated/tables/<name>` or a
+   *   read-only system table. For system tables, applications can use
+   *   `Table._storage` or `Table._scheduled_functions`; components must select
+   *   a handle from {@link Table.systemTablesForScope} with their generated
+   *   `scope`.
+   *
+   * @returns The lookup and query operations available on the selected handle.
+   *
+   * @see {@link QueryInitializer.QueryInitializer} for lookups and queries on a single table.
+   */
   readonly table: <Table_ extends IncludedTables<DatabaseSchema_>>(
     table: Table_,
   ) => TableReader<
@@ -130,6 +182,10 @@ export const make = <
  * `Handler`/runtime provisioning provide. The tag's _Service_ (what `yield*`
  * produces) carries `Docs`, so queries resolve to the named doc interfaces.
  *
+ * Annotates the generated `DatabaseReader` tag. For an Effect requirement,
+ * import the type `DatabaseReader` from `confect/_generated/services` instead
+ * of naming this tag type.
+ *
  * @internal
  */
 export type DatabaseReaderTag<
@@ -141,6 +197,10 @@ export type DatabaseReaderTag<
 >;
 
 /**
+ * Constructs the schema-specific tag for generated services. Import
+ * `DatabaseReader` from `confect/_generated/services` and yield it rather than
+ * calling this factory.
+ *
  * @internal
  */
 export const DatabaseReader = <
@@ -152,6 +212,14 @@ export const DatabaseReader = <
     DatabaseReaderService<DatabaseSchema_, Docs>
   >("@confect/server/DatabaseReader");
 
+/**
+ * Service requirement for effects that read from this database schema. Yield
+ * `DatabaseReader` from `confect/_generated/services` and call
+ * `reader.table(handle)` to read the named document types in the current
+ * database.
+ *
+ * @category Services
+ */
 export type DatabaseReader<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
 > = DatabaseReaderService<DatabaseSchema_>;

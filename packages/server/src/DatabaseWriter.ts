@@ -23,9 +23,11 @@ import * as QueryInitializer from "./QueryInitializer";
 import type * as Table from "./Table";
 
 /**
- * The argument accepted by `patch`: like `Partial<Doc>` without system fields,
- * but the fields that are already optional also accept `undefined`, since
- * setting a field to `undefined` unsets it.
+ * Partial update to a document's decoded user fields. Omit a field to leave it
+ * unchanged, or set an optional field to `undefined` to remove it. `_id` and
+ * `_creationTime` cannot be patched.
+ *
+ * @category Utility types
  */
 export type PatchValue<Doc> = {
   [
@@ -33,17 +35,60 @@ export type PatchValue<Doc> = {
   ]?: undefined extends Doc[K] ? Doc[K] | undefined : Doc[K];
 };
 
+/**
+ * Write operations for the table selected by `writer.table(handle)`. They
+ * accept decoded user fields and use the table's codec to produce the stored
+ * values. Native database failures are defects.
+ *
+ * @category Models
+ */
 export interface DatabaseWriterTableAccessor<
   DataModel_ extends DataModel.AnyWithProps,
   TableName extends DataModel.TableNames<DataModel_>,
   Doc = DocumentByName_<DataModel_, TableName>,
 > {
+  /**
+   * Encodes the user fields and inserts a document into the selected table.
+   *
+   * **Gotchas**
+   *
+   * The signature declares `DocumentEncodeError`, but constructing that error
+   * requires an input `_id`. If encoding fails on the usual input without
+   * `_id`, the effect dies instead.
+   *
+   * @category Writing
+   *
+   * @param document - Decoded user fields without `_id` or `_creationTime`.
+   *
+   * @returns An effect yielding the new ID in the selected table's scope. Its
+   *   declared failure type is `DocumentEncodeError`.
+   */
   readonly insert: (
     document: Document.WithoutSystemFields<Doc>,
   ) => Effect.Effect<
     DataModel.Id<DataModel_, TableName>,
     Document.DocumentEncodeError
   >;
+  /**
+   * Reads the document, applies the patch to its decoded fields, and writes the
+   * encoded result in the same mutation.
+   *
+   * **Details**
+   *
+   * The merge is shallow: supplying a nested object replaces it. Omitted fields
+   * remain unchanged; `undefined` removes an optional field.
+   *
+   * @category Writing
+   *
+   * @param id - ID of the existing document.
+   * @param patchedValues - Changed decoded user fields, without system fields.
+   *
+   * @returns An effect completing with void. Missing documents fail with
+   *   `GetByIdFailure`; reading or encoding can fail with `DocumentDecodeError`
+   *   or `DocumentEncodeError`. Native database failures remain defects.
+   *
+   * @see {@link DatabaseWriterTableAccessor.replace} for a full replacement.
+   */
   readonly patch: (
     id: DataModel.Id<DataModel_, TableName>,
     patchedValues: PatchValue<Doc>,
@@ -53,26 +98,88 @@ export interface DatabaseWriterTableAccessor<
     | Document.DocumentDecodeError
     | Document.DocumentEncodeError
   >;
+  /**
+   * Replaces every user field with the encoded replacement, preserving `_id`
+   * and `_creationTime` without decoding the original document.
+   *
+   * **Gotchas**
+   *
+   * A missing target is a native database defect, not `GetByIdFailure`. If
+   * encoding fails on input without `_id`, constructing `DocumentEncodeError`
+   * also produces a defect.
+   *
+   * @category Writing
+   *
+   * @param id - ID of the document to replace.
+   * @param value - Complete replacement in decoded form, without system fields.
+   *
+   * @returns An effect completing with `void`, with `DocumentEncodeError` in
+   *   the declared error channel.
+   *
+   * @see {@link DatabaseWriterTableAccessor.patch} to update only selected fields.
+   */
   readonly replace: (
     id: DataModel.Id<DataModel_, TableName>,
     value: Document.WithoutSystemFields<Doc>,
   ) => Effect.Effect<void, Document.DocumentEncodeError>;
+  /**
+   * Deletes the document with the supplied ID from the selected table.
+   *
+   * @category Writing
+   *
+   * @param id - Table-typed document ID.
+   *
+   * @returns An effect completing with void. There is no typed failure channel;
+   *   native database failures are defects.
+   */
   readonly delete: (
     id: DataModel.Id<DataModel_, TableName>,
   ) => Effect.Effect<void>;
 }
 
 /**
- * The service shape backing the `DatabaseWriter` tag. Named (rather than an
- * inferred anonymous object) so declaration emit prints
- * `DatabaseWriterService<…>` by reference instead of expanding the data model.
- * `Docs` is the optional named document registry (see
- * `DatabaseReaderService`).
+ * Service for writing decoded documents in a mutation. Yield the generated
+ * `DatabaseWriter` tag and select a bound table in this database to use its
+ * field codec. `Docs` optionally supplies the generated named document types.
+ *
+ * **Example** (Inserting a note with decoded fields)
+ *
+ * ```ts
+ * import * as Effect from "effect/Effect";
+ * import { DatabaseWriter } from "confect/_generated/services";
+ * import notesTable from "confect/_generated/tables/notes";
+ *
+ * export const insertNote = Effect.gen(function* () {
+ *   const writer = yield* DatabaseWriter;
+ *   return yield* writer.table(notesTable).insert({ text: "First note" });
+ * });
+ * ```
+ *
+ * @remarks
+ *   Codegen support: this interface names the generated service shape; do not
+ *   import it directly. Yield `DatabaseWriter` from
+ *   `confect/_generated/services` and call `writer.table(handle)`.
+ *
+ * @category Services
  */
 export interface DatabaseWriterService<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
   Docs = {},
 > {
+  /**
+   * Selects a user-defined table for writes without reading or changing any
+   * documents.
+   *
+   * @category Writing
+   *
+   * @param table - The table's bound handle from `_generated/tables/<name>`.
+   *   System table handles are read-only.
+   *
+   * @returns Write operations typed to the selected table's decoded fields and
+   *   IDs. A component's writer requires handles and IDs from its own scope.
+   *
+   * @see {@link DatabaseWriterTableAccessor} for the operations on the selected table.
+   */
   readonly table: <Table_ extends DatabaseSchema.Tables<DatabaseSchema_>>(
     table: Table_ & {
       readonly tableName: Exclude<
@@ -95,6 +202,10 @@ export interface DatabaseWriterService<
  * The tag's _Identifier_ is `Docs`-independent (see `DatabaseReaderTag`); only
  * the _Service_ carries `Docs` so writer inputs print the named doc
  * interfaces.
+ *
+ * Annotates the generated `DatabaseWriter` tag. For an Effect requirement,
+ * import the type `DatabaseWriter` from `confect/_generated/services` instead
+ * of naming this tag type.
  *
  * @internal
  */
@@ -199,6 +310,10 @@ export const make = <
 };
 
 /**
+ * Constructs the schema-specific tag for generated services. Import
+ * `DatabaseWriter` from `confect/_generated/services` and yield it rather than
+ * calling this factory.
+ *
  * @internal
  */
 export const DatabaseWriter = <
@@ -210,6 +325,14 @@ export const DatabaseWriter = <
     DatabaseWriterService<DatabaseSchema_, Docs>
   >("@confect/server/DatabaseWriter");
 
+/**
+ * Service requirement for effects that write to this database schema. Yield the
+ * `DatabaseWriter` tag from `confect/_generated/services` and call
+ * `writer.table(handle)` to write the named document types in the current
+ * database.
+ *
+ * @category Services
+ */
 export type DatabaseWriter<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
 > = [DatabaseSchema_["target"]] extends [DatabaseSchema.AppTarget]

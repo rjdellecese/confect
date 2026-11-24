@@ -53,14 +53,30 @@ export const Limits = Schema.Struct({
 export type Limits = typeof Limits.Type;
 
 /**
+ * Defect from `QueryStream.paginate` when `maximumRowsRead` or
+ * `maximumBytesRead` is not a nonnegative integer. The `cause` describes the
+ * invalid option; exhausting a valid budget is a separate condition.
+ *
+ * @category Errors
+ *
  * @experimental
  */
 export class InvalidReadLimitError extends Schema.TaggedError<
   InvalidReadLimitError,
   {}
 >()("InvalidReadLimitError", {
+  /**
+   * SchemaError describing the invalid limit options.
+   *
+   * @category Getters
+   */
   cause: Schema.declare<Schema.SchemaError>(Schema.isSchemaError),
 }) {
+  /**
+   * Returns a message describing the invalid read limit.
+   *
+   * @category Getters
+   */
   override get message(): string {
     return `Invalid read limits: ${this.cause.message}`;
   }

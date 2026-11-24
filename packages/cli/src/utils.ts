@@ -158,10 +158,11 @@ export const touchConvexSchema = Effect.gen(function* () {
 const generateOptionalFile = Effect.fnUntraced(function* (
   confectFile: string,
   convexFile: string,
-  generateContents: (importPath: string) => Effect.Effect<string>,
-  removeOnly: Effect.Effect<boolean, never, ConvexDirectory> = Effect.succeed(
-    false,
-  ),
+  generateContents: (
+    importPath: string,
+    component: boolean,
+  ) => Effect.Effect<string>,
+  legacyContentsToRemoveInComponents?: (importPath: string) => string,
 ) {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
@@ -170,7 +171,9 @@ const generateOptionalFile = Effect.fnUntraced(function* (
 
   const confectFilePath = path.join(confectDirectory, confectFile);
   const convexFilePath = path.join(convexDirectory, convexFile);
-  const removing = yield* removeOnly;
+  const component = (yield* ConvexDirectory.target).kind === "component";
+  const removing =
+    component && legacyContentsToRemoveInComponents !== undefined;
   if (!(yield* fs.exists(removing ? convexFilePath : confectFilePath))) {
     return Option.none();
   }
@@ -180,9 +183,15 @@ const generateOptionalFile = Effect.fnUntraced(function* (
     confectFilePath,
   );
   const moduleImportPath = yield* toModuleImportPath(relativeImportPath);
-  const contents = yield* generateContents(moduleImportPath);
-  if (removing && (yield* fs.readFileString(convexFilePath)) !== contents) {
-    return Option.none();
+  const contents = yield* generateContents(moduleImportPath, component);
+  if (removing) {
+    const existing = yield* fs.readFileString(convexFilePath);
+    if (
+      existing !== contents &&
+      existing !== legacyContentsToRemoveInComponents(moduleImportPath)
+    ) {
+      return Option.none();
+    }
   }
   const change = removing
     ? yield* removePathIfExists(convexFilePath).pipe(
@@ -198,7 +207,7 @@ const generateOptionalFile = Effect.fnUntraced(function* (
 export const generateHttp = generateOptionalFile(
   "http.ts",
   "http.ts",
-  (importPath) => templates.http({ httpImportPath: importPath }),
+  (httpImportPath, component) => templates.http({ httpImportPath, component }),
 );
 
 /**
@@ -207,7 +216,8 @@ export const generateHttp = generateOptionalFile(
 export const generateCrons = generateOptionalFile(
   "crons.ts",
   "crons.ts",
-  (importPath) => templates.crons({ cronsImportPath: importPath }),
+  (cronsImportPath, component) =>
+    templates.crons({ cronsImportPath, component }),
 );
 
 /**
@@ -217,5 +227,5 @@ export const generateAuthConfig = generateOptionalFile(
   "auth.ts",
   "auth.config.ts",
   (importPath) => templates.authConfig({ authImportPath: importPath }),
-  Effect.map(ConvexDirectory.target, (target) => target.kind === "component"),
+  (importPath) => `import auth from "${importPath}";\n\nexport default auth;\n`,
 );
