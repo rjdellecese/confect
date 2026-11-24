@@ -1,5 +1,12 @@
 # @confect/core
 
+## 11.0.0
+
+### Patch Changes
+
+- f8315d4: Add API documentation for public functions, service methods, result types, and generated helpers.
+- 4aa2d12: Fix paginated-query type checks to reject query refs without pagination arguments or paginated results.
+
 ## 10.6.0
 
 ### Minor Changes

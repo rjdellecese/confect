@@ -1,5 +1,14 @@
 # @confect/js
 
+## 11.0.0
+
+### Patch Changes
+
+- f8315d4: Add API documentation for public functions, service methods, result types, and generated helpers.
+- Updated dependencies [f8315d4]
+- Updated dependencies [4aa2d12]
+  - @confect/core@11.0.0
+
 ## 10.6.0
 
 ### Minor Changes
