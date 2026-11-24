@@ -344,16 +344,10 @@ export const match: {
       readonly onSuccess: (value: A) => Y;
       readonly onFailure: (error: E) => Z;
     },
-  ): X | Y | Z => {
-    switch (self._tag) {
-      case "Loading":
-        return handlers.onLoading();
-      case "Success":
-        return handlers.onSuccess(self.value);
-      case "Failure":
-        return handlers.onFailure(self.error);
-      default:
-        return Function.absurd(self);
-    }
-  },
+  ): X | Y | Z =>
+    Match.typeTags<QueryResult<A, E>, X | Y | Z>()({
+      Loading: () => handlers.onLoading(),
+      Success: ({ value }) => handlers.onSuccess(value),
+      Failure: ({ error }) => handlers.onFailure(error),
+    })(self),
 );

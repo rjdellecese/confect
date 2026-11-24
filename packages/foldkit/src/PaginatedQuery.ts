@@ -867,10 +867,17 @@ export const make = <Query extends Ref.AnyConfectPublicPaginatedQuery>(
     state: Idle,
     ...params: [options: Options] | [args: UserArgs<Query>, options: Options]
   ): MachineActive<Query> =>
-    params.length === 2
-      ? initialState(state.generation + 1, params[0], params[1])
-      : // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- Only refs with no user fields expose init(idle, options).
-        initialState(state.generation + 1, {} as UserArgs<Query>, params[0]);
+    Match.value(params).pipe(
+      Match.withReturnType<MachineActive<Query>>(),
+      Match.when(
+        (p: typeof params): p is [UserArgs<Query>, Options] => p.length === 2,
+        ([args, options]) => initialState(state.generation + 1, args, options),
+      ),
+      Match.orElse(([options]) =>
+        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- Only refs with no user fields expose init(idle, options).
+        initialState(state.generation + 1, {} as UserArgs<Query>, options),
+      ),
+    );
 
   const reinitialize: PaginatedQuery<Query>["reinitialize"] = (
     state: MachineActive<Query>,
@@ -879,19 +886,42 @@ export const make = <Query extends Ref.AnyConfectPublicPaginatedQuery>(
       | [args: UserArgs<Query>, options?: Options | undefined]
   ): MachineActive<Query> => {
     const generation = state.generation + 1;
-    if (params.length === 2) {
-      return initialState(generation, params[0], params[1] ?? state.options);
-    }
-    const [single] = params;
-    if (single === undefined) {
-      return initialState(generation, state.args, state.options);
-    }
-    if (hasUserArgs) {
-      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- For refs with user fields the single argument is user args, even if those fields look like pagination options.
-      return initialState(generation, single as UserArgs<Query>, state.options);
-    }
-    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- With no user fields the public reinitialize(active, options?) overload accepts only options here.
-    return initialState(generation, state.args, single as Options);
+    return Match.value(params).pipe(
+      Match.withReturnType<MachineActive<Query>>(),
+      Match.when(
+        (p: typeof params): p is [UserArgs<Query>, Options | undefined] =>
+          p.length === 2,
+        ([args, options]) =>
+          initialState(generation, args, options ?? state.options),
+      ),
+      Match.orElse(([single]) =>
+        Match.value(single).pipe(
+          Match.withReturnType<MachineActive<Query>>(),
+          Match.when(undefined, () =>
+            initialState(generation, state.args, state.options),
+          ),
+          Match.when(Match.defined, (provided) =>
+            Match.value(hasUserArgs).pipe(
+              Match.withReturnType<MachineActive<Query>>(),
+              Match.when(true, () =>
+                initialState(
+                  generation,
+                  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- For refs with user fields this argument is user args.
+                  provided as UserArgs<Query>,
+                  state.options,
+                ),
+              ),
+              Match.when(false, () =>
+                // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- For refs without user fields this argument is options.
+                initialState(generation, state.args, provided as Options),
+              ),
+              Match.exhaustive,
+            ),
+          ),
+          Match.exhaustive,
+        ),
+      ),
+    );
   };
 
   return {
@@ -1204,26 +1234,27 @@ const settleSuccess = <Item_, UserArgs_, Error_>(
       };
     }),
     Match.when(false, () => {
-      const previousDescriptor = state.prevStack.at(-1);
-      if (
-        result.page.length === 0 &&
-        result.isDone &&
-        previousDescriptor !== undefined
-      ) {
-        return {
+      const retreatTo =
+        result.page.length === 0 && result.isDone
+          ? state.prevStack.at(-1)
+          : undefined;
+      return Match.value(retreatTo).pipe(
+        Match.withReturnType<Active<Item_, UserArgs_, Error_>>(),
+        Match.when(Match.defined, (previousDescriptor) => ({
           ...state,
           requestId: state.requestId + 1,
           current: previousDescriptor,
           prevStack: state.prevStack.slice(0, -1),
           phase: pendingPhase(phaseData(state.phase), "Previous"),
-        };
-      }
-      return {
-        ...state,
-        phase: Phase.Success<Item_, Error_>({
-          data: pageFromResult(state, result),
-        }),
-      };
+        })),
+        Match.when(undefined, () => ({
+          ...state,
+          phase: Phase.Success<Item_, Error_>({
+            data: pageFromResult(state, result),
+          }),
+        })),
+        Match.exhaustive,
+      );
     }),
     Match.exhaustive,
   );
@@ -1654,23 +1685,17 @@ export const match: {
       readonly onSuccess: (success: Success<Item_>) => F;
     },
   ): A | B | C | D | E | F => {
-    if (state._tag === "Idle") {
-      return handlers.onIdle(state);
-    }
-    const { phase } = state;
-    switch (phase._tag) {
-      case "Loading":
-        return handlers.onLoading(phase);
-      case "Refreshing":
-        return handlers.onRefreshing(phase);
-      case "Failure":
-        return handlers.onFailure(phase);
-      case "Stale":
-        return handlers.onStale(phase);
-      case "Success":
-        return handlers.onSuccess(phase);
-      default:
-        return Function.absurd(phase);
-    }
+    type Out = A | B | C | D | E | F;
+    return Match.typeTags<State<Item_, UserArgs_, Error_>, Out>()({
+      Idle: handlers.onIdle,
+      Active: ({ phase }) =>
+        Match.typeTags<Phase<Item_, Error_>, Out>()({
+          Loading: handlers.onLoading,
+          Refreshing: handlers.onRefreshing,
+          Failure: handlers.onFailure,
+          Stale: handlers.onStale,
+          Success: handlers.onSuccess,
+        })(phase),
+    })(state);
   },
 );

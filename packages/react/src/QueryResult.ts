@@ -162,14 +162,23 @@ class QueryResultProto<A, E>
     this: QueryResult<unknown, unknown>,
     that: QueryResult<unknown, unknown>,
   ): boolean {
-    switch (this._tag) {
-      case "Loading":
-        return that._tag === "Loading" && this.skipped === that.skipped;
-      case "Success":
-        return that._tag === "Success" && Equal.equals(this.value, that.value);
-      case "Failure":
-        return that._tag === "Failure" && Equal.equals(this.error, that.error);
-    }
+    return Match.value(this).pipe(
+      Match.tag(
+        "Loading",
+        (self) => that._tag === "Loading" && self.skipped === that.skipped,
+      ),
+      Match.tag(
+        "Success",
+        (self) =>
+          that._tag === "Success" && Equal.equals(self.value, that.value),
+      ),
+      Match.tag(
+        "Failure",
+        (self) =>
+          that._tag === "Failure" && Equal.equals(self.error, that.error),
+      ),
+      Match.exhaustive,
+    );
   }
   [Hash.symbol](this: QueryResult<unknown, unknown>): number {
     const tagHash = Hash.string(this._tag);

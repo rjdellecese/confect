@@ -303,22 +303,28 @@ class PaginatedQueryResultProto<Item, E>
     this: Variants<unknown, unknown>,
     that: Variants<unknown, unknown>,
   ): boolean {
-    switch (this._tag) {
-      case "LoadingFirstPage":
-        return (
-          that._tag === "LoadingFirstPage" && this.skipped === that.skipped
-        );
-      case "Failure":
-        return (
+    return Match.value(this).pipe(
+      Match.tag(
+        "LoadingFirstPage",
+        (self) =>
+          that._tag === "LoadingFirstPage" && self.skipped === that.skipped,
+      ),
+      Match.tag(
+        "LoadingMore",
+        "CanLoadMore",
+        "Exhausted",
+        (self) =>
+          self._tag === that._tag && Equal.equals(self.results, that.results),
+      ),
+      Match.tag(
+        "Failure",
+        (self) =>
           that._tag === "Failure" &&
-          Equal.equals(this.error, that.error) &&
-          Equal.equals(this.results, that.results)
-        );
-      default:
-        return (
-          this._tag === that._tag && Equal.equals(this.results, that.results)
-        );
-    }
+          Equal.equals(self.error, that.error) &&
+          Equal.equals(self.results, that.results),
+      ),
+      Match.exhaustive,
+    );
   }
   [Hash.symbol](this: Variants<unknown, unknown>): number {
     const tagHash = Hash.string(this._tag);

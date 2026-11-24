@@ -669,18 +669,13 @@ export const encodeArgs = <Ref_ extends Any>(
   ref: Ref_,
   args: Args<Ref_>,
 ): Effect.Effect<DefaultFunctionArgs, Schema.SchemaError> =>
-  ref._tag === "Convex"
-    ? Effect.succeed(args)
-    : Schema.encodeEffect(ref.args)(args);
-
-const returnCodec = <R extends Any>(
-  ref: R,
-): Schema.Codec<Returns<R>, unknown> | undefined => {
-  if (ref._tag === "Convex") {
-    return undefined;
-  }
-  return ref.returns;
-};
+  Match.value<Any>(ref).pipe(
+    Match.tag("Confect", (confectRef) =>
+      Schema.encodeEffect(confectRef.args)(args),
+    ),
+    Match.tag("Convex", () => Effect.succeed(args)),
+    Match.exhaustive,
+  );
 
 /**
  * @internal
@@ -688,14 +683,25 @@ const returnCodec = <R extends Any>(
 export const decodeReturns = <Ref_ extends Any>(
   ref: Ref_,
   returns: unknown,
-): Effect.Effect<Returns<Ref_>, Schema.SchemaError> => {
-  const codec = returnCodec(ref);
-  if (codec !== undefined) {
-    return Schema.decodeUnknownEffect(codec)(returns);
-  }
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- Plain Convex refs use the registered function's return type and deliberately have no decoder.
-  return Effect.succeed(returns as Returns<Ref_>);
-};
+): Effect.Effect<Returns<Ref_>, Schema.SchemaError> =>
+  Match.value<RefWithReturns<Returns<Ref_>>>(ref).pipe(
+    Match.tag("Confect", (confectRef) =>
+      Schema.decodeUnknownEffect(confectRef.returns)(returns),
+    ),
+    Match.tag("Convex", () =>
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- Plain Convex refs use the registered function's return type and deliberately have no decoder.
+      Effect.succeed(returns as Returns<Ref_>),
+    ),
+    Match.exhaustive,
+  );
+
+type RefWithReturns<A> = Ref<
+  RuntimeAndFunctionType.RuntimeAndFunctionType,
+  FunctionVisibility,
+  DefaultFunctionArgs,
+  A,
+  unknown
+>;
 
 /**
  * @internal
@@ -704,9 +710,11 @@ export const encodeArgsSync = <Ref_ extends Any>(
   ref: Ref_,
   args: Args<Ref_>,
 ): DefaultFunctionArgs =>
-  ref._tag === "Convex"
-    ? args
-    : Result.getOrThrow(Schema.encodeResult(ref.args)(args));
+  Match.typeTags<Any, DefaultFunctionArgs>()({
+    Confect: (confectRef) =>
+      Result.getOrThrow(Schema.encodeResult(confectRef.args)(args)),
+    Convex: () => args,
+  })(ref);
 
 /**
  * @internal
@@ -714,17 +722,17 @@ export const encodeArgsSync = <Ref_ extends Any>(
 export const decodeArgsSync = <Ref_ extends Any>(
   ref: Ref_,
   encodedArgs: unknown,
-): Args<Ref_> => {
-  if (ref._tag === "Confect") {
-    return Result.getOrThrow(
-      Schema.decodeUnknownResult<Schema.Codec<Args<Ref_>, DefaultFunctionArgs>>(
-        ref.args,
-      )(encodedArgs),
-    );
-  }
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- Plain Convex arguments pass through unchanged; the native ref supplies their type.
-  return encodedArgs as Args<Ref_>;
-};
+): Args<Ref_> =>
+  Match.typeTags<Any, Args<Ref_>>()({
+    Confect: (confectRef) =>
+      Result.getOrThrow(
+        Schema.decodeUnknownResult<
+          Schema.Codec<Args<Ref_>, DefaultFunctionArgs>
+        >(confectRef.args)(encodedArgs),
+      ),
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- Plain Convex arguments pass through unchanged; the native ref supplies their type.
+    Convex: () => encodedArgs as Args<Ref_>,
+  })(ref);
 
 /**
  * @internal
@@ -734,9 +742,13 @@ export const encodeReturnsSync = <Ref_ extends Any>(
   returns: Returns<Ref_>,
   // oxlint-disable-next-line quality/no-unknown-returns -- Refs carry the decoded return type, not a guarantee about the wire representation of a custom return codec.
 ): unknown =>
-  ref._tag === "Convex"
-    ? returns
-    : Result.getOrThrow(Schema.encodeResult(ref.returns)(returns));
+  Match.value<RefWithReturns<Returns<Ref_>>>(ref).pipe(
+    Match.tag("Confect", (confectRef) =>
+      Result.getOrThrow(Schema.encodeResult(confectRef.returns)(returns)),
+    ),
+    Match.tag("Convex", () => returns),
+    Match.exhaustive,
+  );
 
 /**
  * @internal
@@ -744,14 +756,15 @@ export const encodeReturnsSync = <Ref_ extends Any>(
 export const decodeReturnsSync = <Ref_ extends Any>(
   ref: Ref_,
   encodedReturns: unknown,
-): Returns<Ref_> => {
-  const codec = returnCodec(ref);
-  if (codec !== undefined) {
-    return Result.getOrThrow(Schema.decodeUnknownResult(codec)(encodedReturns));
-  }
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- As in decodeReturns, a native ref describes the response but carries no runtime codec.
-  return encodedReturns as Returns<Ref_>;
-};
+): Returns<Ref_> =>
+  Match.typeTags<RefWithReturns<Returns<Ref_>>, Returns<Ref_>>()({
+    Confect: (confectRef) =>
+      Result.getOrThrow(
+        Schema.decodeUnknownResult(confectRef.returns)(encodedReturns),
+      ),
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- As in decodeReturns, a native ref describes the response but carries no runtime codec.
+    Convex: () => encodedReturns as Returns<Ref_>,
+  })(ref);
 
 const ConvexErrorIdentifier = Symbol.for("ConvexError");
 
@@ -789,21 +802,25 @@ export const decodeErrorOrElse =
 
 const errorSchemaOf = <R extends Any>(
   ref: R,
-): Option.Option<Schema.Codec<Error<R>, unknown>> => {
-  if (ref._tag === "Convex") {
-    return Option.none();
-  }
-  const schemas: Array<Schema.Codec<unknown>> = [
-    ...("error" in ref && ref.error !== undefined ? [ref.error] : []),
-    ...MiddlewareSpec.errorSchemas(ref.middlewareSpecs),
-  ];
-  if (schemas.length === 0) {
-    return Option.none();
-  }
-  const union = schemas.length === 1 ? schemas[0] : Schema.Union(schemas);
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- Ref.make derives Error<R> from these same function and middleware declarations.
-  return Option.some(union as Schema.Codec<Error<R>, unknown>);
-};
+): Option.Option<Schema.Codec<Error<R>, unknown>> =>
+  Match.value<Any>(ref).pipe(
+    Match.tag("Confect", (confectRef) => {
+      const schemas: Array<Schema.Codec<unknown>> = [
+        ...("error" in confectRef && confectRef.error !== undefined
+          ? [confectRef.error]
+          : []),
+        ...MiddlewareSpec.errorSchemas(confectRef.middlewareSpecs),
+      ];
+      if (schemas.length === 0) {
+        return Option.none();
+      }
+      const union = schemas.length === 1 ? schemas[0] : Schema.Union(schemas);
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- Ref.make derives Error<R> from these same function and middleware declarations.
+      return Option.some(union as Schema.Codec<Error<R>, unknown>);
+    }),
+    Match.tag("Convex", () => Option.none()),
+    Match.exhaustive,
+  );
 
 /**
  * Decode `encodedError` against the ref's error schema—the function's declared
@@ -887,11 +904,13 @@ export const encodePaginatedQueryArgsSync = <
   ref: Ref_,
   args: Omit<Args<Ref_>, "paginationOpts"> | PaginatedArgs<Ref_>,
 ): DefaultFunctionArgs =>
-  ref._tag === "Convex"
-    ? args
-    : Result.getOrThrow(
-        Schema.encodeUnknownResult(paginatedKind(ref).userArgs)(args),
-      );
+  Match.typeTags<AnyPublicPaginatedQuery, DefaultFunctionArgs>()({
+    Confect: (confectRef) =>
+      Result.getOrThrow(
+        Schema.encodeUnknownResult(paginatedKind(confectRef).userArgs)(args),
+      ),
+    Convex: () => args,
+  })(ref);
 
 /**
  * Decode a page of a paginated query's results via the ref's item schema.
@@ -905,11 +924,15 @@ export const decodePaginationPageSync = <Ref_ extends AnyPublicPaginatedQuery>(
   encodedPage: unknown,
 ): Returns<Ref_>["page"] =>
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- The paginated ref's page codec is built from its item schema; native refs keep the page returned by Convex.
-  (ref._tag === "Convex"
-    ? encodedPage
-    : Result.getOrThrow(
-        Schema.decodeUnknownResult(paginatedKind(ref).page)(encodedPage),
-      )) as Returns<Ref_>["page"];
+  Match.value<AnyPublicPaginatedQuery>(ref).pipe(
+    Match.tag("Confect", (confectRef) =>
+      Result.getOrThrow(
+        Schema.decodeUnknownResult(paginatedKind(confectRef).page)(encodedPage),
+      ),
+    ),
+    Match.tag("Convex", () => encodedPage),
+    Match.exhaustive,
+  ) as Returns<Ref_>["page"];
 
 /**
  * Encode args via the ref's args schema, invoke `call`, decode returns via the
