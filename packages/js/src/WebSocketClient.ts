@@ -24,7 +24,7 @@ import * as Stream from "effect/Stream";
  */
 export class WebSocketClientError extends Schema.TaggedError<
   WebSocketClientError,
-  unknown
+  { readonly brand: unique symbol }
 >()("WebSocketClientError", {
   /**
    * The original failure, encoded with Effect's defect schema when serialized.

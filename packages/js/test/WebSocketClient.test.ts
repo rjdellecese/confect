@@ -1,6 +1,6 @@
 import { FunctionSpec, Ref } from "@confect/core";
 import { expectTypeOf, it } from "@effect/vitest";
-import type * as WebSocketClient from "@confect/js/WebSocketClient";
+import * as WebSocketClient from "@confect/js/WebSocketClient";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
@@ -78,6 +78,21 @@ class NotFound extends Schema.TaggedError<
 >()("NotFound", {
   id: Schema.String,
 }) {}
+
+it("distinguishes WebSocketClientError from an independently declared error with the same shape", () => {
+  class OtherError extends Schema.TaggedError<
+    OtherError,
+    { readonly brand: unique symbol }
+  >()("WebSocketClientError", { cause: Schema.Defect() }) {}
+  const fields = { cause: new Error("connection closed") };
+  expectTypeOf(WebSocketClient.WebSocketClientError).toBeConstructibleWith(
+    fields,
+  );
+  expectTypeOf(
+    WebSocketClient.WebSocketClientError.make(fields),
+  ).toEqualTypeOf<WebSocketClient.WebSocketClientError>();
+  expectTypeOf<OtherError>().not.toExtend<WebSocketClient.WebSocketClientError>();
+});
 
 const queryWithError = Ref.make(
   "notes",
