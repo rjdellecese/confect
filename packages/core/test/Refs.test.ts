@@ -364,6 +364,39 @@ describe("make", () => {
 });
 
 describe("middleware error unions", () => {
+  it("preserves the declared codecs on a ref with middleware errors", () => {
+    class NotFound extends Schema.TaggedError<NotFound, unknown>()("NotFound", {
+      id: Schema.String,
+    }) {}
+    class Blocked extends Schema.TaggedError<Blocked, unknown>()(
+      "Blocked",
+      {},
+    ) {}
+    class Gate extends MiddlewareSpec.MiddlewareSpec<Gate>()("Gate", {
+      error: () => Blocked,
+      functionTypes: { query: true, mutation: false, action: false },
+    }) {}
+    const get = FunctionSpec.publicQuery({
+      name: "get",
+      returns: () => Schema.FiniteFromString,
+      error: () => NotFound,
+    });
+    const notes = GroupSpec.make().middleware(Gate).addFunction(get);
+    const refs = Refs.make({
+      [Spec.TypeId]: { notes: GroupSpec.withName("notes", notes) },
+    });
+    const ref = refs.public.notes.get;
+    const encoded = Result.getOrThrow(Schema.encodeResult(ref.returns)(1));
+    expectTypeOf(encoded).toEqualTypeOf<string>();
+    expect(encoded).toBe("1");
+
+    expectTypeOf<Ref.Error<typeof ref>>().toEqualTypeOf<NotFound | Blocked>();
+    expectTypeOf<NonNullable<typeof ref.error>>().toEqualTypeOf<
+      typeof NotFound
+    >();
+    expect(ref.error).toBe(NotFound);
+  });
+
   it("adds them to Confect refs and keeps them off plain Convex refs", () => {
     class Blocked extends Schema.TaggedError<Blocked, unknown>()(
       "Blocked",
@@ -399,6 +432,7 @@ describe("middleware error unions", () => {
     expectTypeOf<
       Ref.Error<typeof refs.public.mixed.update>
     >().toEqualTypeOf<Blocked>();
+    expectTypeOf(refs.public.mixed.update.error).toBeUndefined();
     expectTypeOf<Ref.Error<typeof refs.public.mixed.search>>().toBeNever();
   });
 });

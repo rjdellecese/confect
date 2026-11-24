@@ -104,8 +104,8 @@ export type Ref<
       FunctionVisibility_,
       FunctionProvenance.ArgsFields,
       Args_,
-      Returns_,
-      Error_
+      Schema.Codec<Returns_, unknown>,
+      Schema.Codec<Error_, unknown>
     >
   | ConvexRef<
       RuntimeAndFunctionType_,
@@ -142,29 +142,30 @@ export type ConfectRef<
   FunctionVisibility_,
   ArgsFields_,
   Schema.Struct.Type<ArgsFields_>,
-  ReturnsSchema_["Type"],
-  ErrorSchema_["Type"] | MiddlewareError_
+  ReturnsSchema_,
+  ErrorSchema_,
+  MiddlewareError_
 >;
 
 /**
- * Internal form used while mapping a spec to a ref. Supplying the already
- * derived value types avoids repeatedly expanding `Schema.Struct` for every
- * leaf in a generated ref tree; the public `ConfectRef` alias still derives the
- * same values from its fields and schemas.
+ * Supplying the already derived argument type avoids repeatedly expanding
+ * `Schema.Struct` for every leaf in a generated ref tree. The declared codecs
+ * stay intact; middleware errors widen only the invocation's error type.
  */
 interface ConfectRefWithTypes<
   RuntimeAndFunctionType_ extends RuntimeAndFunctionType.RuntimeAndFunctionType,
   FunctionVisibility_ extends FunctionVisibility,
   ArgsFields_ extends FunctionProvenance.ArgsFields,
   Args_ extends DefaultFunctionArgs,
-  Returns_,
-  Error_,
+  ReturnsSchema_ extends Schema.Codec<unknown>,
+  ErrorSchema_ extends Schema.Codec<unknown>,
+  MiddlewareError_ = never,
 > extends Base<
   RuntimeAndFunctionType_,
   FunctionVisibility_,
   Args_,
-  Returns_,
-  Error_
+  ReturnsSchema_["Type"],
+  ErrorSchema_["Type"] | MiddlewareError_
 > {
   /**
    * Identifies a ref whose args, returns, and typed failures use Effect codecs.
@@ -184,7 +185,7 @@ interface ConfectRefWithTypes<
    *
    * @category Schemas
    */
-  readonly returns: Schema.Codec<Returns_, unknown>;
+  readonly returns: ReturnsSchema_;
   /**
    * Whether the declaration is standard or paginated; paginated metadata
    * retains user-argument and item codecs separately from the wire-level page
@@ -213,7 +214,7 @@ interface ConfectRefWithTypes<
    *
    * @category Schemas
    */
-  readonly error?: Schema.Codec<Error_, unknown>;
+  readonly error?: ErrorSchema_;
 }
 
 /**
@@ -521,8 +522,7 @@ export type FromFunctionSpec<
   FunctionSpec.GetFunctionVisibility<FunctionSpec_>,
   FunctionSpec.ArgsFields<FunctionSpec_>,
   FunctionSpec.Args<FunctionSpec_>,
-  FunctionSpec.Returns<FunctionSpec_>,
-  FunctionSpec.Error<FunctionSpec_> | MiddlewareError
+  MiddlewareError
 >;
 
 type FromFunctionSpecHelper<
@@ -531,39 +531,37 @@ type FromFunctionSpecHelper<
   FunctionVisibility_ extends FunctionVisibility,
   ArgsFields_ extends FunctionProvenance.ArgsFields,
   Args_ extends DefaultFunctionArgs,
-  Returns_,
-  Error_,
-> =
-  FunctionSpec_ extends FunctionSpec.WithFunctionProvenance<
-    FunctionSpec_,
-    FunctionProvenance.AnyConvex
-  >
-    ? ConvexRef<
+  MiddlewareError,
+> = FunctionSpec_ extends {
+  readonly functionProvenance: FunctionProvenance.AnyConvex;
+}
+  ? ConvexRef<
+      RuntimeAndFunctionType_,
+      FunctionVisibility_,
+      Args_ extends DefaultFunctionArgs ? Args_ : never,
+      FunctionSpec.Returns<FunctionSpec_>,
+      never
+    >
+  : FunctionSpec_ extends {
+        readonly functionProvenance: infer Provenance extends
+          FunctionProvenance.AnyConfect;
+      }
+    ? ConfectRefWithTypes<
         RuntimeAndFunctionType_,
         FunctionVisibility_,
-        Args_ extends DefaultFunctionArgs ? Args_ : never,
-        Returns_,
-        never
+        ArgsFields_,
+        Args_,
+        Provenance["returns"],
+        FunctionSpec.ErrorSchema<FunctionSpec_>,
+        MiddlewareError
       >
-    : FunctionSpec_ extends FunctionSpec.WithFunctionProvenance<
-          FunctionSpec_,
-          FunctionProvenance.AnyConfect
-        >
-      ? ConfectRefWithTypes<
-          RuntimeAndFunctionType_,
-          FunctionVisibility_,
-          ArgsFields_,
-          Args_,
-          Returns_,
-          Error_
-        >
-      : Ref<
-          RuntimeAndFunctionType_,
-          FunctionVisibility_,
-          Args_,
-          Returns_,
-          Error_
-        >;
+    : Ref<
+        RuntimeAndFunctionType_,
+        FunctionVisibility_,
+        Args_,
+        FunctionSpec.Returns<FunctionSpec_>,
+        FunctionSpec.Error<FunctionSpec_> | MiddlewareError
+      >;
 
 /**
  * Builds a leaf in the generated ref tree. Pass the corresponding `refs.public`
