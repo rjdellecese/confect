@@ -1,0 +1,306 @@
+import {
+  FunctionSpec,
+  GenericId,
+  GroupSpec,
+  IdScope,
+  Table,
+} from "@confect/core";
+import {
+  Auth,
+  MutationAuth,
+  DatabaseReader,
+  DatabaseSchema,
+  DatabaseWriter,
+  FunctionImpl,
+  HttpRouter,
+  MutationCtx,
+  RequestMetadata,
+  RegisteredConvexFunction,
+  StorageReader,
+  Scheduler,
+} from "@confect/server";
+import type {
+  DataModel,
+  Handler,
+  Document,
+  QueryInitializer,
+  BlobNotFoundError,
+  StorageActionWriter,
+  ActionCtx,
+  QueryCtx,
+} from "@confect/server";
+import { describe, expect, expectTypeOf, it } from "@effect/vitest";
+import type {
+  FunctionReference_future,
+  GenericMutationCtx,
+} from "convex/server";
+import { makeFunctionReference } from "convex/server";
+import * as Context from "effect/Context";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
+import * as Predicate from "effect/Predicate";
+import * as Schema from "effect/Schema";
+import * as Router from "effect/http/HttpRouter";
+import * as HttpServerResponse from "effect/http/HttpServerResponse";
+
+const scope = IdScope.component("@example/counter");
+const users = Table.make(() => Schema.Struct({ name: Schema.String }))(
+  "users",
+  scope,
+);
+const databaseSchema = DatabaseSchema.make(
+  { users },
+  { kind: "component", scope },
+);
+type Database = typeof databaseSchema;
+type Model = DataModel.ToConvexDataModel<
+  DataModel.FromDatabaseSchema<Database>
+>;
+const group = GroupSpec.make().addFunction(
+  FunctionSpec.publicMutation({
+    name: "create",
+    args: () => ({}),
+    returns: () => Schema.Null,
+  }),
+);
+
+describe("component capabilities", () => {
+  it("requires a known app target for application capabilities", () => {
+    const app = DatabaseSchema.make({});
+    type Mixed = Database | typeof app;
+    type MutationServices = Handler.MutationServices<Mixed>;
+    expectTypeOf<Auth.Auth>().not.toExtend<
+      Handler.QueryServices<DatabaseSchema.AnyWithProps>
+    >();
+    expectTypeOf<MutationAuth.MutationAuth>().not.toExtend<
+      Handler.MutationServices<DatabaseSchema.AnyWithProps>
+    >();
+    expectTypeOf<
+      MutationCtx.MutationCtx<Model>
+    >().not.toExtend<MutationServices>();
+    expectTypeOf<QueryCtx.QueryCtx<Model>>().not.toExtend<
+      Handler.QueryServices<Mixed>
+    >();
+    expectTypeOf<ActionCtx.ActionCtx<Model>>().not.toExtend<
+      Handler.ActionServices<Mixed>
+    >();
+    expectTypeOf<Scheduler.Scheduler>().not.toExtend<MutationServices>();
+    expectTypeOf<
+      Scheduler.ForScope<typeof scope>
+    >().not.toExtend<MutationServices>();
+    expectTypeOf<
+      MutationCtx.MutationCtx<Model, typeof scope>
+    >().not.toExtend<MutationServices>();
+    expectTypeOf<StorageReader.StorageReader>().not.toExtend<MutationServices>();
+  });
+
+  it("preserves native database variables and schedulable references", () => {
+    type Raw = Context.Service.Shape<
+      MutationCtx.MutationCtxTag<Model, typeof scope>
+    >;
+    expectTypeOf<Raw["db"]["vars"]>().toEqualTypeOf<
+      GenericMutationCtx<Model>["db"]["vars"]
+    >();
+    const schedule = (
+      { scheduler }: Raw,
+      ref: FunctionReference_future<
+        "mutation",
+        "internal",
+        { count: number },
+        null
+      >,
+    ) => {
+      const delayed = scheduler.runAfter(0, ref, { count: 1 });
+      const timed = scheduler.runAt(0, ref, { count: 1 });
+      expectTypeOf(delayed).toEqualTypeOf<
+        Promise<GenericId.GenericId<"_scheduled_functions", typeof scope>>
+      >();
+      expectTypeOf(timed).toEqualTypeOf<typeof delayed>();
+      // @ts-expect-error Scheduling a future reference still checks its arguments.
+      void scheduler.runAfter(0, ref, { count: "1" });
+    };
+    void schedule;
+  });
+
+  it("excludes JWT signing from component mutation handlers", () => {
+    expectTypeOf<MutationAuth.MutationAuth>().not.toExtend<
+      Handler.MutationServices<Database>
+    >();
+  });
+  it("allows scoped Blob storage in mutations without admitting application IDs", () => {
+    expectTypeOf<StorageActionWriter.ForScope<typeof scope>>().toExtend<
+      Handler.MutationServices<Database>
+    >();
+    expectTypeOf<StorageActionWriter.StorageActionWriter>().not.toExtend<
+      Handler.MutationServices<Database>
+    >();
+    expectTypeOf<StorageActionWriter.ForScope<typeof scope>>().not.toExtend<
+      Handler.QueryServices<Database>
+    >();
+    type Raw = Context.Service.Shape<
+      MutationCtx.MutationCtxTag<Model, typeof scope>
+    >;
+    expectTypeOf<Awaited<ReturnType<Raw["storage"]["store"]>>>().toEqualTypeOf<
+      GenericId.GenericId<"_storage", typeof scope>
+    >();
+    expectTypeOf<Parameters<Raw["storage"]["get"]>[0]>().toEqualTypeOf<
+      GenericId.GenericId<"_storage", typeof scope>
+    >();
+  });
+
+  it("keeps the implementation builder while rejecting app authentication", () => {
+    const builder = FunctionImpl.forSchema<Database>();
+    const auth = Effect.gen(function* () {
+      yield* Auth.Auth;
+      return null;
+    });
+    // @ts-expect-error Component handlers are not provided application Auth.
+    builder.make(group, "create", () => auth);
+    const rawApp = Effect.gen(function* () {
+      yield* MutationCtx.MutationCtx<Model>();
+      return null;
+    });
+    // @ts-expect-error An unscoped raw app context cannot bypass component capabilities.
+    builder.make(group, "create", () => rawApp);
+    builder.make(group, "create", () => Effect.succeed(null));
+    const appScheduler = Effect.gen(function* () {
+      yield* Scheduler.Scheduler;
+      return null;
+    });
+    // @ts-expect-error A component cannot acquire root-scoped scheduled-function IDs.
+    builder.make(group, "create", () => appScheduler);
+  });
+
+  it("scopes database and raw-context IDs", () => {
+    const program: Effect.Effect<
+      void,
+      | Document.DocumentDecodeError
+      | Document.DocumentEncodeError
+      | QueryInitializer.GetByIdFailure
+      | BlobNotFoundError.BlobNotFoundError
+      | Schema.SchemaError,
+      Handler.MutationServices<Database>
+    > = Effect.gen(function* () {
+      const writer = yield* DatabaseWriter.DatabaseWriter<Database>();
+      const reader = yield* DatabaseReader.DatabaseReader<Database>();
+      const id = yield* writer.table(users).insert({ name: "Ada" });
+      yield* reader.table(users).get(id);
+      const appId = yield* Schema.decodeUnknownEffect(
+        GenericId.GenericId("users"),
+      )("app-id");
+      // @ts-expect-error The host's users table is a different table.
+      yield* reader.table(users).get(appId);
+      // @ts-expect-error Writes must also reject a foreign ID.
+      yield* writer.table(users).delete(appId);
+      const raw = yield* MutationCtx.MutationCtx<Model, typeof scope>();
+      // @ts-expect-error Component raw contexts don't expose auth.
+      void raw.auth;
+      yield* Effect.promise(() => raw.db.get("users", id));
+      // @ts-expect-error Raw database operations preserve the same ID boundary.
+      yield* Effect.promise(() => raw.db.get("users", appId));
+      const scheduled = yield* Effect.promise(() =>
+        raw.scheduler.runAfter(
+          100,
+          makeFunctionReference<"mutation", {}>("counter:tick"),
+          {},
+        ),
+      );
+      const scoped: GenericId.GenericId<"_scheduled_functions", typeof scope> =
+        scheduled;
+      void scoped;
+      // @ts-expect-error Raw scheduling returns an ID in the component's system table.
+      const rootScheduled: GenericId.GenericId<"_scheduled_functions"> =
+        scheduled;
+      void rootScheduled;
+      const storage =
+        yield* StorageReader.StorageReader.forScope<typeof scope>();
+      const storageId = yield* Schema.decodeUnknownEffect(
+        GenericId.GenericId("_storage", scope),
+      )("file");
+      yield* storage.getUrl(storageId);
+      const appStorageId = yield* Schema.decodeUnknownEffect(
+        GenericId.GenericId("_storage"),
+      )("file");
+      // @ts-expect-error File storage is scoped too.
+      yield* storage.getUrl(appStorageId);
+    });
+    void program;
+  });
+
+  it("derives HTTP handler capabilities from the same schema", () => {
+    const routes = Router.add(
+      "GET",
+      "/",
+      Auth.Auth.pipe(Effect.as(HttpServerResponse.text("OK"))),
+    );
+    // @ts-expect-error Component HTTP handlers also cannot require application Auth.
+    HttpRouter.forSchema<Database>(databaseSchema.target)(routes);
+    HttpRouter.forSchema<Database>(databaseSchema.target)(
+      Router.add("GET", "/", HttpServerResponse.text("OK")),
+    );
+  });
+
+  it.effect(
+    "omits authentication from the runtime layer and raw context",
+    () => {
+      // Only ctx construction is faked here; no database or storage method is called.
+      const ctx = {
+        auth: {},
+        meta: {
+          getSnapshotTs: () => 1n,
+          getRequestMetadata: () =>
+            Promise.resolve({
+              ip: null,
+              userAgent: null,
+              requestId: "request",
+              scheduledFunctionId: null,
+              authToken: "fixture",
+            }),
+        },
+        db: {},
+        scheduler: {},
+        storage: {},
+        runQuery: () => Promise.resolve(null),
+        runMutation: () => Promise.resolve(null),
+      } as unknown as GenericMutationCtx<Model>;
+      return Effect.gen(function* () {
+        expectTypeOf<[["users"], typeof ctx]>().not.toExtend<
+          Parameters<typeof RegisteredConvexFunction.mutationLayer<Database>>
+        >();
+        const context = yield* Layer.build(
+          RegisteredConvexFunction.mutationLayer<Database>(
+            ["users"],
+            ctx,
+            databaseSchema.target,
+          ),
+        );
+        expect(Option.isNone(Context.getOption(context, Auth.Auth))).toBe(true);
+        expect(
+          Option.isNone(Context.getOption(context, MutationAuth.MutationAuth)),
+        ).toBe(true);
+        const raw = Context.get(
+          context,
+          MutationCtx.MutationCtx<Model, typeof scope>(),
+        );
+        expect(Predicate.hasProperty(raw, "auth")).toBe(false);
+        expect(raw.meta.getSnapshotTs()).toBe(1n);
+        expect(RequestMetadata.forScope(ctx.meta, IdScope.app)).toBe(ctx.meta);
+        const requestMetadata = Context.get(
+          context,
+          RequestMetadata.RequestMetadata,
+        );
+        const native = yield* Effect.promise(() =>
+          ctx.meta.getRequestMetadata(),
+        );
+        const wrapped = yield* requestMetadata.get();
+        const rawMetadata = yield* Effect.promise(() =>
+          raw.meta.getRequestMetadata(),
+        );
+        expect(wrapped).toEqual({ ...native, authToken: null });
+        expect(rawMetadata).toEqual(wrapped);
+        expect(native.authToken).toBe("fixture");
+      }).pipe(Effect.scoped);
+    },
+  );
+});

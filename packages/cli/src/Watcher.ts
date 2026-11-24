@@ -791,7 +791,10 @@ const convexConfigStructureWatcher = Effect.fnUntraced(function* (
   yield* pipe(
     fs.watch(convexDirectory),
     Stream.runForEach((event) => {
-      if (path.relative(convexDirectory, event.path) !== CONVEX_CONFIG_FILENAME)
+      if (
+        path.resolve(convexDirectory, event.path) !==
+        path.join(convexDirectory, CONVEX_CONFIG_FILENAME)
+      )
         return Effect.void;
       return Match.value(event).pipe(
         Match.tag("Update", () => Effect.void),

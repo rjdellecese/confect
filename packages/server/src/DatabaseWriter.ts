@@ -8,11 +8,13 @@ import type {
 } from "convex/server";
 import type { GenericId } from "convex/values";
 import type { BaseDatabaseReader } from "@confect/core/Types";
+import type * as IdScope from "@confect/core/IdScope";
 import { pipe } from "effect/Function";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Record from "effect/Record";
+import type * as Types from "effect/Types";
 import type * as DatabaseSchema from "./DatabaseSchema";
 import type * as DataModel from "./DataModel";
 import type { DocumentByName as DocumentByName_ } from "./DataModel";
@@ -34,9 +36,9 @@ export type PatchValue<Doc> = {
 };
 
 /**
- * Write operations for the application table selected by
- * `writer.table(handle)`. They accept decoded user fields and use the table's
- * codec to produce the stored values. Native database failures are defects.
+ * Write operations for the table selected by `writer.table(handle)`. They
+ * accept decoded user fields and use the table's codec to produce the stored
+ * values. Native database failures are defects.
  *
  * @category Models
  */
@@ -58,12 +60,15 @@ export interface DatabaseWriterTableAccessor<
    *
    * @param document - Decoded user fields without `_id` or `_creationTime`.
    *
-   * @returns An effect yielding the new table-typed ID. Its declared failure
-   *   type is `DocumentEncodeError`.
+   * @returns An effect yielding the new ID in the selected table's scope. Its
+   *   declared failure type is `DocumentEncodeError`.
    */
   readonly insert: (
     document: Document.WithoutSystemFields<Doc>,
-  ) => Effect.Effect<GenericId<TableName>, Document.DocumentEncodeError>;
+  ) => Effect.Effect<
+    DataModel.Id<DataModel_, TableName>,
+    Document.DocumentEncodeError
+  >;
   /**
    * Reads the document, applies the patch to its decoded fields, and writes the
    * encoded result in the same mutation.
@@ -85,7 +90,7 @@ export interface DatabaseWriterTableAccessor<
    * @see {@link DatabaseWriterTableAccessor.replace} for a full replacement.
    */
   readonly patch: (
-    id: GenericId<TableName>,
+    id: DataModel.Id<DataModel_, TableName>,
     patchedValues: PatchValue<Doc>,
   ) => Effect.Effect<
     void,
@@ -114,7 +119,7 @@ export interface DatabaseWriterTableAccessor<
    * @see {@link DatabaseWriterTableAccessor.patch} to update only selected fields.
    */
   readonly replace: (
-    id: GenericId<TableName>,
+    id: DataModel.Id<DataModel_, TableName>,
     value: Document.WithoutSystemFields<Doc>,
   ) => Effect.Effect<void, Document.DocumentEncodeError>;
   /**
@@ -127,13 +132,15 @@ export interface DatabaseWriterTableAccessor<
    * @returns An effect completing with void. There is no typed failure channel;
    *   native database failures are defects.
    */
-  readonly delete: (id: GenericId<TableName>) => Effect.Effect<void>;
+  readonly delete: (
+    id: DataModel.Id<DataModel_, TableName>,
+  ) => Effect.Effect<void>;
 }
 
 /**
  * Service for writing decoded documents in a mutation. Yield the generated
- * `DatabaseWriter` tag and select a bound application table to use its field
- * codec. `Docs` optionally supplies the generated named document types.
+ * `DatabaseWriter` tag and select a bound table in this database to use its
+ * field codec. `Docs` optionally supplies the generated named document types.
  *
  * **Example** (Inserting a note with decoded fields)
  *
@@ -160,7 +167,7 @@ export interface DatabaseWriterService<
   Docs = {},
 > {
   /**
-   * Selects an application table for writes without reading or changing any
+   * Selects a user-defined table for writes without reading or changing any
    * documents.
    *
    * @category Writing
@@ -169,7 +176,7 @@ export interface DatabaseWriterService<
    *   System table handles are read-only.
    *
    * @returns Write operations typed to the selected table's decoded fields and
-   *   IDs.
+   *   IDs. A component's writer requires handles and IDs from its own scope.
    *
    * @see {@link DatabaseWriterTableAccessor} for the operations on the selected table.
    */
@@ -206,16 +213,20 @@ export type DatabaseWriterTag<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
   Docs = {},
 > = Context.Service<
-  DatabaseWriterService<DatabaseSchema_>,
+  DatabaseWriter<DatabaseSchema_>,
   DatabaseWriterService<DatabaseSchema_, Docs>
 >;
 
 /**
  * @internal
  */
-export const make = <Model extends GenericDataModel>(
+export const make = <
+  Model extends GenericDataModel,
+  const Scope extends IdScope.IdScope = IdScope.App,
+>(
   convexDatabaseWriter: GenericDatabaseWriter<Model>,
-): DatabaseWriterService<DatabaseSchema.FromConvexDataModel<Model>> => {
+  ..._scope: IdScope.Args<Scope>
+): DatabaseWriterService<DatabaseSchema.FromConvexDataModel<Model, Scope>> => {
   const reader: BaseDatabaseReader<any> = convexDatabaseWriter;
   const table = <TableName extends TableNamesInDataModel<Model>>(
     tableDef: Table.AnyWithProps & { readonly tableName: TableName },
@@ -295,7 +306,7 @@ export const make = <Model extends GenericDataModel>(
 
   return {
     table,
-  } as DatabaseWriterService<DatabaseSchema.FromConvexDataModel<Model>>;
+  } as DatabaseWriterService<DatabaseSchema.FromConvexDataModel<Model, Scope>>;
 };
 
 /**
@@ -310,20 +321,25 @@ export const DatabaseWriter = <
   Docs = {},
 >(): DatabaseWriterTag<DatabaseSchema_, Docs> =>
   Context.Service<
-    DatabaseWriterService<DatabaseSchema_>,
+    DatabaseWriter<DatabaseSchema_>,
     DatabaseWriterService<DatabaseSchema_, Docs>
   >("@confect/server/DatabaseWriter");
 
 /**
  * Service requirement for effects that write to this database schema. Yield the
  * `DatabaseWriter` tag from `confect/_generated/services` and call
- * `writer.table(handle)` to write the application's named document types.
+ * `writer.table(handle)` to write the named document types in the current
+ * database.
  *
  * @category Services
  */
 export type DatabaseWriter<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
-> = DatabaseWriterService<DatabaseSchema_>;
+> = [DatabaseSchema_["target"]] extends [DatabaseSchema.AppTarget]
+  ? DatabaseWriterService<DatabaseSchema_>
+  : {
+      readonly "~@confect/server/ScopedDatabaseWriter": Types.Invariant<DatabaseSchema_>;
+    };
 
 /**
  * @internal
@@ -332,5 +348,9 @@ export const layer = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
   convexDatabaseWriter: GenericDatabaseWriter<
     DataModel.ToConvexDataModel<DataModel.FromDatabaseSchema<DatabaseSchema_>>
   >,
+  ...scope: IdScope.Args<DatabaseSchema.Scope<DatabaseSchema_>>
 ) =>
-  Layer.succeed(DatabaseWriter<DatabaseSchema_>(), make(convexDatabaseWriter));
+  Layer.succeed(
+    DatabaseWriter<DatabaseSchema_>(),
+    make(convexDatabaseWriter, ...scope),
+  );

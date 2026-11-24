@@ -1,3 +1,4 @@
+import type { Component } from "@confect/core";
 import { componentsGeneric } from "convex/server";
 
 /**
@@ -7,7 +8,7 @@ import { componentsGeneric } from "convex/server";
  * @category models
  */
 export type Components = {
-  "workpool": import("@convex-dev/workpool/_generated/component.js").ComponentApi<"workpool">;
+  "workpool": Component.Mounted<import("@convex-dev/workpool/_generated/component.js").ComponentApi<"workpool">, "workpool">;
 };
 
 /**

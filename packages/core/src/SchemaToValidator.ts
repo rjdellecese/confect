@@ -1,4 +1,6 @@
+import * as IdScope from "./IdScope";
 import type {
+  GenericId as ConvexGenericId,
   PropertyValidators,
   Validator,
   VAny,
@@ -45,6 +47,7 @@ import type {
  */
 export const compileArgsSchema = <ConfectValue, ConvexValue>(
   argsSchema: Schema.Codec<ConfectValue, ConvexValue>,
+  scope: IdScope.IdScope = IdScope.app,
 ): PropertyValidators => {
   const ast = Schema.toEncoded(argsSchema).ast;
 
@@ -53,7 +56,7 @@ export const compileArgsSchema = <ConfectValue, ConvexValue>(
     Match.value,
     Match.tag("Objects", (objectsAst) =>
       Array.isReadonlyArrayEmpty(objectsAst.indexSignatures)
-        ? handlePropertySignatures(objectsAst)
+        ? handlePropertySignatures(objectsAst, scope)
         : Effect.fail(IndexSignaturesAreNotSupportedError.make()),
     ),
     Match.orElse(() => Effect.fail(TopLevelMustBeObjectError.make())),
@@ -68,8 +71,9 @@ export const compileArgsSchema = <ConfectValue, ConvexValue>(
  */
 export const compileReturnsSchema = <ConfectValue, ConvexValue>(
   schema: Schema.Codec<ConfectValue, ConvexValue>,
+  scope: IdScope.IdScope = IdScope.app,
 ): Validator<any, any, any> =>
-  Effect.runSync(compileAst(Schema.toEncoded(schema).ast));
+  Effect.runSync(compileAst(Schema.toEncoded(schema).ast, false, scope));
 
 // Table
 
@@ -87,12 +91,77 @@ export type TableSchemaToTableValidator<
     ? Vd
     : never;
 
+declare const IdValidatorTypeId: unique symbol;
+type LocalId<Name extends string> = VId<ConvexGenericId<Name>>;
+type DeployedId<Original, Name extends string, Owner, Scope> = Original & {
+  readonly [IdValidatorTypeId]: IdScope.IdScope extends Scope
+    ? LocalId<Name> | VString
+    : [Owner, Scope] extends [Scope, Owner]
+      ? LocalId<Name>
+      : Owner extends Scope
+        ? LocalId<Name> | VString
+        : Scope extends Owner
+          ? LocalId<Name> | VString
+          : VString;
+};
+
+type WireValue<Value, Scope> =
+  IsAny<Value> extends true
+    ? any
+    : Value extends ConvexGenericId<infer Name>
+      ? Value extends {
+          readonly "~@confect/core/ScopedId": {
+            readonly table: infer Table extends string;
+            readonly scope: infer Owner;
+          };
+        }
+        ? DeployedId<Value, Table, Owner, Scope>
+        : DeployedId<Value, Name, IdScope.App, Scope>
+      : Value extends
+            | string
+            | number
+            | boolean
+            | bigint
+            | undefined
+            | null
+            | ArrayBuffer
+        ? Value
+        : [Extract<keyof Value, ConvexGenericId<string>>] extends [never]
+          ? { [K in keyof Value]: WireValue<Value[K], Scope> }
+          : {
+              [
+                K in keyof Value as K extends ConvexGenericId<string>
+                  ? WireValue<K, Scope>
+                  : K
+              ]: WireValue<Value[K], Scope>;
+            };
+
+type EmittedValidator<Value, Scope> =
+  IsRecursive<Value> extends true
+    ? VAny
+    : ValueToValidator<WireValue<Value, Scope>>;
+
+export type EmittedTableValidator<
+  TableSchema extends Schema.Codec<any, any>,
+  Scope extends IdScope.IdScope,
+> =
+  EmittedValidator<TableSchema["Encoded"], Scope> extends infer Vd extends
+    | VObject<any, any, any, any>
+    | VUnion<any, any, any, any>
+    | VAny
+    ? Vd
+    : never;
+
 /**
  * @internal
  */
-export const compileTableSchema = <TableSchema extends Schema.Codec<any, any>>(
+export const compileTableSchema = <
+  TableSchema extends Schema.Codec<any, any>,
+  const Scope extends IdScope.IdScope = IdScope.App,
+>(
   schema: TableSchema,
-): TableSchemaToTableValidator<TableSchema> => {
+  ...[scope]: IdScope.Args<Scope>
+): EmittedTableValidator<TableSchema, Scope> => {
   const ast = Schema.toEncoded(schema).ast;
 
   return pipe(
@@ -101,10 +170,10 @@ export const compileTableSchema = <TableSchema extends Schema.Codec<any, any>>(
     Match.tag("Objects", ({ indexSignatures }) =>
       Array.isReadonlyArrayEmpty(indexSignatures)
         ? // oxlint-disable-next-line effecttsgo/unsafe-effect-type-assertion -- The return type is derived from the input schema and cannot be recovered from the runtime AST.
-          (compileAst(ast) as Effect.Effect<any>)
+          (compileAst(ast, false, scope) as Effect.Effect<any>)
         : Effect.fail(IndexSignaturesAreNotSupportedError.make()),
     ),
-    Match.tag("Union", (unionAst) => compileAst(unionAst)),
+    Match.tag("Union", (unionAst) => compileAst(unionAst, false, scope)),
     Match.orElse(() => Effect.fail(TopLevelMustBeObjectOrUnionError.make())),
     Effect.runSync,
   );
@@ -134,12 +203,22 @@ export type ReadonlyRecordValue = {
   readonly [key: string]: ReadonlyValue | undefined;
 };
 
+type DeployedIdType<T> = T extends {
+  readonly [IdValidatorTypeId]: { readonly type: infer Value extends string };
+}
+  ? Value
+  : T;
+
 type MutableValue<T> =
-  T extends ReadonlyArray<infer El>
-    ? MutableValue<El>[]
-    : T extends ReadonlyRecordValue
-      ? { -readonly [K in keyof T]: MutableValue<Exclude<T[K], undefined>> }
-      : T;
+  T extends ConvexGenericId<string>
+    ? DeployedIdType<T>
+    : T extends ReadonlyArray<infer El>
+      ? MutableValue<El>[]
+      : T extends ReadonlyRecordValue
+        ? [Extract<keyof T, { [IdValidatorTypeId]: unknown }>] extends [never]
+          ? { -readonly [K in keyof T]: MutableValue<Exclude<T[K], undefined>> }
+          : Record<DeployedIdType<keyof T>, MutableValue<T[keyof T]>>
+        : T;
 
 /**
  * @internal
@@ -202,36 +281,51 @@ type ConvertValueToValidator<
 type StringValueToValidator<
   Vl,
   Optionality extends "required" | "optional",
-> = Vl extends { __tableName: infer TableName extends string }
-  ? VId<OptionalValue<GenericId.GenericId<TableName>, Optionality>, Optionality>
-  : [string] extends [Vl]
-    ? VString<OptionalValue<string, Optionality>, Optionality>
-    : VLiteral<OptionalValue<Vl, Optionality>, Optionality>;
+> = Vl extends {
+  readonly [IdValidatorTypeId]: infer V extends VId<any> | VString;
+}
+  ? Optionality extends "optional"
+    ? ReturnType<typeof v.optional<V>>
+    : V
+  : Vl extends ConvexGenericId<string>
+    ? VId<OptionalValue<Vl, Optionality>, Optionality>
+    : [string] extends [Vl]
+      ? VString<OptionalValue<string, Optionality>, Optionality>
+      : VLiteral<OptionalValue<Vl, Optionality>, Optionality>;
 
-type ObjectValueToValidator<Vl, Optionality extends "required" | "optional"> =
-  IsRecord<MutableValue<Vl>> extends true
-    ? ValueToValidator<Vl[keyof Vl]> extends infer VdValue extends Validator<
-        any,
-        "required",
+type ObjectValueToValidator<Vl, Optionality extends "required" | "optional"> = (
+  IsRecord<Vl> extends true
+    ? true
+    : [keyof Vl] extends [never]
+      ? false
+      : keyof Vl extends ConvexGenericId<string>
+        ? true
+        : IsRecord<MutableValue<Vl>>
+) extends true
+  ? ValueToValidator<Vl[keyof Vl]> extends infer VdValue extends Validator<
+      any,
+      "required",
+      any
+    >
+    ? VRecord<
+        OptionalValue<MutableValue<Vl>, Optionality>,
+        keyof Vl extends ConvexGenericId<string>
+          ? StringValueToValidator<keyof Vl, "required">
+          : VString,
+        VdValue,
+        Optionality
+      >
+    : never
+  : ObjectFieldsToValidators<Vl> extends infer VdFields extends Record<
+        string,
         any
       >
-      ? VRecord<
-          OptionalValue<MutableValue<Vl>, Optionality>,
-          VString,
-          VdValue,
-          Optionality
-        >
-      : never
-    : ObjectFieldsToValidators<Vl> extends infer VdFields extends Record<
-          string,
-          any
-        >
-      ? VObject<
-          OptionalValue<MutableValue<Vl>, Optionality>,
-          VdFields,
-          Optionality
-        >
-      : never;
+    ? VObject<
+        OptionalValue<MutableValue<Vl>, Optionality>,
+        VdFields,
+        Optionality
+      >
+    : never;
 
 type ObjectFieldsToValidators<Vl> = {
   -readonly [K in keyof Vl]-?: IsAny<Vl[K]> extends true
@@ -284,10 +378,15 @@ type OptionalValueToValidator<Vl> = [Vl] extends [
 /**
  * @internal
  */
-export const compileSchema = <T, E>(
+export const compileSchema = <
+  T,
+  E,
+  const Scope extends IdScope.IdScope = IdScope.App,
+>(
   schema: Schema.Codec<T, E>,
-): ValueToValidator<(typeof schema)["Encoded"]> =>
-  Effect.runSync(compileAst(schema.ast)) as any;
+  ...[scope]: IdScope.Args<Scope>
+): EmittedValidator<E, Scope> =>
+  Effect.runSync(compileAst(Schema.toEncoded(schema).ast, false, scope)) as any;
 
 /**
  * @internal
@@ -338,6 +437,7 @@ export const isRecursive = (ast: SchemaAST.AST): boolean =>
 export const compileAst = (
   ast: SchemaAST.AST,
   isOptionalPropertyOfTypeLiteral = false,
+  scope: IdScope.IdScope = IdScope.app,
 ): Effect.Effect<
   Validator<any, any, any>,
   | UnsupportedSchemaTypeError
@@ -374,17 +474,22 @@ export const compileAst = (
           GenericId.tableName(stringAst).pipe(
             Option.match({
               onNone: () => Effect.succeed(v.string()),
-              onSome: (tableName) => Effect.succeed(v.id(tableName)),
+              onSome: (tableName) =>
+                Effect.succeed(
+                  GenericId.scope(stringAst) === scope
+                    ? v.id(tableName)
+                    : v.string(),
+                ),
             }),
           ),
         ),
         Match.tag("Number", () => Effect.succeed(v.float64())),
         Match.tag("BigInt", () => Effect.succeed(v.int64())),
         Match.tag("Union", (unionAst) =>
-          handleUnion(unionAst, isOptionalPropertyOfTypeLiteral),
+          handleUnion(unionAst, isOptionalPropertyOfTypeLiteral, scope),
         ),
-        Match.tag("Objects", (objectsAst) => handleObjects(objectsAst)),
-        Match.tag("Arrays", (arraysAst) => handleArrays(arraysAst)),
+        Match.tag("Objects", (objectsAst) => handleObjects(objectsAst, scope)),
+        Match.tag("Arrays", (arraysAst) => handleArrays(arraysAst, scope)),
         Match.tag("Unknown", "Any", () => Effect.succeed(v.any())),
         Match.tag("Declaration", (declaration) =>
           Effect.mapBoth(
@@ -426,11 +531,13 @@ export const compileAst = (
 const handleUnion = (
   { types }: SchemaAST.Union,
   isOptionalPropertyOfTypeLiteral: boolean,
-) => handleUnionTypes(types, isOptionalPropertyOfTypeLiteral);
+  scope: IdScope.IdScope,
+) => handleUnionTypes(types, isOptionalPropertyOfTypeLiteral, scope);
 
 const handleUnionTypes = Effect.fnUntraced(function* (
   types: SchemaAST.Union["types"],
   isOptionalPropertyOfTypeLiteral: boolean,
+  scope: IdScope.IdScope,
 ) {
   const members = isOptionalPropertyOfTypeLiteral
     ? Array.filter(types, Predicate.not(SchemaAST.isUndefined))
@@ -438,7 +545,7 @@ const handleUnionTypes = Effect.fnUntraced(function* (
 
   const [firstValidator, secondValidator, ...restValidators] =
     yield* Effect.all(
-      Array.map(members, (type) => compileAst(type)),
+      Array.map(members, (type) => compileAst(type, false, scope)),
       { concurrency: 1 },
     );
 
@@ -451,12 +558,13 @@ const handleUnionTypes = Effect.fnUntraced(function* (
   }
 });
 
-const handleObjects = (objectsAst: SchemaAST.Objects) =>
+const handleObjects = (objectsAst: SchemaAST.Objects, scope: IdScope.IdScope) =>
   pipe(
     objectsAst.indexSignatures,
     Array.head,
     Option.match({
-      onNone: () => Effect.map(handlePropertySignatures(objectsAst), v.object),
+      onNone: () =>
+        Effect.map(handlePropertySignatures(objectsAst, scope), v.object),
       onSome: ({ parameter, type }) =>
         pipe(
           objectsAst.propertySignatures,
@@ -466,8 +574,8 @@ const handleObjects = (objectsAst: SchemaAST.Objects) =>
               Effect.map(
                 Effect.all(
                   {
-                    parameter_: compileAst(parameter),
-                    type_: compileAst(type),
+                    parameter_: compileAst(parameter, false, scope),
+                    type_: compileAst(type, false, scope),
                   },
                   { concurrency: 1 },
                 ),
@@ -482,19 +590,22 @@ const handleObjects = (objectsAst: SchemaAST.Objects) =>
     }),
   );
 
-const handleArrays = ({ elements, rest }: SchemaAST.Arrays) =>
-  handleArrayElements(elements, rest);
+const handleArrays = (
+  { elements, rest }: SchemaAST.Arrays,
+  scope: IdScope.IdScope,
+) => handleArrayElements(elements, rest, scope);
 
 const handleArrayElements = Effect.fnUntraced(function* (
   elements: SchemaAST.Arrays["elements"],
   rest: SchemaAST.Arrays["rest"],
+  scope: IdScope.IdScope,
 ) {
   const [f, s, ...r] = elements;
 
   const elementToValidator = (element: SchemaAST.AST) =>
     SchemaAST.isOptional(element)
       ? Effect.fail(OptionalTupleElementsAreNotSupportedError.make())
-      : compileAst(element);
+      : compileAst(element, false, scope);
 
   const arrayItemsValidator = yield* f === undefined
     ? pipe(
@@ -502,7 +613,7 @@ const handleArrayElements = Effect.fnUntraced(function* (
         Array.head,
         Option.match({
           onNone: () => Effect.fail(EmptyTupleIsNotSupportedError.make()),
-          onSome: (type) => compileAst(type),
+          onSome: (type) => compileAst(type, false, scope),
         }),
       )
     : s === undefined
@@ -520,7 +631,10 @@ const handleArrayElements = Effect.fnUntraced(function* (
   return v.array(arrayItemsValidator);
 });
 
-const handlePropertySignatures = (objectsAst: SchemaAST.Objects) =>
+const handlePropertySignatures = (
+  objectsAst: SchemaAST.Objects,
+  scope: IdScope.IdScope,
+) =>
   pipe(
     objectsAst.propertySignatures,
     Effect.forEach(
@@ -531,7 +645,7 @@ const handlePropertySignatures = (objectsAst: SchemaAST.Objects) =>
           return Option.match(Number.parse(name), {
             onNone: () =>
               Effect.gen(function* () {
-                const validator = yield* compileAst(type, isOptional);
+                const validator = yield* compileAst(type, isOptional, scope);
 
                 return {
                   propertyName: name,

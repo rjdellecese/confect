@@ -19,7 +19,7 @@ import type { Effect } from "effect";
 import type { Schema } from "effect";
 import * as Layer from "effect/Layer";
 import * as Match from "effect/Match";
-import type * as DatabaseSchema from "./DatabaseSchema";
+import * as DatabaseSchema from "./DatabaseSchema";
 import * as RegisteredFunction from "./RegisteredFunction";
 import * as FunctionRegistryItem from "./FunctionRegistryItem";
 import * as ResolvedMiddleware from "./ResolvedMiddleware";
@@ -39,6 +39,7 @@ import { mapLeaves } from "./internal/utils";
  */
 export const buildForGroup = <Group extends GroupSpec.AnyWithProps>(
   groupLayer: Layer.Layer<GroupImpl.GroupImpl<"Finalized">>,
+  target?: DatabaseSchema.Target,
 ): RegisteredFunctions.RegisteredFunctionsForGroupSpec<Group> => {
   const { functionRegistryItems, middlewareRegistryItems } =
     GroupRegistry.make(groupLayer);
@@ -54,6 +55,7 @@ export const buildForGroup = <Group extends GroupSpec.AnyWithProps>(
           make(
             confect,
             ResolvedMiddleware.resolve(confect, middlewareRegistryItems),
+            target,
           ),
         ),
         Match.exhaustive,
@@ -67,6 +69,7 @@ export const buildForGroup = <Group extends GroupSpec.AnyWithProps>(
 export const make = (
   item: FunctionRegistryItem.ConfectFunctionRegistryItem,
   resolvedMiddlewares: ReadonlyArray<ResolvedMiddleware.ResolvedMiddleware> = [],
+  target: DatabaseSchema.Target = DatabaseSchema.appTarget,
 ): RegisteredFunction.Any => {
   const genericFunction = Match.value(item.functionVisibility).pipe(
     Match.when("public", () => actionGeneric),
@@ -77,6 +80,7 @@ export const make = (
   return genericFunction(
     RegisteredFunction.toConvexDefinition(
       nodeActionFunction({
+        target: DatabaseSchema.checkedTarget(target),
         name: item.name,
         functionVisibility: item.functionVisibility,
         args: item.args,
@@ -96,6 +100,7 @@ const nodeActionFunction = <
   ConvexReturns,
   E,
 >({
+  target,
   name,
   functionVisibility,
   args,
@@ -104,6 +109,7 @@ const nodeActionFunction = <
   handler,
   resolvedMiddlewares,
 }: {
+  target: DatabaseSchema.Target;
   name: string;
   functionVisibility: FunctionVisibility;
   args: Schema.Codec<Args, ConvexArgs>;
@@ -120,6 +126,7 @@ const nodeActionFunction = <
   resolvedMiddlewares: ReadonlyArray<ResolvedMiddleware.ResolvedMiddleware>;
 }) =>
   RegisteredFunction.actionFunctionBase({
+    scope: target.scope,
     name,
     functionVisibility,
     args,
@@ -128,5 +135,8 @@ const nodeActionFunction = <
     handler,
     resolvedMiddlewares,
     createLayer: (ctx) =>
-      Layer.mergeAll(RegisteredFunction.actionLayer(ctx), NodeServices.layer),
+      Layer.mergeAll(
+        RegisteredFunction.actionLayer(ctx, target),
+        NodeServices.layer,
+      ),
   });

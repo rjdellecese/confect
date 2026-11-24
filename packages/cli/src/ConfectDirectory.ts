@@ -44,7 +44,7 @@ export const findConfectDirectory = Effect.gen(function* () {
 /**
  * @internal
  */
-export const layer = Layer.effect(
+export const layerFromConvexDirectory = Layer.effect(
   ConfectDirectory,
   Effect.gen(function* () {
     const confectDirectory = yield* findConfectDirectory;
@@ -53,4 +53,11 @@ export const layer = Layer.effect(
 
     return { get: Ref.get(ref) } as const;
   }),
-).pipe(Layer.provide(ConvexDirectory.layer));
+);
+
+/**
+ * @internal
+ */
+export const layer = layerFromConvexDirectory.pipe(
+  Layer.provide(ConvexDirectory.layer),
+);

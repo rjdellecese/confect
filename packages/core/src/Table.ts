@@ -1,3 +1,4 @@
+import * as IdScope from "./IdScope";
 import * as Lazy from "./Lazy";
 import * as SystemFields from "./SystemFields";
 import type { TableSchemaToTableValidator } from "./SchemaToValidator";
@@ -78,6 +79,7 @@ export interface Table<
   Indexes_ extends GenericTableIndexes = {},
   SearchIndexes_ extends GenericTableSearchIndexes = {},
   VectorIndexes_ extends GenericTableVectorIndexes = {},
+  Scope_ extends IdScope.IdScope = IdScope.App,
 > {
   /**
    * @internal
@@ -90,6 +92,13 @@ export interface Table<
    */
   readonly tableName: Name_;
   /**
+   * The database scope of the table's document IDs. A component table and an
+   * application table can have the same name without sharing an ID type.
+   *
+   * @category Getters
+   */
+  readonly scope: Scope_;
+  /**
    * The user-field codec, evaluated on first access. Use `typeof
    * table.Fields.Type` for its decoded TypeScript type; system fields are not
    * included.
@@ -99,12 +108,17 @@ export interface Table<
   readonly Fields: TableSchema_;
   /**
    * The user-field codec extended with `_id` and `_creationTime`, evaluated on
-   * first access. Use it for document returns and `typeof table.Doc.Type` for
-   * the decoded document type.
+   * first access. The ID belongs to this table's scope. Use the codec for
+   * document returns and `typeof table.Doc.Type` for the decoded document
+   * type.
    *
    * @category Getters
    */
-  readonly Doc: SystemFields.ExtendWithSystemFields<Name_, TableSchema_>;
+  readonly Doc: SystemFields.ExtendWithSystemFields<
+    Name_,
+    TableSchema_,
+    Scope_
+  >;
   /**
    * @internal
    */
@@ -140,7 +154,8 @@ export type AnyWithProps = Table<
   GenericValidator,
   GenericTableIndexes,
   GenericTableSearchIndexes,
-  GenericTableVectorIndexes
+  GenericTableVectorIndexes,
+  IdScope.IdScope
 >;
 
 // -----------------------------------------------------------------------------
@@ -179,15 +194,20 @@ export interface UnnamedTable<
    *
    * @internal
    */
-  <const Name_ extends string>(
+  <
+    const Name_ extends string,
+    const Scope_ extends IdScope.IdScope = IdScope.App,
+  >(
     tableName: Name_,
+    ...scope: IdScope.Args<Scope_>
   ): Table<
     Name_,
     TableSchema_,
     TableValidator_,
     Indexes_,
     SearchIndexes_,
-    VectorIndexes_
+    VectorIndexes_,
+    Scope_
   >;
 
   /**
@@ -383,6 +403,10 @@ export type Doc<TableDef extends AnyWithProps> = TableDef["Doc"];
  * @internal
  */
 export type Fields<TableDef extends AnyWithProps> = TableDef["Fields"];
+/**
+ * @internal
+ */
+export type Scope<TableDef extends AnyWithProps> = TableDef["scope"];
 
 /**
  * @internal
@@ -432,20 +456,24 @@ const makeBound = <
   Indexes_ extends GenericTableIndexes,
   SearchIndexes_ extends GenericTableSearchIndexes,
   VectorIndexes_ extends GenericTableVectorIndexes,
+  Scope_ extends IdScope.IdScope,
 >(
   tableName: Name_,
   state: UnnamedState<TableSchema_, Indexes_, SearchIndexes_, VectorIndexes_>,
+  scope: Scope_,
 ): Table<
   Name_,
   TableSchema_,
   TableValidator_,
   Indexes_,
   SearchIndexes_,
-  VectorIndexes_
+  VectorIndexes_,
+  Scope_
 > => {
   const bound = {
     [TypeId]: TypeId as TypeId,
     tableName,
+    scope,
     indexes: state.indexes,
     searchIndexes: state.searchIndexes,
     vectorIndexes: state.vectorIndexes,
@@ -455,7 +483,8 @@ const makeBound = <
     TableValidator_,
     Indexes_,
     SearchIndexes_,
-    VectorIndexes_
+    VectorIndexes_,
+    Scope_
   >;
 
   Lazy.defineProperty(bound, "Fields", () => state.lazyFields());
@@ -464,6 +493,7 @@ const makeBound = <
     SystemFields.extendWithSystemFields(
       tableName,
       (bound as { Fields: TableSchema_ }).Fields,
+      scope,
     ),
   );
 
@@ -496,15 +526,20 @@ const makeUnnamed = <
   type UnnamedTableFunction<FunctionName extends keyof UnnamedTable_> =
     UnnamedTable_[FunctionName];
 
-  const bind = <const Name_ extends string>(
+  const bind = <
+    const Name_ extends string,
+    const Scope_ extends IdScope.IdScope = IdScope.App,
+  >(
     tableName: Name_,
+    scope?: Scope_,
   ): Table<
     Name_,
     TableSchema_,
     TableValidator_,
     Indexes_,
     SearchIndexes_,
-    VectorIndexes_
+    VectorIndexes_,
+    Scope_
   > =>
     makeBound<
       Name_,
@@ -512,8 +547,9 @@ const makeUnnamed = <
       TableValidator_,
       Indexes_,
       SearchIndexes_,
-      VectorIndexes_
-    >(tableName, state);
+      VectorIndexes_,
+      Scope_
+    >(tableName, state, (scope ?? IdScope.app) as Scope_);
 
   const index: UnnamedTableFunction<"index"> = (name, fields) =>
     makeUnnamed({
@@ -614,8 +650,8 @@ export const make = <const TableSchema_ extends Schema.Codec<any, any>>(
  *
  * @public
  */
-type ExtractFieldPaths<T extends Validator<any, any, any>> =
+type ExtractFieldPaths<TableValidator_ extends Validator<any, any, any>> =
   // Add in the system fields available in index definitions.
   // This should be everything except for `_id` because thats added to indexes
   // automatically.
-  T["fieldPaths"] | keyof ConvexSystemFields;
+  TableValidator_["fieldPaths"] | keyof ConvexSystemFields;

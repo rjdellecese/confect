@@ -5,6 +5,8 @@ import type {
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Match from "effect/Match";
+import type * as DatabaseSchema from "./DatabaseSchema";
 
 /**
  * Native Convex JWT claims and signing options accepted by `signJwt`.
@@ -32,8 +34,8 @@ const make = (auth: Pick<ConvexMutationAuth, "signJwt">) => ({
 
 /**
  * Tag for the deployment's JWT signing service. Yield the generated
- * `MutationAuth` tag in a mutation or mutation-only middleware to sign a
- * token.
+ * `MutationAuth` tag in an application mutation or its mutation-only middleware
+ * to sign a token. Component mutations cannot sign JWTs.
  *
  * @category Tags
  */
@@ -47,3 +49,27 @@ export class MutationAuth extends Context.Service<
  */
 export const layer = (auth: Pick<ConvexMutationAuth, "signJwt">) =>
   Layer.succeed(MutationAuth, make(auth));
+
+/**
+ * Selects the generated `MutationAuth` requirement for application mutations
+ * only.
+ *
+ * @internal
+ */
+export type ForTarget<Target extends DatabaseSchema.Target> =
+  Target["kind"] extends "app" ? MutationAuth : never;
+
+/**
+ * Provides the generated `MutationAuth` tag only for application mutations.
+ *
+ * @internal
+ */
+export const layerForTarget = <Target extends DatabaseSchema.Target>(
+  target: Target,
+  auth: Pick<ConvexMutationAuth, "signJwt">,
+): Layer.Layer<ForTarget<Target>> =>
+  Match.value(target.kind).pipe(
+    Match.when("app", () => layer(auth)),
+    Match.when("component", () => Layer.empty),
+    Match.exhaustive,
+  ) as Layer.Layer<ForTarget<Target>>;

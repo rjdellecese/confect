@@ -7,12 +7,13 @@ import type {
   FunctionVisibility,
   PaginationResult,
 } from "convex/server";
-import { makeFunctionReference } from "convex/server";
+import { getFunctionAddress, makeFunctionReference } from "convex/server";
 import type { Value } from "convex/values";
 import { ConvexError } from "convex/values";
 import * as Effect from "effect/Effect";
 import * as Match from "effect/Match";
 import * as Option from "effect/Option";
+import * as Predicate from "effect/Predicate";
 import * as Schema from "effect/Schema";
 import type * as FunctionProvenance from "./FunctionProvenance";
 import type * as FunctionSpec from "./FunctionSpec";
@@ -23,9 +24,22 @@ import * as MiddlewareSpec from "./MiddlewareSpec";
 import type * as RuntimeAndFunctionType from "./RuntimeAndFunctionType";
 
 /**
- * The common contract of a generated function ref. Its generic parameters track
- * runtime, visibility, decoded args, decoded returns, and typed failures. Only
- * `convexFunctionName` is runtime data here; the `~` fields carry types.
+ * The runtime identifier shared by Confect and plain Convex refs.
+ *
+ * @category Type IDs
+ */
+export const TypeId = "~@confect/core/Ref";
+/**
+ * The type of the runtime identifier on every ref.
+ *
+ * @category Type IDs
+ */
+export type TypeId = typeof TypeId;
+
+/**
+ * The common contract of a function ref. Its generic parameters track runtime,
+ * visibility, decoded args, decoded returns, and typed failures. A ref retains
+ * its native destination when it cannot be called by local name.
  *
  * @category Models
  */
@@ -36,6 +50,12 @@ export interface Base<
   Returns_,
   Error_ = never,
 > {
+  /**
+   * Identifies a ref at runtime.
+   *
+   * @category Type IDs
+   */
+  readonly [TypeId]: TypeId;
   /**
    * The runtime and function kind carried only at the type level.
    *
@@ -68,22 +88,33 @@ export interface Base<
    */
   readonly "~Error": Error_;
   /**
-   * The Convex wire name, such as `notes:list` or `team/notes:list`.
+   * The function name, such as `notes:list`, or an address label for an adapted
+   * native reference. For component refs and handles this string need not be a
+   * callable local name.
    *
    * @category Models
    */
   readonly convexFunctionName: string;
+  /**
+   * The native reference used for calls when present. This preserves the
+   * destination of component references and function handles.
+   *
+   * @category References
+   */
+  readonly functionReference?: ConvexFunctionReference<any, any>;
 }
 
 /**
- * A generated reference that identifies one Convex function by its wire name.
+ * A reference that identifies a Convex function by name or native reference.
  * Its type parameters describe the arguments callers supply, the result they
  * receive, and any declared failures.
  *
  * **When to use**
  *
- * Use with a client, function runner, or scheduler: pass a leaf from the
- * generated `refs` module rather than calling the ref as a function.
+ * Use with a client, function runner, or scheduler: pass a ref rather than
+ * calling it as a function. For local functions, use a leaf from the generated
+ * `refs` module. For an installed component, use its bound refs on the
+ * backend.
  *
  * **Details**
  *
@@ -217,7 +248,7 @@ interface ConfectRefWithTypes<
 }
 
 /**
- * A generated ref for a plain Convex function. It carries the function name and
+ * A ref for a plain Convex function. It carries the function's destination and
  * inferred call types, but no Effect argument, return, or error codecs. Confect
  * callers pass its args and results through without codec conversion.
  *
@@ -250,6 +281,17 @@ export interface ConvexRef<
  * @internal
  */
 export type Any = Ref<any, any, any, any, any>;
+
+/**
+ * Narrows an unknown value to a Confect or plain Convex ref by its runtime
+ * identifier. A native Convex function reference must be adapted first.
+ *
+ * @category Guards
+ *
+ * @see {@link fromFunctionReference}
+ */
+export const isRef = (value: unknown): value is Any =>
+  Predicate.hasProperty(value, TypeId);
 
 /**
  * Erased Confect-provenance ref used by provenance-specific APIs.
@@ -581,12 +623,14 @@ export const make = <FunctionSpec_ extends FunctionSpec.AnyWithProps>(
       "Convex",
       (): Any =>
         ({
+          [TypeId]: TypeId,
           _tag: "Convex",
           convexFunctionName,
         }) as Any,
     ),
     Match.tag("Confect", (provenance): Any => {
       const ref = {
+        [TypeId]: TypeId as TypeId,
         _tag: "Confect" as const,
         convexFunctionName,
         kind: provenance.kind,
@@ -628,6 +672,9 @@ const functionReferenceCache = new Map<string, FunctionReference<Any>>();
 export const getFunctionReference = <Ref_ extends Any>(
   ref: Ref_,
 ): FunctionReference<Ref_> => {
+  if (ref.functionReference !== undefined) {
+    return ref.functionReference as FunctionReference<Ref_>;
+  }
   const convexFunctionName = getConvexFunctionName(ref);
 
   const cached = functionReferenceCache.get(convexFunctionName);
@@ -639,6 +686,74 @@ export const getFunctionReference = <Ref_ extends Any>(
   functionReferenceCache.set(convexFunctionName, functionReference);
 
   return functionReference as FunctionReference<Ref_>;
+};
+
+/**
+ * Adapts a native Convex function reference for a Confect runner or scheduler.
+ * The original reference remains the call destination, including for component
+ * functions and handles that have no local function name.
+ *
+ * **Gotchas**
+ *
+ * Arguments and results keep their native wire types. This adapter adds no
+ * codecs or typed failures. Use `Component.bind` if the component publishes a
+ * Confect contract and you want its decoded types.
+ *
+ * **Example** (Reading native Workpool status with a query runner)
+ *
+ * ```ts
+ * import { Ref } from "@confect/core";
+ * import { components } from "confect/_generated/components";
+ * import { QueryRunner } from "confect/_generated/services";
+ * import * as Effect from "effect/Effect";
+ *
+ * const status = Ref.fromFunctionReference(components.workpool.lib.status);
+ * const readStatus = (id: string) =>
+ *   Effect.gen(function* () {
+ *     const { runQuery } = yield* QueryRunner;
+ *     return yield* runQuery(status, { id });
+ *   });
+ * ```
+ *
+ * @category Converting
+ *
+ * @see {@link ConvexRef}
+ */
+export const fromFunctionReference = <
+  Type extends "query" | "mutation" | "action",
+  Visibility extends FunctionVisibility,
+  Args_ extends DefaultFunctionArgs,
+  Returns_,
+>(
+  functionReference: ConvexFunctionReference<Type, Visibility, Args_, Returns_>,
+): ConvexRef<
+  Extract<
+    RuntimeAndFunctionType.RuntimeAndFunctionType,
+    { readonly runtime: "Convex"; readonly functionType: Type }
+  >,
+  Visibility,
+  Args_,
+  Returns_
+> => {
+  const address = getFunctionAddress(functionReference);
+  return {
+    [TypeId]: TypeId,
+    _tag: "Convex",
+    convexFunctionName:
+      address.name ??
+      address.reference ??
+      address.functionHandle ??
+      "<external function>",
+    functionReference,
+  } as ConvexRef<
+    Extract<
+      RuntimeAndFunctionType.RuntimeAndFunctionType,
+      { readonly runtime: "Convex"; readonly functionType: Type }
+    >,
+    Visibility,
+    Args_,
+    Returns_
+  >;
 };
 
 /**

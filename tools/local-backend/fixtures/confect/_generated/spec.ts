@@ -3,10 +3,12 @@ import clientsSpec from "../clients.spec";
 import groups_authenticationSpec from "../groups/authentication.spec";
 import groups_cacheControlSpec from "../groups/cacheControl.spec";
 import groups_cacheStubbedSpec from "../groups/cacheStubbed.spec";
+import groups_componentsSpec from "../groups/components.spec";
 import groups_contextReuseSpec from "../groups/contextReuse.spec";
 import groups_documentIdsSpec from "../groups/documentIds.spec";
 import groups_httpVectorsSpec from "../groups/httpVectors.spec";
 import groups_metadataSpec from "../groups/metadata.spec";
+import groups_nativeComponentsSpec from "../groups/nativeComponents.spec";
 import groups_schedulingSpec from "../groups/scheduling.spec";
 import groups_storageSpec from "../groups/storage.spec";
 import groups_transactionsSpec from "../groups/transactions.spec";
@@ -21,7 +23,7 @@ import metadataNodeSpec from "../metadataNode.spec";
  */
 const spec: Spec.Spec<{
   readonly clients: GroupSpec_.NamedAt<typeof clientsSpec, "clients">;
-  readonly groups: GroupSpec_.NamedAt<GroupSpec_.GroupSpec<"Convex", "groups", never, GroupSpec_.NamedAt<typeof groups_authenticationSpec, "authentication"> | GroupSpec_.NamedAt<typeof groups_cacheControlSpec, "cacheControl"> | GroupSpec_.NamedAt<typeof groups_cacheStubbedSpec, "cacheStubbed"> | GroupSpec_.NamedAt<typeof groups_contextReuseSpec, "contextReuse"> | GroupSpec_.NamedAt<typeof groups_documentIdsSpec, "documentIds"> | GroupSpec_.NamedAt<typeof groups_httpVectorsSpec, "httpVectors"> | GroupSpec_.NamedAt<typeof groups_metadataSpec, "metadata"> | GroupSpec_.NamedAt<typeof groups_schedulingSpec, "scheduling"> | GroupSpec_.NamedAt<typeof groups_storageSpec, "storage"> | GroupSpec_.NamedAt<typeof groups_transactionsSpec, "transactions">>, "groups">;
+  readonly groups: GroupSpec_.NamedAt<GroupSpec_.GroupSpec<"Convex", "groups", never, GroupSpec_.NamedAt<typeof groups_authenticationSpec, "authentication"> | GroupSpec_.NamedAt<typeof groups_cacheControlSpec, "cacheControl"> | GroupSpec_.NamedAt<typeof groups_cacheStubbedSpec, "cacheStubbed"> | GroupSpec_.NamedAt<typeof groups_componentsSpec, "components"> | GroupSpec_.NamedAt<typeof groups_contextReuseSpec, "contextReuse"> | GroupSpec_.NamedAt<typeof groups_documentIdsSpec, "documentIds"> | GroupSpec_.NamedAt<typeof groups_httpVectorsSpec, "httpVectors"> | GroupSpec_.NamedAt<typeof groups_metadataSpec, "metadata"> | GroupSpec_.NamedAt<typeof groups_nativeComponentsSpec, "nativeComponents"> | GroupSpec_.NamedAt<typeof groups_schedulingSpec, "scheduling"> | GroupSpec_.NamedAt<typeof groups_storageSpec, "storage"> | GroupSpec_.NamedAt<typeof groups_transactionsSpec, "transactions">>, "groups">;
   readonly metadataNode: GroupSpec_.NamedAt<typeof metadataNodeSpec, "metadataNode">;
 }> = Spec.fromGroups({
   ["clients"]: clientsSpec,
@@ -29,10 +31,12 @@ const spec: Spec.Spec<{
     ["authentication"]: groups_authenticationSpec,
     ["cacheControl"]: groups_cacheControlSpec,
     ["cacheStubbed"]: groups_cacheStubbedSpec,
+    ["components"]: groups_componentsSpec,
     ["contextReuse"]: groups_contextReuseSpec,
     ["documentIds"]: groups_documentIdsSpec,
     ["httpVectors"]: groups_httpVectorsSpec,
     ["metadata"]: groups_metadataSpec,
+    ["nativeComponents"]: groups_nativeComponentsSpec,
     ["scheduling"]: groups_schedulingSpec,
     ["storage"]: groups_storageSpec,
     ["transactions"]: groups_transactionsSpec,

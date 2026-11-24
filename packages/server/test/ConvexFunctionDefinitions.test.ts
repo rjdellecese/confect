@@ -48,7 +48,10 @@ it("prepares only its own functions and preserves native registrations", () => {
   );
   expectTypeOf<
     Parameters<typeof ConvexFunctionDefinitions.buildForGroup>["length"]
-  >().toEqualTypeOf<2>();
+  >().toEqualTypeOf<2 | 3>();
+  expectTypeOf<[[], typeof layer, typeof native]>().not.toExtend<
+    Parameters<typeof ConvexFunctionDefinitions.buildForGroup>
+  >();
 });
 
 it("derives exact definitions for every kind and nested group", () => {

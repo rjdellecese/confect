@@ -142,7 +142,8 @@ export type MiddlewareOptions<Options_ = never> = {
      */
     readonly functionType: FunctionType;
     /**
-     * Whether the function is public or restricted to server-side calls.
+     * The function's declared visibility. Public functions in a component are
+     * exported to its caller's backend, not to frontend clients.
      *
      * @category Models
      */

@@ -189,7 +189,8 @@ layer(TestLayer)("generateComponents", (it) => {
         path.join(confectDirectory, "_generated", "components.ts"),
       );
       expect(contents).toBe(
-        `import { componentsGeneric } from "convex/server";
+        `import type { Component } from "@confect/core";
+import { componentsGeneric } from "convex/server";
 
 /**
  * Map from installed component names to their typed \`ComponentApi\` function
@@ -198,8 +199,8 @@ layer(TestLayer)("generateComponents", (it) => {
  * @category models
  */
 export type Components = {
-  "secondPool": import("@convex-dev/workpool/_generated/component.js").ComponentApi<"secondPool">;
-  "workpool": import("@convex-dev/workpool/_generated/component.js").ComponentApi<"workpool">;
+  "secondPool": Component.Mounted<import("@convex-dev/workpool/_generated/component.js").ComponentApi<"secondPool">, "secondPool">;
+  "workpool": Component.Mounted<import("@convex-dev/workpool/_generated/component.js").ComponentApi<"workpool">, "workpool">;
 };
 
 /**

@@ -1,4 +1,9 @@
 import * as DatabaseSchema from "@confect/server/DatabaseSchema";
+import type { GenericId as ConfectId } from "@confect/core";
+import { IdScope } from "@confect/core";
+import * as Auth from "@confect/server/Auth";
+import type * as StorageReader from "@confect/server/StorageReader";
+import type * as Scheduler from "@confect/server/Scheduler";
 import type * as DataModel from "@confect/server/DataModel";
 import type * as ActionCtx from "@confect/server/ActionCtx";
 import * as HttpRouter_ from "@confect/server/HttpRouter";
@@ -9,6 +14,7 @@ import type * as MutationAuth from "@confect/server/MutationAuth";
 import type * as TransactionMetadata from "@confect/server/TransactionMetadata";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import type { GenericId } from "convex/values";
+import type { GenericActionCtx, GenericDataModel } from "convex/server";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import * as HttpRouter from "effect/http/HttpRouter";
@@ -40,6 +46,51 @@ describe("HttpRouter", () => {
   });
   type Model = DataModel.FromDatabaseSchema<typeof schema>;
   const Search = VectorSearch.VectorSearch<Model>();
+
+  it.effect(
+    "matches literal installation paths before interpreting route patterns",
+    () =>
+      Effect.gen(function* () {
+        vi.stubEnv(
+          "CONVEX_SITE_URL",
+          "https://example.test/team%20docs/v1::blue/",
+        );
+        try {
+          const scope = IdScope.component("routes");
+          const http = HttpRouter_.forSchema({ kind: "component", scope })(
+            HttpRouter.add(
+              "GET",
+              "/items/:id",
+              HttpRouter.params.pipe(Effect.flatMap(HttpServerResponse.json)),
+            ),
+          );
+          const action = http.lookup("/items/42", "GET")![0] as unknown as {
+            _handler: (
+              ctx: GenericActionCtx<GenericDataModel>,
+              request: Request,
+            ) => Promise<Response>;
+          };
+          const empty = () => Promise.resolve(null);
+          const ctx = {
+            runQuery: empty,
+            runMutation: empty,
+            runAction: empty,
+            vectorSearch: empty,
+          } as unknown as GenericActionCtx<GenericDataModel>;
+          const response = yield* Effect.promise(() =>
+            action._handler(
+              ctx,
+              new Request("https://example.test/team%20docs/v1::blue/items/42"),
+            ),
+          );
+          expect(response.status).toBe(200);
+          const params = yield* Effect.promise(() => response.json());
+          expect(params).toEqual({ id: "42" });
+        } finally {
+          vi.unstubAllEnvs();
+        }
+      }),
+  );
 
   it("checks vector-search route requirements against a type-only schema", () => {
     const routes = HttpRouter.add(
@@ -104,6 +155,59 @@ describe("HttpRouter", () => {
     HttpRouter_.make(routes);
   });
 
+  it("preserves component vector IDs and excludes application services", () => {
+    const scope = IdScope.component("@example/search");
+    const componentSchema = DatabaseSchema.make(
+      {
+        documents: Table.make(() =>
+          Schema.Struct({ embedding: Schema.Array(Schema.Finite) }),
+        ).vectorIndex("embedding", {
+          vectorField: "embedding",
+          dimensions: 2,
+        })("documents", scope),
+      },
+      { kind: "component", scope },
+    );
+    type ComponentModel = DataModel.FromDatabaseSchema<typeof componentSchema>;
+    type Services = HttpRouter_.Services<typeof componentSchema>;
+    expectTypeOf<Auth.Auth>().not.toExtend<Services>();
+    expectTypeOf<StorageReader.StorageReader>().not.toExtend<Services>();
+    expectTypeOf<Scheduler.Scheduler>().not.toExtend<Services>();
+    expectTypeOf<StorageReader.ForScope<typeof scope>>().toExtend<Services>();
+    expectTypeOf<Scheduler.ForScope<typeof scope>>().toExtend<Services>();
+    const routes = HttpRouter.add(
+      "GET",
+      "/search",
+      Effect.gen(function* () {
+        const search = yield* VectorSearch.VectorSearch<ComponentModel>();
+        const matches = yield* search("documents", "embedding", {
+          vector: [1, 0],
+          limit: 10,
+        });
+        expectTypeOf<(typeof matches)[number]["_id"]>().toEqualTypeOf<
+          ConfectId.GenericId<"documents", typeof scope>
+        >();
+        return yield* HttpServerResponse.json(matches);
+      }),
+    );
+    expectTypeOf<typeof routes>().not.toExtend<
+      HttpRouter_.Routes<typeof schema>
+    >();
+    // @ts-expect-error The application entry point cannot supply component services.
+    HttpRouter_.make<typeof componentSchema>(routes);
+    HttpRouter_.forSchema<typeof componentSchema>(componentSchema.target)(
+      routes,
+    );
+    const authenticated = HttpRouter.add(
+      "GET",
+      "/auth",
+      Auth.Auth.pipe(Effect.as(HttpServerResponse.text("unexpected"))),
+    );
+    expectTypeOf<typeof authenticated>().not.toExtend<
+      HttpRouter_.Routes<typeof componentSchema>
+    >();
+  });
+
   it("keeps non-HTTP capabilities unavailable", () => {
     type Services = HttpRouter_.Services<typeof schema>;
     expectTypeOf<HttpRouter_.Services>().toEqualTypeOf<
@@ -124,7 +228,7 @@ describe("HttpRouter", () => {
   });
 
   it("allows a generic schema's vector search in its HTTP handlers", () => {
-    const mount = <S extends DatabaseSchema.AnyWithProps>(
+    const mount = <S extends DatabaseSchema.AnyApp>(
       search: VectorSearch.VectorSearchTag<DataModel.FromDatabaseSchema<S>>,
     ) =>
       HttpRouter_.make<S>(

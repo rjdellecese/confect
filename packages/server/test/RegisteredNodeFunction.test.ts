@@ -1,7 +1,9 @@
 import * as Result from "effect/Result";
 import { RegisteredNodeFunction } from "@confect/server/node";
-import { FunctionImpl, GroupImpl } from "@confect/server";
+import { DatabaseSchema, FunctionImpl, GroupImpl } from "@confect/server";
 import { FunctionSpec, GroupSpec } from "@confect/core";
+import { GenericId } from "@confect/core/GenericId";
+import * as IdScope from "@confect/core/IdScope";
 import * as SchemaToValidator from "@confect/core/SchemaToValidator";
 import * as FunctionRegistryItem from "@confect/server/FunctionRegistryItem";
 import { afterEach, assert, expect, expectTypeOf, it } from "@effect/vitest";
@@ -12,6 +14,56 @@ import * as Schema from "effect/Schema";
 import { vi } from "vitest";
 
 afterEach(() => vi.restoreAllMocks());
+
+it("preserves component scope in lazy Node validators", () => {
+  const scope = IdScope.component("counter");
+  const own = GenericId("items", scope);
+  const item = FunctionRegistryItem.make({
+    functionSpec: FunctionSpec.publicNodeAction({
+      name: "scoped",
+      args: () => ({ own, foreign: GenericId("items") }),
+      returns: () => own,
+    }),
+    groupMiddlewareAttachments: [],
+    handler: (args) => Effect.succeed(args.own),
+  });
+  assert(item._tag === "Confect");
+  const compileArgs = vi.spyOn(SchemaToValidator, "compileArgsSchema");
+  const compileReturns = vi.spyOn(SchemaToValidator, "compileReturnsSchema");
+  const registered = RegisteredNodeFunction.make(item, [], {
+    kind: "component",
+    scope,
+  }) as unknown as { exportArgs: () => string; exportReturns: () => string };
+  expect(compileArgs).not.toHaveBeenCalled();
+  expect(compileReturns).not.toHaveBeenCalled();
+  expect(
+    Result.getOrThrow(
+      Schema.decodeResult(Schema.fromJsonString(Schema.Unknown))(
+        registered.exportArgs(),
+      ),
+    ),
+  ).toEqual({
+    type: "object",
+    value: {
+      own: { fieldType: { type: "id", tableName: "items" }, optional: false },
+      foreign: { fieldType: { type: "string" }, optional: false },
+    },
+  });
+  expect(
+    Result.getOrThrow(
+      Schema.decodeResult(Schema.fromJsonString(Schema.Unknown))(
+        registered.exportReturns(),
+      ),
+    ),
+  ).toEqual({
+    type: "id",
+    tableName: "items",
+  });
+  registered.exportArgs();
+  registered.exportReturns();
+  expect(compileArgs).toHaveBeenCalledExactlyOnceWith(item.args, scope);
+  expect(compileReturns).toHaveBeenCalledExactlyOnceWith(item.returns, scope);
+});
 
 it("registers a Node group without a factory parameter", () => {
   const group = GroupSpec.makeNode().addFunction(
@@ -25,13 +77,19 @@ it("registers a Node group without a factory parameter", () => {
     GroupImpl.finalize,
   );
   const registered = RegisteredNodeFunction.buildForGroup<typeof group>(layer);
+  expect(() =>
+    RegisteredNodeFunction.buildForGroup<typeof group>(layer, {
+      kind: "component",
+      scope: IdScope.app,
+    }),
+  ).toThrow(DatabaseSchema.InvalidDatabaseTargetError);
   expect(registered.run).toBeDefined();
   expectTypeOf(registered.run).toExtend<
     RegisteredAction<"public", Record<string, unknown>, unknown>
   >();
   expectTypeOf<
     Parameters<typeof RegisteredNodeFunction.buildForGroup>["length"]
-  >().toEqualTypeOf<1>();
+  >().toEqualTypeOf<1 | 2>();
 });
 
 const options = {

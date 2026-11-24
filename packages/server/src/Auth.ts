@@ -3,8 +3,10 @@ import * as Context from "effect/Context";
 import { flow } from "effect/Function";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Match from "effect/Match";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
+import type * as DatabaseSchema from "./DatabaseSchema";
 
 const make = (auth: ConvexAuth) => ({
   /**
@@ -34,7 +36,8 @@ const make = (auth: ConvexAuth) => ({
 /**
  * Tag for the current invocation's authentication service. Yield the
  * application's generated `Auth` tag in a query, mutation, action, or HTTP
- * handler to access `getUserIdentity`.
+ * handler to access `getUserIdentity`. Components do not receive this service;
+ * pass any identity information they need as function arguments.
  *
  * @category Tags
  */
@@ -46,6 +49,29 @@ export class Auth extends Context.Service<Auth, ReturnType<typeof make>>()(
  * @internal
  */
 export const layer = (auth: ConvexAuth) => Layer.succeed(Auth, make(auth));
+
+/**
+ * Selects the generated `Auth` requirement for application handlers only.
+ *
+ * @internal
+ */
+export type ForTarget<Target extends DatabaseSchema.Target> =
+  Target["kind"] extends "app" ? Auth : never;
+
+/**
+ * Provides the generated `Auth` tag only for application invocations.
+ *
+ * @internal
+ */
+export const layerForTarget = <Target extends DatabaseSchema.Target>(
+  target: Target,
+  auth: ConvexAuth,
+): Layer.Layer<ForTarget<Target>> =>
+  Match.value(target.kind).pipe(
+    Match.when("app", () => layer(auth)),
+    Match.when("component", () => Layer.empty),
+    Match.exhaustive,
+  ) as Layer.Layer<ForTarget<Target>>;
 
 /**
  * Tagged failure of `getUserIdentity` when the caller is unauthenticated. Match

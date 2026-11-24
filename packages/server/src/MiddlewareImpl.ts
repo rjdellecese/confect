@@ -21,7 +21,7 @@ import type * as MutationRunner from "./MutationRunner";
 import type * as QueryRunner from "./QueryRunner";
 import type { QueryTransactionContext } from "./QueryTransactionContext";
 import type * as Scheduler from "./Scheduler";
-import type { Storage } from "./Storage";
+import type * as Storage from "./Storage";
 import type * as StorageActionWriter from "./StorageActionWriter";
 import type * as StorageReader from "./StorageReader";
 import type * as StorageWriter from "./StorageWriter";
@@ -106,39 +106,43 @@ export type CommonServices<
       : [FunctionTypes] extends ["query" | "mutation"]
         ? QueryMutationCommonServices<DatabaseSchema_>
         : [FunctionTypes] extends ["mutation" | "action"]
-          ? MutationActionCommonServices
-          : AllFunctionTypesCommonServices;
+          ? MutationActionCommonServices<DatabaseSchema_>
+          : AllFunctionTypesCommonServices<DatabaseSchema_>;
 
 type QueryMutationCommonServices<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
 > =
   | DatabaseReader.DatabaseReader<DatabaseSchema_>
   | DocumentIds.DocumentIds<DatabaseSchema_>
-  | Auth.Auth
+  | Auth.ForTarget<DatabaseSchema_["target"]>
   | ExecutionMetadata
   | TransactionMetadata
   | QueryTransactionContext
-  | Storage
-  | StorageReader.StorageReader
+  | Storage.ForScope<DatabaseSchema.Scope<DatabaseSchema_>>
+  | StorageReader.ForScope<DatabaseSchema.Scope<DatabaseSchema_>>
   | QueryRunner.QueryRunner;
 
-type MutationActionCommonServices =
-  | Auth.Auth
+type MutationActionCommonServices<
+  DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
+> =
+  | Auth.ForTarget<DatabaseSchema_["target"]>
   | ExecutionMetadata
   | RequestMetadata
-  | Scheduler.Scheduler
-  | Storage
-  | StorageReader.StorageReader
-  | StorageWriter.StorageWriter
-  | StorageActionWriter.StorageActionWriter
+  | Scheduler.ForScope<DatabaseSchema.Scope<DatabaseSchema_>>
+  | Storage.ForScope<DatabaseSchema.Scope<DatabaseSchema_>>
+  | StorageReader.ForScope<DatabaseSchema.Scope<DatabaseSchema_>>
+  | StorageWriter.ForScope<DatabaseSchema.Scope<DatabaseSchema_>>
+  | StorageActionWriter.ForScope<DatabaseSchema.Scope<DatabaseSchema_>>
   | QueryRunner.QueryRunner
   | MutationRunner.MutationRunner;
 
-type AllFunctionTypesCommonServices =
-  | Auth.Auth
+type AllFunctionTypesCommonServices<
+  DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
+> =
+  | Auth.ForTarget<DatabaseSchema_["target"]>
   | ExecutionMetadata
-  | Storage
-  | StorageReader.StorageReader
+  | Storage.ForScope<DatabaseSchema.Scope<DatabaseSchema_>>
+  | StorageReader.ForScope<DatabaseSchema.Scope<DatabaseSchema_>>
   | QueryRunner.QueryRunner;
 
 const layerFromImpls = <
@@ -171,9 +175,9 @@ const layerFromImpls = <
   );
 
 /**
- * Application-typed middleware builders exported as `MiddlewareImpl` by
- * `_generated/server`. They type each wrapper's database services against the
- * application's schema.
+ * Schema-typed middleware builders exported as `MiddlewareImpl` by
+ * `_generated/server`. Wrappers can use the services available to their
+ * function types in the current application or component.
  *
  * @remarks
  *   Codegen support: this interface names the generated builder shape; do not
@@ -289,7 +293,7 @@ export interface Builders<DatabaseSchema_ extends DatabaseSchema.AnyWithProps> {
 }
 
 /**
- * Binds the application's database type without loading its tables. Use
+ * Binds the database type without loading its tables. Use
  * `MiddlewareImpl.make`, `MiddlewareImpl.makeByFunctionType`, or
  * `MiddlewareImpl.provides` from `confect/_generated/server` instead of binding
  * the builder directly.
@@ -331,7 +335,7 @@ export const {
   /**
    * Creates a middleware layer with one wrapper shared across the spec's
    * function types, without specializing its database services. Import
-   * `MiddlewareImpl` from `_generated/server` for the application-typed `make`
+   * `MiddlewareImpl` from `_generated/server` for the schema-typed `make`
    * method.
    *
    * @category Layers
@@ -340,8 +344,7 @@ export const {
   /**
    * Creates a middleware layer with one wrapper per declared function type,
    * without specializing its database services. The generated `MiddlewareImpl`
-   * exposes `MiddlewareImpl.makeByFunctionType` with application-typed
-   * services.
+   * exposes `MiddlewareImpl.makeByFunctionType` with schema-typed services.
    *
    * @category Layers
    */
@@ -349,7 +352,7 @@ export const {
   /**
    * Creates a middleware layer that supplies a service to the downstream
    * handler without specializing database services. The generated
-   * `MiddlewareImpl` exposes `provides` with application-typed services.
+   * `MiddlewareImpl` exposes `provides` with schema-typed services.
    *
    * @category Layers
    */

@@ -10,12 +10,25 @@ export * as FunctionProvenance from "./FunctionProvenance";
  */
 export * as FunctionSpec from "./FunctionSpec";
 /**
- * Backs the generated ID schema and type. Import `Id` from
- * `confect/_generated/id` rather than using this namespace directly.
+ * Table ID types and schemas for hand-authored component contracts. Use the
+ * generated `Id` from `confect/_generated/id` for your project's own tables.
  *
- * @internal
+ * @category Schemas
  */
 export * as GenericId from "./GenericId";
+/**
+ * Component contracts, installation-specific function references, and scoped
+ * schemas for callers.
+ *
+ * @category References
+ */
+export * as Component from "./Component";
+/**
+ * Database namespace identities for application and component IDs.
+ *
+ * @category Models
+ */
+export * as IdScope from "./IdScope";
 /**
  * @internal
  */
@@ -63,8 +76,8 @@ export * as PaginationOptions from "./PaginationOptions";
  */
 export * as PaginationResult from "./PaginationResult";
 /**
- * Generated function-ref contracts consumed by clients, runners, and
- * schedulers.
+ * Function references for Confect clients, runners, and schedulers, including
+ * adapters for native Convex references.
  *
  * @category References
  */
@@ -86,7 +99,8 @@ export * as RuntimeAndFunctionType from "./RuntimeAndFunctionType";
  */
 export * as SchemaToValidator from "./SchemaToValidator";
 /**
- * The codegen-assembled project function-spec contract.
+ * Project function specs and the key for assembling a hand-authored component
+ * contract.
  *
  * @category Models
  */

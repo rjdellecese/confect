@@ -67,7 +67,8 @@ export interface GroupSpec<
    */
   readonly experimental_reuseContext: boolean;
   /**
-   * The codegen-assigned group segment; empty on a newly created group.
+   * The group segment, normally assigned by codegen; empty on a newly created
+   * group.
    *
    * @category Models
    */
@@ -478,23 +479,19 @@ export const makeNode = (): GroupSpec<"Node", ""> =>
   });
 
 /**
- * Codegen assigns this group's name from its file path. Default-export a group
- * built with `GroupSpec.make()` or `GroupSpec.makeNode()` from a `.spec.ts`
- * file rather than naming it directly.
+ * Names a group without changing its functions, middleware, or the original
+ * group. In a hand-authored component contract, use the native module's name so
+ * the contract matches its installed references. For a `.spec.ts` file, leave
+ * the group unnamed: codegen derives its name from the path.
  *
- * @internal
+ * @category Combinators
+ *
+ * @throws If the name is not a valid Confect function identifier.
  */
 export function withName<const Name_ extends string, Group extends Any>(
   name: Name_,
   group: Group,
 ): NamedAt<Group, Name_>;
-/**
- * Codegen assigns this group's name from its file path. Default-export a group
- * built with `GroupSpec.make()` or `GroupSpec.makeNode()` from a `.spec.ts`
- * file rather than naming it directly.
- *
- * @internal
- */
 export function withName(name: string, group: Any): AnyWithProps {
   validateConfectFunctionIdentifier(name);
   const group_ = group as AnyWithProps;

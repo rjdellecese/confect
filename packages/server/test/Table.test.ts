@@ -1,4 +1,4 @@
-import { GenericId } from "@confect/core";
+import { GenericId, IdScope } from "@confect/core";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import {
   defineTable,
@@ -12,6 +12,26 @@ import * as Schema from "effect/Schema";
 import * as Table from "@confect/server/Table";
 
 describe("Table.tableDefinition", () => {
+  it("deploys physical validators without changing the scoped table model", () => {
+    const scope = IdScope.component("counter");
+    const own = GenericId.GenericId("users", scope);
+    const host = GenericId.GenericId("users");
+    const table = Table.make(() => Schema.Struct({ owner: own, host })).index(
+      "by_owner",
+      ["owner"],
+    )("links", scope);
+    const actual = Table.tableDefinition(table);
+    const expected = defineTable({
+      owner: v.id("users"),
+      host: v.string(),
+    }).index("by_owner", ["owner"]);
+    expect(actual).toEqual(expected);
+    expectTypeOf(actual).toEqualTypeOf(expected);
+    expectTypeOf<
+      Table.TableValidator<typeof table>["type"]["owner"]
+    >().toEqualTypeOf<typeof own.Type>();
+  });
+
   it("should extend a generic Convex TableDefinition", () => {
     const confectNotesTableDefinition = Table.tableDefinition(
       Table.make(() =>

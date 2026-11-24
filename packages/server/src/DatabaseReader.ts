@@ -7,6 +7,7 @@ import type {
 import * as Context from "effect/Context";
 import * as Layer from "effect/Layer";
 import type { BaseDatabaseReader, IsUnion } from "@confect/core/Types";
+import type * as IdScope from "@confect/core/IdScope";
 import type * as DatabaseSchema from "./DatabaseSchema";
 import type * as DataModel from "./DataModel";
 import * as QueryInitializer from "./QueryInitializer";
@@ -16,7 +17,7 @@ import type { FullIndexScan } from "./internal/FullIndexScan";
 
 type IncludedTables<DatabaseSchema_ extends DatabaseSchema.AnyWithProps> =
   | DatabaseSchema.Tables<DatabaseSchema_>
-  | Table.SystemTables;
+  | Table.SystemTables<DatabaseSchema.Scope<DatabaseSchema_>>;
 
 type ReadDocument<
   Table_ extends Table.AnyWithProps,
@@ -93,7 +94,7 @@ export interface DatabaseReaderService<
   Docs = {},
 > {
   /**
-   * Selects a bound application or system table for lookups and queries without
+   * Selects a table in this database's scope for lookups and queries without
    * reading any documents.
    *
    * **Gotchas**
@@ -105,9 +106,11 @@ export interface DatabaseReaderService<
    *
    * @category Reading
    *
-   * @param table - A bound application table from `_generated/tables/<name>`,
-   *   or a read-only system handle from `@confect/server/Table`: `_storage` or
-   *   `_scheduled_functions`.
+   * @param table - A bound handle from `_generated/tables/<name>` or a
+   *   read-only system table. For system tables, applications can use
+   *   `Table._storage` or `Table._scheduled_functions`; components must select
+   *   a handle from {@link Table.systemTablesForScope} with their generated
+   *   `scope`.
    *
    * @returns The lookup and query operations available on the selected handle.
    *
@@ -137,9 +140,14 @@ type NativeTable<
 /**
  * @internal
  */
-export interface NativeReader<Model extends GenericDataModel> {
+export interface NativeReader<
+  Model extends GenericDataModel,
+  Scope extends IdScope.IdScope = IdScope.App,
+> {
   readonly table: <
-    Table_ extends IncludedTables<DatabaseSchema.FromConvexDataModel<Model>>,
+    Table_ extends
+      | DatabaseSchema.Tables<DatabaseSchema.FromConvexDataModel<Model, Scope>>
+      | Table.SystemTables<Scope>,
   >(
     table: Table_ & NativeTable<Model & SystemDataModel, Table_>,
   ) => TableReader<Table_, {}>;
@@ -148,9 +156,13 @@ export interface NativeReader<Model extends GenericDataModel> {
 /**
  * @internal
  */
-export const make = <Model extends GenericDataModel>(
+export const make = <
+  Model extends GenericDataModel,
+  const Scope extends IdScope.IdScope = IdScope.App,
+>(
   convexDatabaseReader: GenericDatabaseReader<Model>,
-): NativeReader<Model> =>
+  ..._scope: IdScope.Args<Scope>
+): NativeReader<Model, Scope> =>
   ({
     table: (table) => {
       const reader: BaseDatabaseReader<any> = Record.has<string, unknown>(
@@ -161,7 +173,7 @@ export const make = <Model extends GenericDataModel>(
         : convexDatabaseReader;
       return QueryInitializer.make<Table.AnyWithProps, string>(reader, table);
     },
-  }) as NativeReader<Model>;
+  }) as NativeReader<Model, Scope>;
 
 /**
  * The tag's _Identifier_ (the Effect requirements-channel type) is
@@ -203,7 +215,8 @@ export const DatabaseReader = <
 /**
  * Service requirement for effects that read from this database schema. Yield
  * `DatabaseReader` from `confect/_generated/services` and call
- * `reader.table(handle)` to read the application's named document types.
+ * `reader.table(handle)` to read the named document types in the current
+ * database.
  *
  * @category Services
  */
@@ -218,8 +231,12 @@ export const layer = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
   convexDatabaseReader: GenericDatabaseReader<
     DataModel.ToConvexDataModel<DataModel.FromDatabaseSchema<DatabaseSchema_>>
   >,
+  ...scope: IdScope.Args<DatabaseSchema.Scope<DatabaseSchema_>>
 ) =>
   Layer.succeed(
     DatabaseReader<DatabaseSchema_>(),
-    make(convexDatabaseReader) as DatabaseReaderService<DatabaseSchema_>,
+    make(
+      convexDatabaseReader,
+      ...scope,
+    ) as DatabaseReaderService<DatabaseSchema_>,
   );

@@ -27,7 +27,8 @@ export * as AiGatewayLanguageClient from "./AiGatewayLanguageClient";
  */
 export * as AiGatewayLanguageModel from "./AiGatewayLanguageModel";
 /**
- * Native Convex action context available through the generated `ActionCtx` tag.
+ * Raw action context available through the generated `ActionCtx` tag, scoped to
+ * the application or component.
  *
  * @category Invocation
  */
@@ -39,8 +40,8 @@ export * as ActionCtx from "./ActionCtx";
  */
 export * as ActionRunner from "./ActionRunner";
 /**
- * Identity lookups through the generated `Auth` service, including the failure
- * for a missing identity.
+ * Identity lookups in application handlers through the generated `Auth`
+ * service, including the failure for a missing identity.
  *
  * @category Authentication
  */
@@ -102,13 +103,14 @@ export * as CronWindow from "./CronWindow";
  */
 export * as DatabaseReader from "./DatabaseReader";
 /**
- * ID parsing and table identification against the application's schema.
+ * ID parsing and table identification against the current database schema.
  *
  * @category Database
  */
 export * as DocumentIds from "./DocumentIds";
 /**
- * Database schema and access to its full registry of application table handles.
+ * Database schema and access to an application or component's bound table
+ * handles.
  *
  * @category Database
  */
@@ -140,7 +142,7 @@ export * as Document from "./Document";
 export * as ExecutionMetadata from "./ExecutionMetadata";
 /**
  * Layers that implement individual group functions. Use the builder from
- * `_generated/server` to type handlers against the application schema.
+ * `_generated/server` to type handlers against the current database schema.
  *
  * @category Function implementation
  */
@@ -178,15 +180,14 @@ export * as MiddlewareImpl from "./MiddlewareImpl";
  */
 export * as MiddlewareRegistryItem from "./MiddlewareRegistryItem";
 /**
- * JWT signing with the deployment's signing key through the mutation-only
- * `MutationAuth` service.
+ * JWT signing through the `MutationAuth` service in application mutations.
  *
  * @category Authentication
  */
 export * as MutationAuth from "./MutationAuth";
 /**
- * Native Convex mutation context available through the generated `MutationCtx`
- * tag.
+ * Raw mutation context available through the generated `MutationCtx` tag,
+ * scoped to the application or component.
  *
  * @category Invocation
  */
@@ -215,7 +216,8 @@ export * as MutationTransactionContext from "./MutationTransactionContext";
  */
 export * as OrderedQuery from "./OrderedQuery";
 /**
- * Native Convex query context available through the generated `QueryCtx` tag.
+ * Raw query context available through the generated `QueryCtx` tag, scoped to
+ * the application or component.
  *
  * @category Invocation
  */

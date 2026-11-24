@@ -1,5 +1,9 @@
 import * as Record from "effect/Record";
-import { compileTableSchema } from "@confect/core/SchemaToValidator";
+import * as IdScope from "@confect/core/IdScope";
+import {
+  compileTableSchema,
+  type EmittedTableValidator,
+} from "@confect/core/SchemaToValidator";
 import * as Table_ from "@confect/core/Table";
 import * as Schema from "effect/Schema";
 import { defineTable, type TableDefinition } from "convex/server";
@@ -18,10 +22,10 @@ export {
    */
   make,
   /**
-   * Bound table handle used by database readers and writers. Import an
-   * application handle from `_generated/tables/<name>` or a read-only system
-   * handle, {@link _storage} or {@link _scheduled_functions}, from this
-   * module.
+   * Bound table handle used by database readers and writers. Import a handle
+   * from `_generated/tables/<name>`. For system reads, use an application
+   * handle ({@link _storage} or {@link _scheduled_functions}) or select a
+   * component-scoped handle with {@link systemTablesForScope}.
    *
    * @category Models
    */
@@ -46,6 +50,7 @@ export {
   type VectorIndexes,
   type Doc,
   type Fields,
+  type Scope,
   type WithName,
   type TablesRecord,
 } from "@confect/core/Table";
@@ -64,6 +69,24 @@ const tableDefinitionCache = new WeakMap<
   TableDefinition<any, any, any, any>
 >();
 
+type CompiledTable<Table extends Table_.AnyWithProps> =
+  Table extends Table_.Table<
+    string,
+    infer Fields,
+    any,
+    infer Indexes,
+    infer SearchIndexes,
+    infer VectorIndexes,
+    infer Scope
+  >
+    ? TableDefinition<
+        EmittedTableValidator<Fields, Scope>,
+        Indexes,
+        SearchIndexes,
+        VectorIndexes
+      >
+    : never;
+
 /**
  * Constructs a native table definition for the generated deployment schema. For
  * deployment or test setup, default-import `confect/_generated/convexSchema`
@@ -73,25 +96,14 @@ const tableDefinitionCache = new WeakMap<
  */
 export const tableDefinition = <Table extends Table_.AnyWithProps>(
   table: Table,
-): TableDefinition<
-  Table_.TableValidator<Table>,
-  Table_.Indexes<Table>,
-  Table_.SearchIndexes<Table>,
-  Table_.VectorIndexes<Table>
-> => {
+): CompiledTable<Table> => {
   const cached = tableDefinitionCache.get(table);
   if (cached !== undefined) {
-    return cached as TableDefinition<
-      Table_.TableValidator<Table>,
-      Table_.Indexes<Table>,
-      Table_.SearchIndexes<Table>,
-      Table_.VectorIndexes<Table>
-    >;
+    return cached as CompiledTable<Table>;
   }
 
-  let definition: TableDefinition<any, any, any, any> = table.Fields.pipe(
-    compileTableSchema,
-    defineTable,
+  let definition: TableDefinition<any, any, any, any> = defineTable(
+    compileTableSchema(table.Fields, table.scope),
   );
   for (const [name, indexFields] of Record.toEntries(
     table.indexes as Record<string, any>,
@@ -110,27 +122,14 @@ export const tableDefinition = <Table extends Table_.AnyWithProps>(
   }
 
   tableDefinitionCache.set(table, definition);
-  return definition as TableDefinition<
-    Table_.TableValidator<Table>,
-    Table_.Indexes<Table>,
-    Table_.SearchIndexes<Table>,
-    Table_.VectorIndexes<Table>
-  >;
+  return definition as CompiledTable<Table>;
 };
 
 // -----------------------------------------------------------------------------
 // System tables
 // -----------------------------------------------------------------------------
 
-/**
- * Read-only system table for scheduled calls, including the function name,
- * arguments, scheduled time, and execution state. Pass this handle to
- * `reader.table` to query or look up a scheduled call. Use the scheduler to
- * schedule or cancel calls.
- *
- * @category System tables
- */
-export const _scheduled_functions = Table_.make(() =>
+const scheduledFunctions = Table_.make(() =>
   Schema.Struct({
     name: Schema.String,
     args: Schema.Array(Schema.Any),
@@ -147,32 +146,61 @@ export const _scheduled_functions = Table_.make(() =>
       Schema.Struct({ kind: Schema.Literal("canceled") }),
     ]),
   }),
-)("_scheduled_functions");
+);
 
-/**
- * Read-only system table for stored file metadata. Pass this handle to
- * `reader.table` to look up a storage ID's SHA-256 hash, size in bytes, and
- * optional content type. Use a storage service to access the file contents.
- *
- * @category System tables
- */
-export const _storage = Table_.make(() =>
+const storage = Table_.make(() =>
   Schema.Struct({
     sha256: Schema.String,
     size: Schema.Finite,
     contentType: Schema.optionalKey(Schema.String),
   }),
-)("_storage");
+);
+
+/**
+ * Returns read-only handles for the storage and scheduled-function system
+ * tables in the supplied ID scope. In a component, pass its generated `scope`
+ * from `_generated/id` and use the returned `_storage` or
+ * `_scheduled_functions` with `reader.table`.
+ *
+ * @category System tables
+ *
+ * @see {@link _storage} and {@link _scheduled_functions} for the application handles.
+ */
+export const systemTablesForScope = <const Scope_ extends IdScope.IdScope>(
+  scope: Scope_,
+) =>
+  ({
+    _scheduled_functions: scheduledFunctions("_scheduled_functions", scope),
+    _storage: storage("_storage", scope),
+  }) as const;
 
 /**
  * @internal
  */
-export const systemTables = {
+export const systemTables = systemTablesForScope(IdScope.app);
+export const {
+  /**
+   * Read-only application system table for scheduled calls, including the
+   * function name, arguments, scheduled time, and execution state. Pass this
+   * handle to `reader.table` to query or look up a scheduled call. Use the
+   * scheduler to schedule or cancel calls.
+   *
+   * @category System tables
+   */
   _scheduled_functions,
+  /**
+   * Read-only application system table for stored file metadata. Pass this
+   * handle to `reader.table` to look up a storage ID's SHA-256 hash, size in
+   * bytes, and optional content type. Use a storage service to access the file
+   * contents.
+   *
+   * @category System tables
+   */
   _storage,
-} as const;
+} = systemTables;
 
 /**
  * @internal
  */
-export type SystemTables = typeof _scheduled_functions | typeof _storage;
+export type SystemTables<Scope_ extends IdScope.IdScope = IdScope.App> =
+  ReturnType<typeof systemTablesForScope<Scope_>>[keyof typeof systemTables];

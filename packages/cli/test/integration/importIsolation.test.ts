@@ -45,13 +45,23 @@ const buildEntry = Effect.fnUntraced(function* (root: string, entry: string) {
 layer(NodeServices.layer, { excludeTestServices: true })(
   "generated Convex bundles",
   (it) => {
-    it.effect(
-      "ships only the handlers' table dependencies without forcing their schemas",
-      () =>
+    it.effect.each(["app", "component"] as const)(
+      "ships only the %s handlers' table dependencies without forcing their schemas",
+      (target) =>
         Effect.gen(function* () {
           const fs = yield* FileSystem.FileSystem;
           const path = yield* Path.Path;
           const project = yield* Project.make;
+          if (target === "component") {
+            yield* project.write(
+              "package.json",
+              '{"type":"module","name":"fixture"}',
+            );
+            yield* project.write(
+              "convex/convex.config.ts",
+              'import { defineComponent } from "convex/server"; export default defineComponent("fixture");',
+            );
+          }
           yield* project.write(
             "reads.ts",
             "export const reads: string[] = [];",
@@ -169,7 +179,10 @@ export default GroupImpl.make(auditedSpec).pipe(
   GroupImpl.finalize,
 );`,
           );
-          const generation = yield* project.start("codegen");
+          const generation = yield* project.start(
+            "codegen",
+            target === "component" ? ["--component-dir", "convex"] : [],
+          );
           const exitCode = yield* generation.handle.exitCode;
           const log = yield* Ref.get(generation.output);
           expect(Number(exitCode), log).toBe(0);

@@ -5,7 +5,6 @@ import type {
   VectorIndexNames,
   VectorSearchQuery,
 } from "convex/server";
-import type { GenericId } from "convex/values";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -15,7 +14,7 @@ type ConvexVectorSearch<DataModel_ extends DataModel.AnyWithProps> =
   GenericActionCtx<DataModel.ToConvexDataModel<DataModel_>>["vectorSearch"];
 
 /**
- * Callable service for finding similar vectors in an application table. Yield
+ * Callable service for finding similar vectors in the current database. Yield
  * the generated `VectorSearch` tag in an action or a schema-typed HTTP router
  * to obtain the search function.
  *
@@ -45,8 +44,8 @@ export interface VectorSearchService<
    * @param query - Search vector, optional result limit, and optional filter
    *   over the index's encoded field values.
    *
-   * @returns An Effect producing ranked `{ _id, _score }` matches. A Convex
-   *   rejection is a defect.
+   * @returns An Effect producing ranked `{ _id, _score }` matches. Each ID has
+   *   the selected table's scope. A Convex rejection is a defect.
    */
   <
     TableName extends DataModel.TableNames<DataModel_>,
@@ -62,7 +61,9 @@ export interface VectorSearchService<
         IndexName
       >
     >,
-  ): Effect.Effect<Array<{ _id: GenericId<TableName>; _score: number }>>;
+  ): Effect.Effect<
+    Array<{ _id: DataModel.Id<DataModel_, TableName>; _score: number }>
+  >;
 }
 
 /**
@@ -86,7 +87,15 @@ export const make =
     vectorSearch: ConvexVectorSearch<DataModel_>,
   ): VectorSearchService<DataModel_> =>
   (tableName, indexName, query) =>
-    Effect.promise(() => vectorSearch(tableName, indexName, query));
+    Effect.promise(() => vectorSearch(tableName, indexName, query)).pipe(
+      Effect.map(
+        (rows) =>
+          rows as unknown as Array<{
+            _id: DataModel.Id<DataModel_, typeof tableName>;
+            _score: number;
+          }>,
+      ),
+    );
 
 /**
  * Constructs the schema-specific tag for generated services. Import
@@ -103,8 +112,9 @@ export const VectorSearch = <
   );
 
 /**
- * Callable vector search service specialized to the application's data model.
- * Its table names, index names, and filter fields come from that model.
+ * Callable vector search service specialized to the application or component's
+ * data model. Its table names, index names, and filter fields come from that
+ * model.
  *
  * Yield `VectorSearch` from `confect/_generated/services` and call the returned
  * function to get ranked document IDs and scores.

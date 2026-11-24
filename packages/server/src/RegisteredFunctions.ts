@@ -7,6 +7,7 @@
  * @internal
  */
 
+import type * as DatabaseSchema from "./DatabaseSchema";
 import * as ConvexFunctionDefinitions from "./ConvexFunctionDefinitions";
 import type * as FunctionSpec from "@confect/core/FunctionSpec";
 import type * as GroupSpec from "@confect/core/GroupSpec";
@@ -99,7 +100,8 @@ export interface AnyWithProps {
 export const buildForGroup = <Group extends GroupSpec.AnyWithProps>(
   tableNames: ReadonlyArray<string>,
   groupLayer: Layer.Layer<GroupImpl.GroupImpl<"Finalized">>,
+  target?: DatabaseSchema.Target,
 ): RegisteredFunctionsForGroupSpec<Group> =>
   ConvexFunctionDefinitions.register<Group>(
-    ConvexFunctionDefinitions.buildForGroup(tableNames, groupLayer),
+    ConvexFunctionDefinitions.buildForGroup(tableNames, groupLayer, target),
   );

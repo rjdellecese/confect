@@ -94,8 +94,9 @@ export type TestConfectWithoutIdentity<
     Ref.Error<ActionRef> | Schema.SchemaError
   >;
   /**
-   * Runs a setup Effect in a mutation transaction, with the database services
-   * for this application's schema. Pass a return codec to get a value back.
+   * Runs a setup Effect in a mutation transaction, with services for the
+   * application's or component's schema. Pass a return codec to get a value
+   * back.
    *
    * **When to use**
    *
@@ -104,9 +105,9 @@ export type TestConfectWithoutIdentity<
    *
    * **Details**
    *
-   * Inside the transaction, `DocumentIds.identify` checks the application table
-   * names supplied to the layer and Convex's system tables. It cannot discover
-   * extra tables in the test deployment.
+   * Inside the transaction, `DocumentIds.identify` checks the table names
+   * supplied to the layer and Convex's system tables. It cannot discover extra
+   * tables in the test deployment.
    *
    * **Gotchas**
    *
@@ -190,10 +191,23 @@ export type TestConfectWithoutIdentity<
  */
 export type TestConfect<DatabaseSchema_ extends DatabaseSchema.AnyWithProps> = {
   /**
+   * Registers the component's deployment schema and module loaders at its
+   * installed path. Pass the generated `ComponentApi<"mountName">` type to
+   * obtain a native reference that you can use with `Component.bind`.
+   *
+   * @category Testing
+   */
+  registerComponent: <ComponentApi = unknown>(
+    componentPath: string,
+    schema: SchemaDefinition<GenericSchema, boolean>,
+    modules: Record<string, () => Promise<any>>,
+  ) => Effect.Effect<ComponentApi>;
+  /**
    * Returns a caller with the given identity without changing the original
    * caller or creating another database. The test backend fills in a missing
    * issuer, subject, or token identifier. To switch users again, call this
-   * method on the original caller.
+   * method on the original caller. Setting an identity does not give component
+   * handlers access to application authentication.
    *
    * @category Combinators
    */
@@ -225,7 +239,7 @@ export type TestConfect<DatabaseSchema_ extends DatabaseSchema.AnyWithProps> = {
  * @category Tags
  */
 export const TestConfect = <
-  DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
+  DatabaseSchema_ extends DatabaseSchema.AnyWithProps = DatabaseSchema.AnyApp,
 >() =>
   Context.Service<TestConfect<DatabaseSchema_>>("@confect/test/TestConfect");
 
@@ -238,6 +252,9 @@ class TestConfectImplWithoutIdentity<
     >,
     private testConvex: TestConvexForDataModel<
       DataModel.ToConvexDataModel<DataModel.FromDatabaseSchema<DatabaseSchema_>>
+    >,
+    private readonly targetArgs: DatabaseSchema.TargetArgs<
+      DatabaseSchema_["target"]
     >,
   ) {}
 
@@ -305,6 +322,7 @@ class TestConfectImplWithoutIdentity<
       RegisteredConvexFunction.mutationLayer<DatabaseSchema_>(
         this.tableNames,
         mutationCtx,
+        ...this.targetArgs,
       );
 
     return returns === undefined
@@ -356,10 +374,14 @@ class TestConfectImpl<
     private testConvex: TestConvexForDataModelAndIdentity<
       DataModel.ToConvexDataModel<DataModel.FromDatabaseSchema<DatabaseSchema_>>
     >,
+    private readonly targetArgs: DatabaseSchema.TargetArgs<
+      DatabaseSchema_["target"]
+    >,
   ) {
     this.testConfectImplWithoutIdentity = new TestConfectImplWithoutIdentity(
       tableNames,
       testConvex,
+      targetArgs,
     );
   }
 
@@ -367,8 +389,15 @@ class TestConfectImpl<
     new TestConfectImplWithoutIdentity(
       this.tableNames,
       this.testConvex.withIdentity(userIdentity),
+      this.targetArgs,
     );
 
+  readonly registerComponent = <ComponentApi = unknown>(
+    ...args: Parameters<TestConfect<DatabaseSchema_>["registerComponent"]>
+  ) =>
+    Effect.sync(() =>
+      this.testConvex.registerComponent<ComponentApi>(...args),
+    ).pipe(Effect.withSpan("TestConfect.registerComponent"));
   readonly jwks = () => this.testConfectImplWithoutIdentity.jwks();
 
   readonly query = <QueryRef extends Ref.AnyQuery>(
@@ -435,20 +464,26 @@ class TestConfectImpl<
  * @category Layers
  *
  * @param tableNames - Default export of `_generated/tableNames`. In `run`,
- *   these are the application tables that `DocumentIds.identify` can match.
+ *   these are the declared tables that `DocumentIds.identify` can match.
  * @param convexSchemaDefinition - Generated Convex deployment schema used by
  *   `convex-test`.
  * @param modules - Convex modules, typically the result of `import.meta.glob`.
+ * @param targetArgs - For a component, pass `target` from its `_generated/id`
+ *   so `run` provides the component's scoped services. Omit it for an
+ *   application.
  *
  * @returns A synchronous layer. Backend construction failures are defects.
  */
-export const layer = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
+export const layer = <
+  DatabaseSchema_ extends DatabaseSchema.AnyWithProps = DatabaseSchema.AnyApp,
+>(
   tableNames: ReadonlyArray<DatabaseSchema.TableNames<DatabaseSchema_>>,
   convexSchemaDefinition: SchemaDefinition<
     Record<DatabaseSchema.TableNames<DatabaseSchema_>, GenericSchema[string]>,
     true
   >,
   modules: Record<string, () => Promise<any>>,
+  ...targetArgs: DatabaseSchema.TargetArgs<DatabaseSchema_["target"]>
 ): Layer.Layer<TestConfect<DatabaseSchema_>> =>
   Layer.sync(
     TestConfect<DatabaseSchema_>(),
@@ -456,5 +491,6 @@ export const layer = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
       new TestConfectImpl<DatabaseSchema_>(
         tableNames,
         convexTest(convexSchemaDefinition, modules) as any,
+        targetArgs,
       ),
   );

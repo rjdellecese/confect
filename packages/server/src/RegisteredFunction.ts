@@ -28,9 +28,8 @@ import * as ActionCtx from "./ActionCtx";
 import * as ActionRunner from "./ActionRunner";
 import * as Auth from "./Auth";
 import * as ConvexLogger from "./ConvexLogger";
-import type * as DatabaseSchema from "./DatabaseSchema";
+import * as DatabaseSchema from "./DatabaseSchema";
 import type * as DataModel from "./DataModel";
-import type * as Handler from "./Handler";
 import * as ExecutionMetadata from "./ExecutionMetadata";
 import * as RequestMetadata from "./RequestMetadata";
 import * as MutationRunner from "./MutationRunner";
@@ -41,6 +40,7 @@ import * as Storage from "./Storage";
 import * as StorageActionWriter from "./StorageActionWriter";
 import * as StorageWriter from "./StorageWriter";
 import * as VectorSearch from "./VectorSearch";
+import type * as Handler from "./Handler";
 
 /**
  * @internal
@@ -307,6 +307,7 @@ export const actionFunctionBase = <
   handler,
   resolvedMiddlewares = [],
   createLayer,
+  scope = DatabaseSchema.appTarget.scope,
 }: {
   name: string;
   functionVisibility: FunctionVisibility;
@@ -315,18 +316,13 @@ export const actionFunctionBase = <
   error: Schema.Codec<Error, Value> | undefined;
   handler: (a: Args) => Effect.Effect<Returns, E, R>;
   resolvedMiddlewares?: ReadonlyArray<ResolvedMiddleware.ResolvedMiddleware>;
-  createLayer: (
-    ctx: GenericActionCtx<
-      DataModel.ToConvexDataModel<DataModel.FromDatabaseSchema<DatabaseSchema_>>
-    >,
-  ) => Layer.Layer<R>;
+  createLayer: (ctx: ActionContext<DatabaseSchema_>) => Layer.Layer<R>;
+  scope?: DatabaseSchema.Scope<DatabaseSchema_>;
 }) => ({
-  args: () => compileArgsSchema(args),
-  returns: () => compileReturnsSchema(returns),
+  args: () => compileArgsSchema(args, scope),
+  returns: () => compileReturnsSchema(returns, scope),
   handler: (
-    ctx: GenericActionCtx<
-      DataModel.ToConvexDataModel<DataModel.FromDatabaseSchema<DatabaseSchema_>>
-    >,
+    ctx: ActionContext<DatabaseSchema_>,
     actualArgs: ConvexArgs,
   ): Promise<ConvexReturns> =>
     Effect.gen(function* () {
@@ -358,35 +354,73 @@ export const actionFunctionBase = <
 });
 
 /**
+ * Types the services provided at action registration. Use the generated service
+ * tags from `confect/_generated/services` in an action handler.
+ *
  * @internal
  */
-export const actionLayer = <
+export type ActionServices<
+  DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
+> = Handler.ActionServices<DatabaseSchema_>;
+
+type ActionContext<S extends DatabaseSchema.AnyWithProps> = GenericActionCtx<
+  DataModel.ToConvexDataModel<DataModel.FromDatabaseSchema<S>>
+>;
+
+/**
+ * @internal
+ */
+export function actionLayer(
+  ctx: ActionContext<DatabaseSchema.AnyApp>,
+  target?: DatabaseSchema.AppTarget,
+): Layer.Layer<Handler.ActionServices<DatabaseSchema.AnyApp>>;
+/**
+ * @internal
+ */
+export function actionLayer<S extends DatabaseSchema.AnyWithProps>(
+  ctx: ActionContext<S>,
+  ...targetArgs: DatabaseSchema.TargetArgs<S["target"]>
+): Layer.Layer<Handler.ActionServices<S>>;
+/**
+ * @internal
+ */
+export function actionLayer<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
 >(
-  ctx: GenericActionCtx<
-    DataModel.ToConvexDataModel<DataModel.FromDatabaseSchema<DatabaseSchema_>>
-  >,
-): Layer.Layer<Handler.ActionServices<DatabaseSchema_>> =>
-  Layer.mergeAll(
-    Scheduler.layer(ctx.scheduler),
-    Auth.layer(ctx.auth),
+  ctx: ActionContext<DatabaseSchema_>,
+  layerTarget: DatabaseSchema_["target"] = DatabaseSchema.appTarget,
+): Layer.Layer<Handler.ActionServices<DatabaseSchema_>> {
+  const target = DatabaseSchema.checkedTarget(layerTarget);
+  return Layer.mergeAll(
+    Scheduler.layer<DatabaseSchema.Scope<DatabaseSchema_>>(
+      ctx.scheduler,
+      target.scope,
+    ),
+    Auth.layerForTarget<DatabaseSchema_["target"]>(target, ctx.auth),
     ExecutionMetadata.layer(ctx.meta),
-    RequestMetadata.layer(ctx.meta),
-    Storage.layer(ctx.storage),
-    StorageWriter.StorageWriter.layer(ctx.storage),
-    StorageActionWriter.StorageActionWriter.layer(ctx.storage),
+    RequestMetadata.layer(RequestMetadata.forScope(ctx.meta, target.scope)),
+    Storage.layer<DatabaseSchema.Scope<DatabaseSchema_>>(
+      ctx.storage,
+      target.scope,
+    ),
+    StorageWriter.StorageWriter.layer<DatabaseSchema.Scope<DatabaseSchema_>>(
+      ctx.storage,
+      target.scope,
+    ),
+    StorageActionWriter.StorageActionWriter.layer<
+      DatabaseSchema.Scope<DatabaseSchema_>
+    >(ctx.storage, target.scope),
     QueryRunner.layer(ctx.runQuery.bind(ctx)),
     MutationRunner.layer(ctx.runMutation.bind(ctx)),
     ActionRunner.layer(ctx.runAction.bind(ctx)),
-    Layer.succeed(
-      ActionCtx.ActionCtx<
-        DataModel.ToConvexDataModel<
-          DataModel.FromDatabaseSchema<DatabaseSchema_>
-        >
-      >(),
-      ctx,
-    ),
+    ActionCtx.layer<
+      DataModel.ToConvexDataModel<
+        DataModel.FromDatabaseSchema<DatabaseSchema_>
+      >,
+      DatabaseSchema.Scope<DatabaseSchema_>
+    >(ctx, target.scope),
     VectorSearch.layer<DataModel.FromDatabaseSchema<DatabaseSchema_>>(
       ctx.vectorSearch.bind(ctx),
     ),
   );
+}

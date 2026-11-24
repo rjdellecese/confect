@@ -1,4 +1,5 @@
-import type { IdField, SystemFields as NonIdSystemFields } from "convex/server";
+import type * as IdScope from "./IdScope";
+import type { SystemFields as NonIdSystemFields } from "convex/server";
 import { pipe } from "effect/Function";
 import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
@@ -18,9 +19,15 @@ import * as GenericId from "./GenericId";
  *
  * @internal
  */
-export const SystemFields = <TableName extends string>(tableName: TableName) =>
+export const SystemFields = <
+  TableName extends string,
+  const Scope extends IdScope.IdScope = IdScope.App,
+>(
+  tableName: TableName,
+  ...scope: IdScope.Args<Scope>
+) =>
   Schema.Struct({
-    _id: GenericId.GenericId(tableName),
+    _id: GenericId.GenericId<TableName, Scope>(tableName, ...scope),
     _creationTime: Schema.Finite,
   });
 
@@ -28,9 +35,10 @@ export const SystemFields = <TableName extends string>(tableName: TableName) =>
  * The field map added to a table schema, derived from {@link SystemFields} so it
  * stays in lockstep with the runtime schema.
  */
-type SystemFieldsFor<TableName extends string> = ReturnType<
-  typeof SystemFields<TableName>
->["fields"];
+type SystemFieldsFor<
+  TableName extends string,
+  Scope extends IdScope.IdScope = IdScope.App,
+> = ReturnType<typeof SystemFields<TableName, Scope>>["fields"];
 
 /**
  * The system field names, derived from {@link SystemFields} so they stay in
@@ -174,11 +182,13 @@ const makeExtendAst = (
 export const extendWithSystemFields = <
   TableName extends string,
   TableSchema extends Schema.Codec<any, any>,
+  const Scope extends IdScope.IdScope = IdScope.App,
 >(
   tableName: TableName,
   schema: TableSchema,
-): ExtendWithSystemFields<TableName, TableSchema> => {
-  const system = SystemFields(tableName).fields;
+  ...scope: IdScope.Args<Scope>
+): ExtendWithSystemFields<TableName, TableSchema, Scope> => {
+  const system = SystemFields<TableName, Scope>(tableName, ...scope).fields;
 
   const extendAst = makeExtendAst(
     pipe(
@@ -216,7 +226,8 @@ export const extendWithSystemFields = <
 
   return extend(schema) as unknown as ExtendWithSystemFields<
     TableName,
-    TableSchema
+    TableSchema,
+    Scope
   >;
 };
 
@@ -225,21 +236,27 @@ export const extendWithSystemFields = <
  * `Schema.fieldsAssign`. Any other (already-extended or opaque) schema falls
  * back to a `Codec` carrying the system-field document shape.
  */
-type ApplySystemFields<TableName extends string, S> =
-  S extends Schema.Struct<infer Fields extends Schema.Struct.Fields>
+type ApplySystemFields<
+  TableName extends string,
+  Schema_,
+  Scope extends IdScope.IdScope,
+> =
+  Schema_ extends Schema.Struct<infer Fields extends Schema.Struct.Fields>
     ? Schema.Struct<
-        Struct.Simplify<Struct.Assign<Fields, SystemFieldsFor<TableName>>>
+        Struct.Simplify<
+          Struct.Assign<Fields, SystemFieldsFor<TableName, Scope>>
+        >
       >
-    : S extends Schema.Codec<infer Type, infer Encoded>
+    : Schema_ extends Schema.Codec<infer Type, infer Encoded>
       ? Schema.Codec<
-          WithSystemFields<TableName, Type>,
-          WithSystemFields<TableName, Encoded>
+          WithSystemFields<TableName, Type, Scope>,
+          WithSystemFields<TableName, Encoded, Scope>
         >
       : never;
 
 /**
  * The codec type of a bound table's `Doc` field. Both decoded and encoded
- * documents include an `_id` branded for `TableName` and a numeric
+ * documents include an `_id` branded for `TableName` in `Scope` and a numeric
  * `_creationTime` in milliseconds since the Unix epoch.
  *
  * **Details**
@@ -256,6 +273,7 @@ type ApplySystemFields<TableName extends string, S> =
 export type ExtendWithSystemFields<
   TableName extends string,
   TableSchema extends Schema.Top,
+  Scope extends IdScope.IdScope = IdScope.App,
 > =
   TableSchema extends Schema.Union<
     infer Members extends ReadonlyArray<Schema.Top>
@@ -263,23 +281,30 @@ export type ExtendWithSystemFields<
     ? Schema.Union<
         Struct.Simplify<
           Readonly<{
-            [K in keyof Members]: ExtendWithSystemFields<TableName, Members[K]>;
+            [MemberIndex in keyof Members]: ExtendWithSystemFields<
+              TableName,
+              Members[MemberIndex],
+              Scope
+            >;
           }>
         >
       >
-    : ApplySystemFields<TableName, TableSchema>;
+    : ApplySystemFields<TableName, TableSchema, Scope>;
 
 /**
  * A document value with the table's fields plus Convex's system fields.
- * `TableName` brands the `_id` string for that table; `_creationTime` is a
- * number of milliseconds since the Unix epoch. Apply the type to either a
- * decoded or encoded document shape. Union members retain their own fields.
+ * `TableName` and `Scope` brand the `_id` string for that table and database;
+ * `_creationTime` is a number of milliseconds since the Unix epoch. Apply the
+ * type to either a decoded or encoded document shape. Union members retain
+ * their own fields.
  *
  * @category Utility types
  */
 export type WithSystemFields<
   TableName extends string,
   Document,
+  Scope extends IdScope.IdScope = IdScope.App,
 > = Document extends unknown
-  ? IdField<TableName> & NonIdSystemFields & Document
+  ? { _id: GenericId.GenericId<TableName, Scope> } & NonIdSystemFields &
+      Document
   : never;

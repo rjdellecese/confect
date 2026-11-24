@@ -77,14 +77,14 @@ export interface QueryInitializer<
      *
      * @category Reading
      *
-     * @param id - Table-typed document ID.
+     * @param id - Document ID for the selected table in this database's scope.
      *
      * @returns An effect yielding the document, or failing with
      *   `GetByIdFailure` when absent or `DocumentDecodeError` when decoding
      *   fails.
      */
     (
-      id: GenericId<TableName>,
+      id: DataModel.Id<DataModel_, TableName>,
     ): Effect.Effect<Doc, Document.DocumentDecodeError | GetByIdFailure>;
     /**
      * Reads the unique document matching the supplied index values.

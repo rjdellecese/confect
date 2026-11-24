@@ -36,6 +36,12 @@ export const isFunctionSpec = (u: unknown): u is AnyWithProps =>
  * to a `GroupSpec`. The handler is supplied separately through
  * `@confect/server`; a spec does not execute the function.
  *
+ * **Details**
+ *
+ * A public application function is client-callable. A public component function
+ * is exported to its caller's backend, not to frontend clients. Internal
+ * component functions are absent from the bound contract.
+ *
  * @category Models
  */
 export interface FunctionSpec<
@@ -58,7 +64,8 @@ export interface FunctionSpec<
    */
   readonly runtimeAndFunctionType: RuntimeAndFunctionType_;
   /**
-   * Whether clients may call this function or only server-side callers may.
+   * Whether the function is public or internal in its declaring application or
+   * component.
    *
    * @category Models
    */
@@ -644,8 +651,8 @@ const makePaginated = <
 };
 
 /**
- * Declares a read-only query that clients can call or subscribe to in the
- * Convex runtime.
+ * Declares a public read-only query in the Convex runtime. Application clients
+ * can call or subscribe to queries exposed by the application.
  *
  * **Example** (Declaring a query with a named argument)
  *
@@ -706,8 +713,8 @@ export const internalQuery = make(
   "internal",
 );
 /**
- * Declares a query that clients can subscribe to one page at a time. Supply a
- * codec for a single item rather than for the entire page.
+ * Declares a public paginated query. Application clients can subscribe one page
+ * at a time. Supply a codec for a single item rather than for the entire page.
  *
  * **Details**
  *
@@ -772,8 +779,7 @@ export const internalPaginatedQuery = makePaginated(
   "internal",
 );
 /**
- * Declares a mutation that clients can call to write data in a Convex
- * transaction.
+ * Declares a public mutation that writes data in a Convex transaction.
  *
  * @category Constructors
  *
@@ -824,8 +830,8 @@ export const internalMutation = make(
   "internal",
 );
 /**
- * Declares a client-callable action for work outside a database transaction in
- * the Convex runtime.
+ * Declares a public action for work outside a database transaction in the
+ * Convex runtime.
  *
  * @category Constructors
  *
@@ -874,8 +880,8 @@ export const internalAction = make(
 );
 
 /**
- * Declares a client-callable action for the Node.js runtime. Add it to a group
- * created with `GroupSpec.makeNode()`.
+ * Declares a public action for the Node.js runtime. Add it to a group created
+ * with `GroupSpec.makeNode()`.
  *
  * @category Constructors
  *
@@ -1002,7 +1008,7 @@ const makeConvex =
   };
 
 /**
- * Creates a spec factory for a client-callable Convex query. Call
+ * Creates a spec factory for a public Convex query. Call
  * `convexPublicQuery<typeof registeredFunction>()("name")` to infer its
  * arguments and result without importing the handler at runtime. Pass the
  * registered query of the matching visibility to `FunctionImpl.make` in the
@@ -1040,7 +1046,7 @@ export const convexInternalQuery = makeConvex(
   "internal",
 );
 /**
- * Creates a spec factory for a client-callable Convex mutation. Call
+ * Creates a spec factory for a public Convex mutation. Call
  * `convexPublicMutation<typeof registeredFunction>()("name")` to infer its
  * arguments and result without importing the handler at runtime. Pass the
  * registered mutation of the matching visibility to `FunctionImpl.make` in the
@@ -1078,7 +1084,7 @@ export const convexInternalMutation = makeConvex(
   "internal",
 );
 /**
- * Creates a spec factory for a client-callable Convex action. Call
+ * Creates a spec factory for a public Convex action. Call
  * `convexPublicAction<typeof registeredFunction>()("name")` to infer its
  * arguments and result without importing the handler at runtime. Pass the
  * registered action of the matching visibility to `FunctionImpl.make` in the
@@ -1116,7 +1122,7 @@ export const convexInternalAction = makeConvex(
   "internal",
 );
 /**
- * Creates a spec factory for a client-callable Convex Node.js action. Call
+ * Creates a spec factory for a public Convex Node.js action. Call
  * `convexPublicNodeAction<typeof registeredFunction>()("name")` to infer its
  * arguments and result without importing the handler at runtime. Pass the
  * registered Node.js action of the matching visibility to `FunctionImpl.make`

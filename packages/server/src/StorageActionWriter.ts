@@ -1,3 +1,5 @@
+import type * as IdScope from "@confect/core/IdScope";
+import type * as Types from "effect/Types";
 import type { StorageActionWriter as ConvexStorageActionWriter } from "convex/server";
 import type { GenericId } from "convex/values";
 import * as Context from "effect/Context";
@@ -6,6 +8,51 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import { BlobNotFoundError } from "./BlobNotFoundError";
+import type * as ScopedId from "@confect/core/GenericId";
+
+/**
+ * Service for reading and storing blobs in mutations, actions, and HTTP
+ * handlers.
+ *
+ * @remarks
+ *   Codegen support: this type describes the generated service. Yield
+ *   `StorageActionWriter` from `confect/_generated/services` to use its
+ *   operations.
+ *
+ * @category Services
+ */
+export type Service<Scope extends IdScope.IdScope = IdScope.App> = {
+  /**
+   * Reads the contents of a stored blob by ID in this scope. A missing blob
+   * fails with {@link BlobNotFoundError}; a Convex rejection is a defect.
+   *
+   * @category Reading
+   */
+  get: (
+    id: ScopedId.GenericId<"_storage", Scope>,
+  ) => ReturnType<ReturnType<typeof make>["get"]>;
+  /**
+   * Stores a blob and returns its storage ID in this scope. Supply a `sha256`
+   * checksum for Convex to verify. A Convex rejection is a defect.
+   *
+   * @category Writing
+   */
+  store: (
+    blob: Blob,
+    options?: { sha256?: string },
+  ) => Effect.Effect<ScopedId.GenericId<"_storage", Scope>>;
+};
+/**
+ * Types the generated `StorageActionWriter` requirement for its database scope.
+ * Use the identically named type from `confect/_generated/services`.
+ *
+ * @internal
+ */
+export type ForScope<Scope extends IdScope.IdScope> = [Scope] extends [
+  IdScope.App,
+]
+  ? StorageActionWriter
+  : { readonly "~ScopedStorageActionWriter": Types.Invariant<Scope> };
 
 const make = (storageActionWriter: ConvexStorageActionWriter) => ({
   /**
@@ -60,8 +107,25 @@ export class StorageActionWriter extends Context.Service<
   ReturnType<typeof make>
 >()("@confect/server/StorageActionWriter") {
   /**
+   * Constructs a scoped tag for codegen. Yield the generated
+   * `StorageActionWriter` tag from `confect/_generated/services` instead.
+   *
    * @internal
    */
-  static readonly layer = (storageActionWriter: ConvexStorageActionWriter) =>
-    Layer.succeed(this, make(storageActionWriter));
+  static readonly forScope = <
+    Scope extends IdScope.IdScope = IdScope.App,
+  >(): Context.Service<ForScope<Scope>, Service<Scope>> =>
+    Context.Service("@confect/server/StorageActionWriter");
+
+  /**
+   * @internal
+   */
+  static readonly layer = <Scope extends IdScope.IdScope = IdScope.App>(
+    storageActionWriter: ConvexStorageActionWriter,
+    _scope?: Scope,
+  ) =>
+    Layer.succeed(
+      this.forScope<Scope>(),
+      make(storageActionWriter) as unknown as Service<Scope>,
+    );
 }

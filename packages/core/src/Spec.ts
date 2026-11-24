@@ -3,11 +3,17 @@ import * as Record from "effect/Record";
 import * as GroupSpec from "./GroupSpec";
 
 /**
- * @internal
+ * The key for the group record in a function spec. For a hand-authored
+ * component wrapper, place the named groups under this key and pass the spec to
+ * `Component.make`. Application code normally imports the generated spec.
+ *
+ * @category Type IDs
  */
 export const TypeId = "~@confect/core/Spec";
 /**
- * @internal
+ * The type of the key that identifies a spec's named groups.
+ *
+ * @category Type IDs
  */
 export type TypeId = typeof TypeId;
 
@@ -18,9 +24,9 @@ export const isSpec = (u: unknown): u is AnyWithProps =>
   Predicate.hasProperty(u, TypeId);
 
 /**
- * The generated project spec that describes function groups and their
- * middleware. Import the codegen-assembled spec rather than constructing it by
- * hand; it does not describe the database schema.
+ * A spec describing function groups and their middleware, not the database
+ * schema. Import the codegen-assembled spec for your project; build a subset by
+ * hand to wrap functions from an existing Convex component.
  *
  * For the application's complete contract, use `typeof spec` with a type-only
  * default import from `confect/_generated/spec`. Specify the group record
@@ -37,8 +43,7 @@ export interface Spec<
   Groups_ extends Record.ReadonlyRecord<string, GroupSpec.AnyWithProps> = {},
 > {
   /**
-   * The generated group record, preserving each group's precise declaration
-   * type.
+   * The group record, preserving each group's precise declaration type.
    *
    * @category Models
    */
