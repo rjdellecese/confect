@@ -156,6 +156,7 @@ export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
     // The ctx-backed service layers are all synchronous and finalizer-free,
     // so the scope can close as soon as the context is built.
     const services = RegisteredFunction.actionLayer<DatabaseSchema_>(
+      // oxlint-disable-next-line quality/no-chained-type-assertions, typescript/no-unsafe-type-assertion -- Convex erases the data model in httpActionGeneric. The generated router binds that deployment's schema to the per-request context for typed vector search.
       ctx as unknown as GenericActionCtx<
         DataModel.ToConvexDataModel<
           DataModel.FromDatabaseSchema<DatabaseSchema_>

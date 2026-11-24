@@ -1,3 +1,4 @@
+import { fromPrototype } from "./internal/fromPrototype";
 import { Ref } from "@confect/core";
 import type { CronJob as ConvexCronJob } from "convex/server";
 import { cronJobs as makeConvexCrons } from "convex/server";
@@ -152,13 +153,13 @@ const Proto = {
       newConvexCrons,
     );
   },
-};
+} satisfies Pick<CronJobs, TypeId | "add">;
 
 const makeProto = (
   cronJobs: Record<string, CronJob.CronJob>,
   convexCronJobs: Crons,
 ): CronJobs =>
-  Object.assign(Object.create(Proto), {
+  Object.assign(fromPrototype(Proto), {
     cronJobs,
     convexCronJobs,
   });

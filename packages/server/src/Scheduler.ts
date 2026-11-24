@@ -42,10 +42,7 @@ const make = (scheduler: ConvexScheduler) => ({
   ) => {
     const delayMs = Duration.toMillis(delay);
     const functionReference = Ref.getFunctionReference(ref);
-    const encodedArgs = Ref.encodeArgsSync(
-      ref,
-      (args[0] ?? {}) as Ref.Args<Ref_>,
-    );
+    const encodedArgs = Ref.encodeArgsSync(ref, Ref.argsOrEmpty<Ref_>(args));
 
     return Effect.promise(() =>
       scheduler.runAfter(delayMs, functionReference, encodedArgs),
@@ -72,10 +69,7 @@ const make = (scheduler: ConvexScheduler) => ({
   ) => {
     const timestamp = DateTime.toEpochMillis(dateTime);
     const functionReference = Ref.getFunctionReference(ref);
-    const encodedArgs = Ref.encodeArgsSync(
-      ref,
-      (args[0] ?? {}) as Ref.Args<Ref_>,
-    );
+    const encodedArgs = Ref.encodeArgsSync(ref, Ref.argsOrEmpty<Ref_>(args));
 
     return Effect.promise(() =>
       scheduler.runAt(timestamp, functionReference, encodedArgs),

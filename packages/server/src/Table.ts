@@ -102,19 +102,15 @@ export const tableDefinition = <Table extends Table_.AnyWithProps>(
     compileTableSchema,
     defineTable,
   );
-  for (const [name, indexFields] of Record.toEntries(
-    table.indexes as Record<string, any>,
-  )) {
+  const { indexes, searchIndexes, vectorIndexes } =
+    Table_.indexDefinitions(table);
+  for (const [name, indexFields] of Record.toEntries(indexes)) {
     definition = definition.index(name, indexFields);
   }
-  for (const [name, config] of Record.toEntries(
-    table.searchIndexes as Record<string, any>,
-  )) {
+  for (const [name, config] of Record.toEntries(searchIndexes)) {
     definition = definition.searchIndex(name, config);
   }
-  for (const [name, config] of Record.toEntries(
-    table.vectorIndexes as Record<string, any>,
-  )) {
+  for (const [name, config] of Record.toEntries(vectorIndexes)) {
     definition = definition.vectorIndex(name, config);
   }
 

@@ -1,3 +1,4 @@
+import type { IdField, SystemFields } from "convex/server";
 import type { ReadonlyValue } from "@confect/core/SchemaToValidator";
 import { pipe } from "effect/Function";
 import * as Effect from "effect/Effect";
@@ -39,11 +40,21 @@ export type WithoutSystemFields<Doc> = Doc extends unknown
 /**
  * @internal
  */
-export type Any = any;
+export type Any = IdField<string> & SystemFields;
 /**
  * @internal
  */
 export type AnyEncoded = ReadonlyRecord<string, ReadonlyValue>;
+
+const errorDetails = (
+  table: Table.Any,
+  id: string,
+  error: Schema.SchemaError,
+) => ({
+  tableName: table.tableName,
+  id,
+  parseError: error.message,
+});
 
 /**
  * @internal
@@ -66,23 +77,16 @@ export const decode = Function.dual<
   >
 >(
   2,
-  <Table_ extends Table.AnyWithProps>(
-    self: TableInfo.TableInfo<Table_>["convexDocument"],
-    table: Table_,
-  ): Effect.Effect<
-    TableInfo.TableInfo<Table_>["document"],
-    DocumentDecodeError
-  > =>
+  <Doc>(
+    self: IdField<string>,
+    table: Table.Any & { readonly Doc: Schema.Codec<Doc, unknown> },
+  ): Effect.Effect<Doc, DocumentDecodeError> =>
     pipe(
       self,
-      Schema.decodeUnknownEffect(table.Doc),
+      Schema.decodeEffect(table.Doc),
       Effect.catchIf(Schema.isSchemaError, (schemaError) =>
         Effect.fail(
-          DocumentDecodeError.make({
-            tableName: table.tableName,
-            id: self._id,
-            parseError: schemaError.message,
-          }),
+          DocumentDecodeError.make(errorDetails(table, self._id, schemaError)),
         ),
       ),
     ),
@@ -118,14 +122,11 @@ export const encode = Function.dual<
   > =>
     pipe(
       self,
-      Schema.encodeEffect(table.Fields),
+      Schema.encodeEffect<Table_["Fields"]>(table.Fields),
       Effect.catchIf(Schema.isSchemaError, (schemaError) =>
         Effect.fail(
-          DocumentEncodeError.make({
-            tableName: table.tableName,
-            id: self._id,
-            parseError: schemaError.message,
-          }),
+          // oxlint-disable-next-line typescript/no-unsafe-argument -- Preserve DocumentEncodeError's required ID: its constructor intentionally gets the original value and defects on insert data without _id.
+          DocumentEncodeError.make(errorDetails(table, self._id, schemaError)),
         ),
       ),
     ),

@@ -33,7 +33,7 @@ const make = (runAction: GenericActionCtx<GenericDataModel>["runAction"]) => ({
     run(
       Ref.runWithCodec(
         action,
-        (args[0] ?? {}) as Ref.Args<Action>,
+        Ref.argsOrEmpty<Action>(args),
         (functionReference, encodedArgs) =>
           runAction(functionReference, encodedArgs),
       ),

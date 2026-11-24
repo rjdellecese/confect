@@ -76,6 +76,7 @@ const registerDefinitions = (
 export const register = <Group extends GroupSpec.AnyWithProps>(
   definitions: Definitions,
 ): RegisteredFunctions.RegisteredFunctionsForGroupSpec<Group> =>
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- Generated exports retain each spec's visibility, arguments, and result; the recursive runtime walk preserves the names but TypeScript forgets them.
   registerDefinitions(
     definitions,
   ) as RegisteredFunctions.RegisteredFunctionsForGroupSpec<Group>;
@@ -93,13 +94,12 @@ export const buildForGroup = <Group extends GroupSpec.AnyWithProps>(
 ): ForGroup<Group> => {
   const { functionRegistryItems, middlewareRegistryItems } =
     GroupRegistry.make(groupLayer);
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- The finalized group's registry mirrors its spec; generated handlers require the exact mapped leaf types, not a dictionary of all function kinds.
   return mapLeaves<
     FunctionRegistryItem.AnyWithProps,
     RegisteredConvexFunction.Definition
   >(
-    functionRegistryItems as {
-      [key: string]: FunctionRegistryItem.AnyWithProps;
-    },
+    functionRegistryItems,
     FunctionRegistryItem.isFunctionRegistryItem,
     (item) =>
       Match.value(item).pipe(

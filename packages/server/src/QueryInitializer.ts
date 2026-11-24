@@ -2,6 +2,7 @@ import type {
   OrderedQuery as ConvexOrderedQuery,
   QueryInitializer as ConvexQueryInitializer,
   DocumentByInfo,
+  GenericDocument,
   GenericTableIndexes,
   Indexes,
   IndexRange,
@@ -14,7 +15,7 @@ import type {
   SearchFilterBuilder,
   SearchIndexes,
 } from "convex/server";
-import type { GenericId } from "convex/values";
+import type { GenericId, Value } from "convex/values";
 import { identity, pipe } from "effect/Function";
 import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
@@ -277,7 +278,8 @@ export const make = <
   >,
   table: Table.WithName<Tables, TableName>,
 ): QueryInitializer<DataModel.FromTables<Tables>, TableName> => {
-  const tableName = table.tableName;
+  const named: { readonly tableName: TableName } = table;
+  const tableName = named.tableName;
   type DataModel_ = DataModel.FromTables<Tables>;
   type ConvexDataModel_ = DataModel.ToConvexDataModel<DataModel_>;
   type ThisQueryInitializer = QueryInitializer<DataModel_, TableName>;
@@ -301,17 +303,20 @@ export const make = <
     Document.DocumentDecodeError | GetByIndexFailure
   > => {
     const indexFieldPaths: GenericTableIndexes[keyof GenericTableIndexes] =
-      table.indexes[indexName as keyof GenericTableIndexes];
+      table.indexes[String(indexName)];
 
     return pipe(
       Effect.promise(() =>
         convexDatabaseReader
           .query(tableName)
           .withIndex(indexName, (q) =>
-            Array.reduce(
-              indexFieldValues,
-              q,
-              (q_, v, i) => q_.eq(indexFieldPaths[i] as any, v as any) as any,
+            Array.reduce(indexFieldValues, q as IndexRange, (range, value, i) =>
+              // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- Convex's tuple-indexed builder changes type after each eq; another remaining equality field proves the current range still supports eq.
+              (range as IndexRangeBuilder<GenericDocument, Array<string>>).eq(
+                indexFieldPaths[i],
+                // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- get types these stored values positionally against the selected index. Iterating the field tuple loses that evidence, but performs no decoding.
+                value as Value,
+              ),
             ),
           )
           .unique(),
@@ -321,7 +326,7 @@ export const make = <
           Result.fromNullishOr(value, () =>
             GetByIndexFailure.make({
               tableName,
-              indexName: indexName as string,
+              indexName: String(indexName),
               indexFieldValues,
             }),
           ),
@@ -331,10 +336,12 @@ export const make = <
     );
   };
 
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- get promises distinct typed failures for ID and index lookups. One variadic implementation dispatches between those overloads by arity.
   const get: QueryInitializerFunction<"get"> = ((
     ...args: Parameters<QueryInitializerFunction<"get">>
   ) => {
     if (args.length === 1) {
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- A single argument is the ID lookup overload; Parameters of the overloaded get exposes only its final index signature.
       const id = args[0] as GenericId<TableName>;
 
       return getById<Tables, TableName>(convexDatabaseReader, table)(id);
@@ -411,11 +418,15 @@ export const make = <
     return OrderedQuery.make(orderedQuery, table);
   };
 
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- The public overloads retain literal order and the unconsumed index-field tuple. The reflection builder constructs precisely that range at runtime.
   const stream: QueryInitializerFunction<"stream"> = ((
     indexName: string,
     indexRangeOrOrder?:
       | ((
-          q: QueryStreamIndexRange.Builder<any, any>,
+          q: QueryStreamIndexRange.Builder<
+            GenericDocument,
+            ReadonlyArray<string>
+          >,
         ) => QueryStreamIndexRange.QueryStreamIndexRange)
       | OrderDirection,
     maybeOrder?: OrderDirection,
@@ -501,9 +512,10 @@ export const getById =
       Effect.promise(() => convexDatabaseReader.get(id)),
       Effect.andThen((value) =>
         Effect.fromResult(
-          Result.fromNullishOr(value, () =>
-            GetByIdFailure.make({ tableName: table.tableName, id }),
-          ),
+          Result.fromNullishOr(value, () => {
+            const bound: Table.Any = table;
+            return GetByIdFailure.make({ tableName: bound.tableName, id });
+          }),
         ),
       ),
       Effect.andThen(Document.decode(table)),

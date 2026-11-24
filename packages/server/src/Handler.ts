@@ -207,6 +207,7 @@ export type Any = AnyConfectProvenance | AnyConvexProvenance;
 /**
  * @internal
  */
+// oxlint-disable-next-line typescript/no-explicit-any -- A registered handler may require its own middleware-provided services as well as its runtime's services; no one R describes all permitted implementations.
 export type AnyConfectProvenance = Base<FunctionSpec.AnyConfect, any>;
 
 /**

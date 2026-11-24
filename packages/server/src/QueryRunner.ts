@@ -133,6 +133,7 @@ const make = (
   > {
     return run(
       Effect.gen(function* () {
+        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- The public overload permits omitted args only for a keyless ref. Its conditional tuple is no longer available beside the transaction options here.
         const actualArgs = (args ?? {}) as Ref.Args<Query>;
         if (options?.useStaleSnapshot !== undefined) {
           const controls =

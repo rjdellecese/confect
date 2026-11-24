@@ -151,8 +151,10 @@ export interface NativeReader<Model extends GenericDataModel> {
 export const make = <Model extends GenericDataModel>(
   convexDatabaseReader: GenericDatabaseReader<Model>,
 ): NativeReader<Model> =>
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- The reader's public result distributes over matching table handles and exposes only indexes shared by a union; the native builder cannot express that conditional return.
   ({
     table: (table) => {
+      // oxlint-disable-next-line typescript/no-explicit-any -- The handle selects the matching application or system reader. Convex models are invariant in index ranges; treating either as GenericDataModel would admit invalid indexes.
       const reader: BaseDatabaseReader<any> = Record.has<string, unknown>(
         Table.systemTables,
         table.tableName,
@@ -221,5 +223,6 @@ export const layer = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
 ) =>
   Layer.succeed(
     DatabaseReader<DatabaseSchema_>(),
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- The generated service uses this exact schema's model; rebuilding table types from the native reader loses the schema's named document identities.
     make(convexDatabaseReader) as DatabaseReaderService<DatabaseSchema_>,
   );

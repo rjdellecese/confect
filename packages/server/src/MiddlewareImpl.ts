@@ -306,6 +306,7 @@ const sharedLayer = <Spec extends MiddlewareSpec.AnyMiddlewareSpec, R>(
           (functionType) => middlewareSpec.functionTypes[functionType],
         ),
         (functionType) =>
+          // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- make checks this spec's exact options and services before registration; resolve pairs the erased wrapper with the same spec and validated options.
           [functionType, impl as MiddlewareSpec.AnyMiddlewareImpl] as const,
       ),
     ),

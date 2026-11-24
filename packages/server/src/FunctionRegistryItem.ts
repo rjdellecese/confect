@@ -1,3 +1,4 @@
+import { fromPrototype } from "./internal/fromPrototype";
 import type * as MiddlewareAttachment from "@confect/core/MiddlewareAttachment";
 import type * as FunctionSpec from "@confect/core/FunctionSpec";
 import * as Lazy from "@confect/core/Lazy";
@@ -28,7 +29,7 @@ export const isFunctionRegistryItem = (value: unknown): value is AnyWithProps =>
 
 const FunctionRegistryItemProto = {
   [TypeId]: TypeId,
-};
+} satisfies Pick<AnyWithProps, TypeId>;
 
 /**
  * A function registered by `FunctionImpl.make`, one of two shapes keyed by the
@@ -51,7 +52,7 @@ export interface ConfectFunctionRegistryItem {
   readonly functionType: FunctionType;
   readonly args: Schema.Codec<unknown, DefaultFunctionArgs>;
   readonly returns: Schema.Codec<unknown>;
-  readonly error?: Schema.Codec<any, any>;
+  readonly error?: Schema.Codec<unknown>;
   readonly middlewareAttachments: ReadonlyArray<MiddlewareAttachment.MiddlewareAttachment>;
   readonly handler: Handler.AnyConfectProvenance;
 }
@@ -79,13 +80,14 @@ export const make = ({
 }): AnyWithProps =>
   Match.value(functionSpec.functionProvenance).pipe(
     Match.tag("Convex", (): AnyWithProps =>
-      Object.assign(Object.create(FunctionRegistryItemProto), {
+      Object.assign(fromPrototype(FunctionRegistryItemProto), {
         _tag: "Convex" as const,
+        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- FunctionImpl.make pairs the native handler with its Convex spec; narrowing provenance cannot narrow the separately stored handler.
         handler: handler as Handler.AnyConvexProvenance,
       }),
     ),
     Match.tag("Confect", (provenance): AnyWithProps => {
-      const item = Object.assign(Object.create(FunctionRegistryItemProto), {
+      const item = Object.assign(fromPrototype(FunctionRegistryItemProto), {
         _tag: "Confect" as const,
         name: functionSpec.name,
         functionVisibility: functionSpec.functionVisibility,
@@ -94,6 +96,7 @@ export const make = ({
           ...groupMiddlewareAttachments,
           ...functionSpec.middlewareAttachments,
         ],
+        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- FunctionImpl.make pairs this Effect handler with its Confect spec; narrowing provenance cannot narrow the separately stored handler.
         handler: handler as Handler.AnyConfectProvenance,
       });
 
@@ -103,7 +106,7 @@ export const make = ({
         Lazy.defineProperty(item, "error", () => provenance.error);
       }
 
-      return item as AnyWithProps;
+      return item;
     }),
     Match.exhaustive,
   );

@@ -176,6 +176,7 @@ export const make = <const AppTableName extends string>(
           Struct.keys(Table.systemTables),
         )) {
           if (isIdForTable(table, input)) {
+            // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- identify returns a discriminated union: the preceding successful check brands this very ID with this very table, a correlation the loop cannot express.
             return Option.some({
               table,
               id: input,

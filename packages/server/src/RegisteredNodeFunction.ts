@@ -38,10 +38,9 @@ export const buildForGroup = <Group extends GroupSpec.AnyWithProps>(
 ): RegisteredFunctions.RegisteredFunctionsForGroupSpec<Group> => {
   const { functionRegistryItems, middlewareRegistryItems } =
     GroupRegistry.make(groupLayer);
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- Generated Node exports keep each declared action's own signature; walking the finalized registry preserves its keys without retaining their literal types.
   return mapLeaves<FunctionRegistryItem.AnyWithProps, RegisteredFunction.Any>(
-    functionRegistryItems as {
-      [key: string]: FunctionRegistryItem.AnyWithProps;
-    },
+    functionRegistryItems,
     FunctionRegistryItem.isFunctionRegistryItem,
     (item) =>
       Match.value(item).pipe(
@@ -104,7 +103,7 @@ const nodeActionFunction = <
   functionVisibility: FunctionVisibility;
   args: Schema.Codec<Args, ConvexArgs>;
   returns: Schema.Codec<Returns, ConvexReturns>;
-  error: Schema.Codec<any, any> | undefined;
+  error: Schema.Codec<unknown> | undefined;
   handler: (
     a: Args,
   ) => Effect.Effect<
