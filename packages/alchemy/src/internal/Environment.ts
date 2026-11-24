@@ -235,7 +235,7 @@ export const environment = Effect.gen(function* () {
       const live = needsRead
         ? yield* (
             deployment?.list ??
-              client.listEnvironmentVariables(target.url, news.deployKey)
+            client.listEnvironmentVariables(target.url, news.deployKey)
           )
         : {};
       let basis = output;
