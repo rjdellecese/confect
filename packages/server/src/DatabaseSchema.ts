@@ -25,11 +25,22 @@ export const isDatabaseSchema = (u: unknown): u is Any =>
   Predicate.hasProperty(u, TypeId);
 
 /**
- * A schema definition holding a record of bound `Table`s keyed by table name.
- * Codegen emits a single static `DatabaseSchema.make({ ... })` call; laziness
- * lives entirely on each `Table` (its `Fields` and `Doc` are lazy memoised
- * getters), so this layer is a plain record indirection with no module-loading
- * or async machinery.
+ * Registry of bound application tables, default-exported from
+ * `_generated/schema`. Assembling it does not evaluate table codecs or
+ * construct Convex deployment validators.
+ *
+ * For an application-wide annotation, use `typeof schema` with a type-only
+ * default import from `confect/_generated/schema`. Use an explicit table record
+ * when describing a subset.
+ *
+ * **Gotchas**
+ *
+ * A value import loads every application table module. Use a type-only import
+ * for a model annotation and import individual handles from
+ * `_generated/tables/<name>` in handlers. `_generated/convexSchema` supplies
+ * the separate Convex schema for deployment and test setup.
+ *
+ * @category Models
  */
 export interface DatabaseSchema<
   Tables_ extends Readonly<Record<string, Table.AnyWithProps>> = {},
@@ -62,7 +73,21 @@ export type Tables<DatabaseSchema_ extends AnyWithProps> =
   DatabaseSchema_[TypeId][keyof DatabaseSchema_[TypeId]];
 
 /**
- * The bound table record, without evaluating any table schemas.
+ * Returns the registry's bound application tables by name without evaluating
+ * their codecs.
+ *
+ * **When to use**
+ *
+ * Use when inspecting the handles for all application tables. For a list of
+ * names alone, default-import `_generated/tableNames` to avoid loading the
+ * table modules.
+ *
+ * @category Getters
+ *
+ * @param self - The application registry from `_generated/schema`.
+ *
+ * @returns A readonly record keyed by application table name. The system tables
+ *   are not part of this record.
  */
 export const tables = <DatabaseSchema_ extends AnyWithProps>(
   self: DatabaseSchema_,
@@ -97,9 +122,9 @@ export type TableWithName<
 > = Extract<Tables<DatabaseSchema_>, { readonly tableName: TableName }>;
 
 /**
- * Construct a database schema from its bound table record. The record's keys
- * must match their tables' names. Table schemas remain lazy; construction only
- * stores the record. The empty case is `make({})`.
+ * Builds the registry exported by codegen without evaluating table codecs. For
+ * the application registry, default-import `confect/_generated/schema` rather
+ * than constructing it directly.
  *
  * @internal
  */

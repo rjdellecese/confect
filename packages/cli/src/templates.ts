@@ -29,6 +29,17 @@ const schemaEffect = Effect.fnUntraced(function* ({
 }) {
   const cbw = new CodeBlockWriter({ indentNumberOfSpaces: 2 });
 
+  yield* cbw.writeLine(`/**
+ * Deployment schema that the Convex CLI and \`convex-test\` read from
+ * \`convex/schema.ts\`.
+ *
+ * **Gotchas**
+ *
+ * Importing this schema constructs validators for every application table. Keep
+ * it out of function runtime code.
+ *
+ * @category Schemas
+ */`);
   yield* cbw.writeLine(`export { default } from "${convexSchemaImportPath}";`);
 
   return yield* cbw.toString();
@@ -71,6 +82,17 @@ const runtimeSchemaEffect = Effect.fnUntraced(function* ({
 
   yield* cbw.blankLine();
 
+  yield* cbw.writeLine(`/**
+ * Registry of all application table handles. Import its type when a service or
+ * helper needs the full database model.
+ *
+ * **Gotchas**
+ *
+ * A value import loads every table module. In handlers, import individual handles
+ * from \`_generated/tables\` instead.
+ *
+ * @category schemas
+ */`);
   if (tableModules.length === 0) {
     yield* cbw.writeLine(
       `const databaseSchema: DatabaseSchema_.DatabaseSchema = DatabaseSchema_.make({});`,
@@ -141,6 +163,17 @@ const convexSchemaEffect = Effect.fnUntraced(function* ({
 
   yield* cbw.blankLine();
 
+  yield* cbw.writeLine(`/**
+ * Convex schema containing the validators and indexes for every application table.
+ * Use it for deployment or pass it to the test backend.
+ *
+ * **Gotchas**
+ *
+ * Importing this module constructs every table's deployment definition. Import
+ * individual handles from \`_generated/tables\` in function implementations.
+ *
+ * @category schemas
+ */`);
   if (tableModules.length === 0) {
     yield* cbw.writeLine(`export default defineSchema_({});`);
   } else {
@@ -161,7 +194,13 @@ const convexSchemaEffect = Effect.fnUntraced(function* ({
 });
 
 export const tableNames = (names: ReadonlyArray<string>) =>
-  `export default [${Array.join(
+  `/**
+ * Names of the application's declared tables, excluding Convex system tables. Use
+ * this list in test setup to supply table names without importing their schemas.
+ *
+ * @category constants
+ */
+export default [${Array.join(
     Array.map(names, (name) => `"${name}"`),
     ", ",
   )}] as const;\n`;
@@ -170,8 +209,30 @@ export const serverBuilders = `import * as FunctionImpl_ from "@confect/server/F
 import * as MiddlewareImpl_ from "@confect/server/MiddlewareImpl";
 import type schema from "./schema";
 
+/**
+ * Builders for a group's implementation layer. Start with
+ * \`GroupImpl.make(groupSpec)\`, provide the function and middleware layers, then
+ * call \`GroupImpl.finalize\` to check completeness.
+ *
+ * @category re-exports
+ */
 export * as GroupImpl from "@confect/server/GroupImpl";
+/**
+ * Builder for a function implementation layer. Pass the group spec, function name,
+ * and handler to \`FunctionImpl.make\`. The handler receives decoded arguments and
+ * services typed to this application's database.
+ *
+ * @category constructors
+ */
 export const FunctionImpl = FunctionImpl_.forSchema<typeof schema>();
+/**
+ * Builders for middleware implementation layers typed to this application's
+ * database. Use \`make\` to share an implementation, \`makeByFunctionType\` for
+ * distinct handlers, or \`provides\` to supply the service declared by the
+ * middleware spec.
+ *
+ * @category constructors
+ */
 export const MiddlewareImpl = MiddlewareImpl_.forSchema<typeof schema>();
 `;
 
@@ -189,10 +250,35 @@ export const id = `import * as GenericId from "@confect/core/GenericId";
 import type { SystemTableNames } from "convex/server";
 import type tableNames from "./tableNames.js";
 
+/**
+ * Union of application table names, excluding Convex system tables. If the
+ * application declares no tables, the type is \`never\`.
+ *
+ * @category models
+ */
 export type TableNames = (typeof tableNames)[number];
 
+/**
+ * Convex document ID branded with its application or system table name. The brand
+ * distinguishes IDs in TypeScript; it does not prove a document exists.
+ *
+ * @category models
+ */
 export type Id<TableName extends TableNames | SystemTableNames> = GenericId.GenericId<TableName>;
 
+/**
+ * Creates an Effect schema for a table's document IDs without importing the table.
+ *
+ * **Gotchas**
+ *
+ * Decoding accepts any string. It does not check the ID's format, table
+ * membership, or existence. Use the generated \`DocumentIds\` service in queries or
+ * mutations to validate table membership.
+ *
+ * @param tableName - An application or Convex system table name.
+ * @returns A schema whose decoded and encoded types are \`Id<TableName>\`.
+ * @category schemas
+ */
 export const Id = <const TableName extends TableNames | SystemTableNames>(
   tableName: TableName,
 ) => GenericId.GenericId(tableName);
@@ -221,6 +307,18 @@ const tableWrapperEffect = Effect.fnUntraced(function* ({
 
   yield* cbw.writeLine(`import ${tableName}Table from "${unnamedImportPath}";`);
   yield* cbw.blankLine();
+  yield* cbw.writeLine(`/**
+ * Table handle for \`${tableName}\`. Pass it to \`reader.table\` or \`writer.table\` to
+ * select this table without loading other application tables.
+ *
+ * **Details**
+ *
+ * \`Fields\` describes the user-defined fields; \`Doc\` also includes \`_id\` and
+ * \`_creationTime\`. Importing the handle does not evaluate its field-schema
+ * callback.
+ *
+ * @category schemas
+ */`);
   yield* cbw.writeLine(`export default ${tableName}Table("${tableName}");`);
 
   return yield* cbw.toString();
@@ -238,6 +336,13 @@ const httpEffect = Effect.fnUntraced(function* ({
 
   yield* cbw.writeLine(`import http from "${httpImportPath}";`);
   yield* cbw.newLine();
+  yield* cbw.writeLine(
+    `/**
+ * HTTP router that registers the application's HTTP routes with Convex.
+ *
+ * @category Configuration
+ */`,
+  );
   yield* cbw.writeLine(`export default http;`);
 
   return yield* cbw.toString();
@@ -255,6 +360,14 @@ const cronsEffect = Effect.fnUntraced(function* ({
 
   yield* cbw.writeLine(`import crons from "${cronsImportPath}";`);
   yield* cbw.newLine();
+  yield* cbw.writeLine(
+    `/**
+ * Cron jobs that Convex runs according to the application's recurring
+ * schedules.
+ *
+ * @category Configuration
+ */`,
+  );
   yield* cbw.writeLine(`export default crons.convexCronJobs;`);
 
   return yield* cbw.toString();
@@ -274,6 +387,14 @@ const authConfigEffect = Effect.fnUntraced(function* ({
 
   yield* cbw.writeLine(`import auth from "${authImportPath}";`);
   yield* cbw.newLine();
+  yield* cbw.writeLine(
+    `/**
+ * Authentication provider configuration that Convex uses to verify caller
+ * identities.
+ *
+ * @category Configuration
+ */`,
+  );
   yield* cbw.writeLine(`export default auth;`);
 
   return yield* cbw.toString();
@@ -309,6 +430,14 @@ const componentsEffect = Effect.fnUntraced(function* ({
   yield* cbw.writeLine(`import { componentsGeneric } from "convex/server";`);
   yield* cbw.blankLine();
 
+  yield* cbw.writeLine(
+    `/**
+ * Map from installed component names to their typed \`ComponentApi\` function
+ * references.
+ *
+ * @category models
+ */`,
+  );
   if (installedComponents.length === 0) {
     yield* cbw.writeLine(`export type Components = {};`);
   } else {
@@ -327,6 +456,20 @@ const componentsEffect = Effect.fnUntraced(function* ({
   }
   yield* cbw.blankLine();
 
+  yield* cbw.writeLine(
+    `/**
+ * Function references for the components installed with \`app.use\` in
+ * \`convex/convex.config.ts\`. Select a component by its installed name, then pass a
+ * reference to a Convex component API or native context.
+ *
+ * **Details**
+ *
+ * The registry is available before Convex code generation. Reading a reference
+ * does not invoke the component function.
+ *
+ * @category references
+ */`,
+  );
   yield* cbw.writeLine(
     `export const components: Components = componentsGeneric() as any;`,
   );
@@ -347,6 +490,25 @@ const refsEffect = Effect.fnUntraced(function* ({
   yield* cbw.writeLine(`import { Refs } from "@confect/core";`);
   yield* cbw.writeLine(`import spec from "${specImportPath}";`);
   yield* cbw.blankLine();
+  yield* cbw.writeLine(`/**
+ * Typed function references grouped by path and function name. Pass a leaf
+ * reference to a Confect client, runner, or scheduler rather than calling it
+ * directly.
+ *
+ * **Details**
+ *
+ * The \`public\` view exposes client-callable references and \`internal\` exposes
+ * server-only references. Each view omits groups with no matching functions.
+ * Each Confect reference carries its argument, result, and declared error types,
+ * including errors from attached middleware. Codecs are evaluated lazily.
+ *
+ * **Gotchas**
+ *
+ * Both views share one tree at runtime. Convex enforces visibility on the
+ * deployed functions.
+ *
+ * @category references
+ */`);
   yield* cbw.writeLine(
     `const refs: Refs.FromSpec<typeof spec> = Refs.make(spec);`,
   );
@@ -386,6 +548,14 @@ const docsEffect = Effect.fnUntraced(function* ({
   // With no tables there is nothing to import—emitting the (unused) imports
   // would trip `noUnusedLocals`.
   if (tables.length === 0) {
+    yield* cbw.writeLine(
+      `/**
+ * Map from application table names to decoded document types. It has no entries
+ * because the application declares no tables.
+ *
+ * @category models
+ */`,
+    );
     yield* cbw.writeLine(`export interface Docs {}`);
     return yield* cbw.toString();
   }
@@ -398,11 +568,27 @@ const docsEffect = Effect.fnUntraced(function* ({
 
   for (const { tableName, docName } of tables) {
     yield* cbw.writeLine(
+      `/**
+ * Decoded document from \`${tableName}\`, including the system fields \`_id\` and
+ * \`_creationTime\`.
+ *
+ * @category models
+ */`,
+    );
+    yield* cbw.writeLine(
       `export type ${docName} = Document.Document<typeof schemaDefinition, "${tableName}">;`,
     );
   }
   yield* cbw.blankLine();
 
+  yield* cbw.writeLine(
+    `/**
+ * Map from application table names to the decoded document types returned by the
+ * database services. System tables are not included.
+ *
+ * @category models
+ */`,
+  );
   yield* cbw.writeLine(`export interface Docs {`);
   yield* cbw.indent(
     Effect.gen(function* () {
@@ -484,13 +670,21 @@ const registeredFunctionsForGroupEffect = Effect.fnUntraced(function* ({
   // per-function bundle. Typing from the leaf spec (not the project-wide assembled spec)
   // keeps the registry's type dependent solely on its own group.
   const specType = `typeof import("${specImportPath}")["default"]`;
+  const registrationDoc = `/**
+ * Registration tree consumed by the generated Convex entry point. Implement
+ * handlers with \`FunctionImpl.make\` from \`confect/_generated/server\`. To invoke
+ * a function, pass a leaf from \`confect/_generated/refs\` to a client or runner
+ * rather than importing this tree.
+ *
+ * @internal
+ */`;
   if (useNode) {
     yield* cbw.writeLine(
-      `export default RegisteredNodeFunction.buildForGroup<${specType}>(groupLayer);`,
+      `${registrationDoc}\nexport default RegisteredNodeFunction.buildForGroup<${specType}>(groupLayer);`,
     );
   } else if (!forwarding) {
     yield* cbw.writeLine(
-      `export default RegisteredFunctions.buildForGroup<${specType}>([], groupLayer);`,
+      `${registrationDoc}\nexport default RegisteredFunctions.buildForGroup<${specType}>([], groupLayer);`,
     );
   } else {
     const JsonString = Schema.fromJsonString(Schema.String);
@@ -538,6 +732,7 @@ const registeredFunctionsForGroupEffect = Effect.fnUntraced(function* ({
 
 const definitions = ConvexFunctionDefinitions.buildForGroup<${specType}>(${usesTableNames ? "tableNames" : "[]"}, groupLayer);
 
+${registrationDoc}
 export default ${registered} as RegisteredFunctions.RegisteredFunctionsForGroupSpec<${specType}>;`);
   }
 
@@ -597,79 +792,222 @@ const servicesEffect = Effect.fnUntraced(function* ({
   yield* cbw.blankLine();
 
   // Auth
+  yield* cbw.writeLine(`/**
+ * Service tag for reading the caller's identity in queries, mutations, actions,
+ * and HTTP handlers. The service's \`getUserIdentity\` Effect fails with
+ * \`NoUserIdentityFoundError\` when the caller is unauthenticated.
+ *
+ * @category tags
+ */`);
   yield* cbw.writeLine("export const Auth = Auth_.Auth;");
+  yield* cbw.writeLine(`/**
+ * Effect environment requirement for {@link Auth}.
+ *
+ * @category context
+ */`);
   yield* cbw.writeLine("export type Auth = typeof Auth.Identifier;");
   yield* cbw.blankLine();
 
+  yield* cbw.writeLine(`/**
+ * Service tag for signing deployment JWTs in mutations. Pass \`SignJwtOptions\` to
+ * the service's \`signJwt\` method; signing failures are defects.
+ *
+ * @category tags
+ */`);
   yield* cbw.writeLine(
     "export const MutationAuth = MutationAuth_.MutationAuth;",
   );
+  yield* cbw.writeLine(`/**
+ * Effect environment requirement for {@link MutationAuth}.
+ *
+ * @category context
+ */`);
   yield* cbw.writeLine(
     "export type MutationAuth = typeof MutationAuth.Identifier;",
   );
   yield* cbw.blankLine();
 
+  yield* cbw.writeLine(`/**
+ * Service tag for reading function and deployment metadata in queries, mutations,
+ * actions, and HTTP handlers.
+ *
+ * @category tags
+ */`);
   yield* cbw.writeLine(
     "export const ExecutionMetadata = ExecutionMetadata_.ExecutionMetadata;",
   );
+  yield* cbw.writeLine(`/**
+ * Effect environment requirement for {@link ExecutionMetadata}.
+ *
+ * @category context
+ */`);
   yield* cbw.writeLine(
     "export type ExecutionMetadata = typeof ExecutionMetadata.Identifier;",
   );
   yield* cbw.blankLine();
 
+  yield* cbw.writeLine(`/**
+ * Service tag for reading metadata about the current request in mutations,
+ * actions, and HTTP handlers. Queries do not provide request metadata.
+ *
+ * @category tags
+ */`);
   yield* cbw.writeLine(
     "export const RequestMetadata = RequestMetadata_.RequestMetadata;",
   );
+  yield* cbw.writeLine(`/**
+ * Effect environment requirement for {@link RequestMetadata}.
+ *
+ * @category context
+ */`);
   yield* cbw.writeLine(
     "export type RequestMetadata = typeof RequestMetadata.Identifier;",
   );
   yield* cbw.blankLine();
 
+  yield* cbw.writeLine(`/**
+ * Service tag for reading transaction metrics and the snapshot timestamp in
+ * queries and mutations.
+ *
+ * @category tags
+ */`);
   yield* cbw.writeLine(
     "export const TransactionMetadata = TransactionMetadata_.TransactionMetadata;",
   );
+  yield* cbw.writeLine(`/**
+ * Effect environment requirement for {@link TransactionMetadata}.
+ *
+ * @category context
+ */`);
   yield* cbw.writeLine(
     "export type TransactionMetadata = typeof TransactionMetadata.Identifier;",
   );
   yield* cbw.blankLine();
 
   // Scheduler
+  yield* cbw.writeLine(`/**
+ * Service tag for scheduling mutations and actions from mutations, actions, and
+ * HTTP handlers. Schedule a reference after an Effect \`Duration\` or at a
+ * \`DateTime\`; use the returned scheduled-function ID to cancel the job.
+ *
+ * **Gotchas**
+ *
+ * Argument encoding can throw before the scheduling method returns an Effect.
+ *
+ * @category tags
+ */`);
   yield* cbw.writeLine("export const Scheduler = Scheduler_.Scheduler;");
+  yield* cbw.writeLine(`/**
+ * Effect environment requirement for {@link Scheduler}.
+ *
+ * @category context
+ */`);
   yield* cbw.writeLine("export type Scheduler = typeof Scheduler.Identifier;");
   yield* cbw.blankLine();
 
+  yield* cbw.writeLine(`/**
+ * Service tag for working with files in Convex storage. Queries, mutations,
+ * actions, and HTTP handlers can resolve a storage ID to a URL; a missing file
+ * fails with \`BlobNotFoundError\`.
+ *
+ * **Details**
+ *
+ * Upload URL generation and deletion require {@link StorageWriter}. Reading and
+ * storing blobs require {@link StorageActionWriter}. Mutations, actions, and HTTP
+ * handlers provide both writer services.
+ *
+ * @category tags
+ */`);
   yield* cbw.writeLine("export const Storage = Storage_.Storage;");
+  yield* cbw.writeLine(`/**
+ * Effect environment requirement for {@link Storage}.
+ *
+ * @category context
+ */`);
   yield* cbw.writeLine("export type Storage = typeof Storage.Identifier;");
   yield* cbw.blankLine();
 
   // StorageReader
+  yield* cbw.writeLine(`/**
+ * Compatibility tag for resolving storage IDs to URLs in queries, mutations,
+ * actions, and HTTP handlers. A missing file fails with \`BlobNotFoundError\`.
+ *
+ * @see {@link Storage} for the storage API recommended for new code.
+ * @category tags
+ */`);
   yield* cbw.writeLine(
     "export const StorageReader = StorageReader_.StorageReader;",
   );
+  yield* cbw.writeLine(`/**
+ * Compatibility environment requirement for {@link StorageReader}; use
+ * {@link Storage} in new code.
+ *
+ * @category context
+ */`);
   yield* cbw.writeLine(
     "export type StorageReader = typeof StorageReader.Identifier;",
   );
   yield* cbw.blankLine();
 
   // StorageWriter
+  yield* cbw.writeLine(`/**
+ * Compatibility tag for generating upload URLs and deleting stored files in
+ * mutations, actions, and HTTP handlers. The service reports deletion failures as
+ * \`BlobNotFoundError\`.
+ *
+ * @see {@link Storage} for the storage API recommended for new code.
+ * @category tags
+ */`);
   yield* cbw.writeLine(
     "export const StorageWriter = StorageWriter_.StorageWriter;",
   );
+  yield* cbw.writeLine(`/**
+ * Compatibility environment requirement for {@link StorageWriter}; use
+ * {@link Storage} in new code.
+ *
+ * @category context
+ */`);
   yield* cbw.writeLine(
     "export type StorageWriter = typeof StorageWriter.Identifier;",
   );
   yield* cbw.blankLine();
 
   // StorageActionWriter
+  yield* cbw.writeLine(`/**
+ * Compatibility tag for reading and storing blobs in mutations, actions, and HTTP
+ * handlers. A missing blob fails with \`BlobNotFoundError\`; storing a blob accepts
+ * an optional SHA-256 checksum and returns a storage ID.
+ *
+ * @see {@link Storage} for the storage API recommended for new code.
+ * @category tags
+ */`);
   yield* cbw.writeLine(
     "export const StorageActionWriter = StorageActionWriter_.StorageActionWriter;",
   );
+  yield* cbw.writeLine(`/**
+ * Compatibility environment requirement for {@link StorageActionWriter}; use
+ * {@link Storage} in new code.
+ *
+ * @category context
+ */`);
   yield* cbw.writeLine(
     "export type StorageActionWriter = typeof StorageActionWriter.Identifier;",
   );
   yield* cbw.blankLine();
 
   // VectorSearch
+  yield* cbw.writeLine(`/**
+ * Service tag for searching a table's vector index from actions or a schema-typed
+ * HTTP router. Call the service with the table name, index, and search options to
+ * get ranked document IDs and scores.
+ *
+ * **Gotchas**
+ *
+ * Results do not contain decoded documents. A Convex search failure is a defect.
+ *
+ * @public
+ * @category tags
+ */`);
   yield* cbw.writeLine(
     "export const VectorSearch: VectorSearch_.VectorSearchTag<",
   );
@@ -679,20 +1017,58 @@ const servicesEffect = Effect.fnUntraced(function* ({
   yield* cbw.writeLine(
     "> = VectorSearch_.VectorSearch<DataModel.FromDatabaseSchema<typeof schemaDefinition>>();",
   );
+  yield* cbw.writeLine(`/**
+ * Effect environment requirement for {@link VectorSearch}.
+ *
+ * @public
+ * @category context
+ */`);
   yield* cbw.writeLine(
     "export type VectorSearch = typeof VectorSearch.Identifier;",
   );
   yield* cbw.blankLine();
 
+  yield* cbw.writeLine(`/**
+ * Service tag for validating document IDs in queries and mutations. Use \`parse\` to
+ * check a string against one table or \`identify\` to find its table among the
+ * application's tables and Convex's system tables.
+ *
+ * **Gotchas**
+ *
+ * Both methods return \`None\` for an invalid ID. A match does not prove a document
+ * exists.
+ *
+ * @public
+ * @category tags
+ */`);
   yield* cbw.writeLine(
     "export const DocumentIds: DocumentIds_.DocumentIdsTag<typeof schemaDefinition> = DocumentIds_.DocumentIds<typeof schemaDefinition>();",
   );
+  yield* cbw.writeLine(`/**
+ * Effect environment requirement for {@link DocumentIds}.
+ *
+ * @public
+ * @category context
+ */`);
   yield* cbw.writeLine(
     "export type DocumentIds = typeof DocumentIds.Identifier;",
   );
   yield* cbw.blankLine();
 
   // DatabaseReader
+  yield* cbw.writeLine(`/**
+ * Service tag for reading decoded documents in queries and mutations. Pass a
+ * generated application table handle or a system table handle to \`reader.table\`.
+ *
+ * **Gotchas**
+ *
+ * A decoding failure is a typed \`DocumentDecodeError\`. Looking up a missing
+ * document with \`get(id)\` fails with \`GetByIdFailure\` rather than returning an
+ * empty result.
+ *
+ * @public
+ * @category tags
+ */`);
   yield* cbw.writeLine(
     "export const DatabaseReader: DatabaseReader_.DatabaseReaderTag<",
   );
@@ -705,12 +1081,27 @@ const servicesEffect = Effect.fnUntraced(function* ({
   yield* cbw.writeLine(
     "> = DatabaseReader_.DatabaseReader<typeof schemaDefinition, Docs>();",
   );
+  yield* cbw.writeLine(`/**
+ * Effect environment requirement for {@link DatabaseReader}.
+ *
+ * @public
+ * @category context
+ */`);
   yield* cbw.writeLine(
     "export type DatabaseReader = typeof DatabaseReader.Identifier;",
   );
   yield* cbw.blankLine();
 
   // DatabaseWriter
+  yield* cbw.writeLine(`/**
+ * Service tag for writing documents in mutations. Pass a generated application
+ * table handle to \`writer.table\` to insert, patch, replace, or delete documents.
+ * Inserts, patches, and replacements encode values through the table schema.
+ *
+ * @see {@link DatabaseReader} for reading application and system tables.
+ * @public
+ * @category tags
+ */`);
   yield* cbw.writeLine(
     "export const DatabaseWriter: DatabaseWriter_.DatabaseWriterTag<",
   );
@@ -723,52 +1114,133 @@ const servicesEffect = Effect.fnUntraced(function* ({
   yield* cbw.writeLine(
     "> = DatabaseWriter_.DatabaseWriter<typeof schemaDefinition, Docs>();",
   );
+  yield* cbw.writeLine(`/**
+ * Effect environment requirement for {@link DatabaseWriter}.
+ *
+ * @public
+ * @category context
+ */`);
   yield* cbw.writeLine(
     "export type DatabaseWriter = typeof DatabaseWriter.Identifier;",
   );
   yield* cbw.blankLine();
 
+  yield* cbw.writeLine(`/**
+ * Capability used by generated runners. Instead of yielding this tag, pass
+ * transactionLimits to runQuery on the yielded QueryRunner in a query or mutation.
+ * @internal
+ */`);
   yield* cbw.writeLine(
     "export const QueryTransactionContext = QueryTransactionContext_.QueryTransactionContext;",
   );
+  yield* cbw.writeLine(`/**
+ * Internal requirement of runQuery with transactionLimits. Use the QueryRunner
+ * from this module rather than importing the capability type.
+ * @internal
+ */`);
   yield* cbw.writeLine(
     "export type QueryTransactionContext = typeof QueryTransactionContext.Identifier;",
   );
   yield* cbw.blankLine();
+  yield* cbw.writeLine(`/**
+ * Capability used by generated runners in mutations. Instead of yielding this
+ * tag, use runQuery with useStaleSnapshot or runMutation with transactionLimits
+ * on the yielded QueryRunner or MutationRunner.
+ * @internal
+ */`);
   yield* cbw.writeLine(
     "export const MutationTransactionContext = MutationTransactionContext_.MutationTransactionContext;",
   );
+  yield* cbw.writeLine(`/**
+ * Internal requirement of runner options in mutations. Use runQuery or runMutation
+ * on the yielded QueryRunner or MutationRunner rather than importing this type.
+ * @internal
+ */`);
   yield* cbw.writeLine(
     "export type MutationTransactionContext = typeof MutationTransactionContext.Identifier;",
   );
   yield* cbw.blankLine();
 
   // QueryRunner
+  yield* cbw.writeLine(`/**
+ * Service tag for calling queries from queries, mutations, actions, and HTTP
+ * handlers. Pass a query reference and decoded arguments to \`runQuery\` to get the
+ * decoded result. Declared errors and \`SchemaError\` are typed failures.
+ *
+ * **Gotchas**
+ *
+ * Transaction limits require a query or mutation context. Supplying
+ * \`useStaleSnapshot\`, even when false, requires a mutation.
+ *
+ * @category tags
+ */`);
   yield* cbw.writeLine("export const QueryRunner = QueryRunner_.QueryRunner;");
+  yield* cbw.writeLine(`/**
+ * Effect environment requirement for {@link QueryRunner}.
+ *
+ * @category context
+ */`);
   yield* cbw.writeLine(
     "export type QueryRunner = typeof QueryRunner.Identifier;",
   );
   yield* cbw.blankLine();
 
   // MutationRunner
+  yield* cbw.writeLine(`/**
+ * Service tag for calling mutations from mutations, actions, and HTTP handlers.
+ * Pass a mutation reference and decoded arguments to \`runMutation\` to get the
+ * decoded result. Declared errors and \`SchemaError\` are typed failures.
+ *
+ * **Gotchas**
+ *
+ * Transaction limits require a mutation context. Omit the options when calling
+ * from an action or HTTP handler.
+ *
+ * @category tags
+ */`);
   yield* cbw.writeLine(
     "export const MutationRunner = MutationRunner_.MutationRunner;",
   );
+  yield* cbw.writeLine(`/**
+ * Effect environment requirement for {@link MutationRunner}.
+ *
+ * @category context
+ */`);
   yield* cbw.writeLine(
     "export type MutationRunner = typeof MutationRunner.Identifier;",
   );
   yield* cbw.blankLine();
 
   // ActionRunner
+  yield* cbw.writeLine(`/**
+ * Service tag for calling actions from actions and HTTP handlers. Pass an action
+ * reference and decoded arguments to \`runAction\` to get the decoded result.
+ * Declared errors and \`SchemaError\` are typed failures.
+ *
+ * @category tags
+ */`);
   yield* cbw.writeLine(
     "export const ActionRunner = ActionRunner_.ActionRunner;",
   );
+  yield* cbw.writeLine(`/**
+ * Effect environment requirement for {@link ActionRunner}.
+ *
+ * @category context
+ */`);
   yield* cbw.writeLine(
     "export type ActionRunner = typeof ActionRunner.Identifier;",
   );
   yield* cbw.blankLine();
 
   // QueryCtx
+  yield* cbw.writeLine(`/**
+ * Service tag for the native Convex query context, typed to the application's
+ * schema and available only in queries. Native reads return encoded document
+ * values rather than Confect's decoded values.
+ *
+ * @public
+ * @category tags
+ */`);
   yield* cbw.writeLine("export const QueryCtx: QueryCtx_.QueryCtxTag<");
   yield* cbw.indent(
     cbw.writeLine(
@@ -782,10 +1254,24 @@ const servicesEffect = Effect.fnUntraced(function* ({
     ),
   );
   yield* cbw.writeLine(">();");
+  yield* cbw.writeLine(`/**
+ * Effect environment requirement for {@link QueryCtx}.
+ *
+ * @public
+ * @category context
+ */`);
   yield* cbw.writeLine("export type QueryCtx = typeof QueryCtx.Identifier;");
   yield* cbw.blankLine();
 
   // MutationCtx
+  yield* cbw.writeLine(`/**
+ * Service tag for the native Convex mutation context, typed to the application's
+ * schema and available only in mutations. Native database operations use encoded
+ * document values rather than Confect's decoded values.
+ *
+ * @public
+ * @category tags
+ */`);
   yield* cbw.writeLine(
     "export const MutationCtx: MutationCtx_.MutationCtxTag<",
   );
@@ -801,12 +1287,26 @@ const servicesEffect = Effect.fnUntraced(function* ({
     ),
   );
   yield* cbw.writeLine(">();");
+  yield* cbw.writeLine(`/**
+ * Effect environment requirement for {@link MutationCtx}.
+ *
+ * @public
+ * @category context
+ */`);
   yield* cbw.writeLine(
     "export type MutationCtx = typeof MutationCtx.Identifier;",
   );
   yield* cbw.blankLine();
 
   // ActionCtx
+  yield* cbw.writeLine(`/**
+ * Service tag for the native Convex action context, typed to the application's
+ * schema and available in actions. Native function calls use the wire
+ * representations of arguments and results.
+ *
+ * @public
+ * @category tags
+ */`);
   yield* cbw.writeLine("export const ActionCtx: ActionCtx_.ActionCtxTag<");
   yield* cbw.indent(
     cbw.writeLine(
@@ -820,6 +1320,12 @@ const servicesEffect = Effect.fnUntraced(function* ({
     ),
   );
   yield* cbw.writeLine(">();");
+  yield* cbw.writeLine(`/**
+ * Effect environment requirement for {@link ActionCtx}.
+ *
+ * @public
+ * @category context
+ */`);
   yield* cbw.writeLine("export type ActionCtx = typeof ActionCtx.Identifier;");
 
   return yield* cbw.toString();

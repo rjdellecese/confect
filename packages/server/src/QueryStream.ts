@@ -1,33 +1,27 @@
 /**
- * Compose, merge, join, and paginate index queries as Effect streams.
+ * Experimental query streams for composing, joining, and paginating
+ * standard-index reads. Start with `reader.table(handle).stream(index)`; use
+ * `reader.table(handle).search(...)` for full-text search. Calling
+ * `reader.table(handle).index(...).stream()` returns a plain Effect `Stream`,
+ * not a query stream.
  *
- * A query stream is an Effect `Stream` of decoded documents with stored keys, a
- * shared key layout, and a direction. Create one with
- * `reader.table(...).stream(index, range?, order?)` for a standard index. The
- * order defaults to `"asc"`; search indexes use `reader.table(...).search(...)`
- * instead. Unlike `reader.table(...).index(...).stream()`, this returns a
- * composable query stream rather than a plain `Stream` over one query.
+ * A query stream orders documents by their stored index keys, not their mapped
+ * values. An `eq` constraint removes the pinned field from the key; a range
+ * bound keeps it. Creation time and document IDs break ties where applicable. A
+ * stream's `keyLayout` describes the visible labels and implicit ID positions;
+ * its `orderDirection` defaults to ascending.
  *
- * Creating or composing a stream does not read documents. Reads begin when you
- * run a consuming effect, such as `Stream.runCollect` or `paginate`, and each
- * run executes the queries again. Keep callbacks deterministic and read-only:
- * pagination, seeks, and reversal can reevaluate them.
+ * Building a stream does not read documents. Consuming it with
+ * `Stream.runCollect`, `unique`, or `paginate` executes the query anew. Keep
+ * callbacks deterministic and read-only: pagination, seeks, and reversal can
+ * reevaluate them. Use this module's combinators to keep the ordering
+ * information needed to merge and paginate.
  *
- * Key values are stored separately from emitted values. Pinning an index field
- * with `eq` removes it from the key; range bounds keep it. Keys retain creation
- * time and document-ID tiebreakers where applicable. `QueryStream` combinators
- * preserve the ordering information needed to merge and paginate; plain
- * `Stream` transforms return ordinary streams without that information. A key
- * layout describes the key positions, their visible labels, and implicit ID
- * positions. Reuse a stream's `keyLayout` with `empty` or `flatMap`.
- *
- * Return the whole `paginate` result from a paginated query handler. In React,
- * use `useStreamPaginatedQuery`, not `usePaginatedQuery`: stream pages aren't
- * tracked by Convex's query journal, so the stream hook pins and splits page
- * ranges to keep loaded pages gap-free. Foldkit's `PaginatedQuery` also
- * supports stream pagination.
- *
- * Stream querying is experimental. Its API may still change.
+ * Return the whole `paginate` result from a handler. React's
+ * `useStreamPaginatedQuery` pins and splits page ranges because Convex's query
+ * journal does not track stream pages; `usePaginatedQuery` is for native
+ * pagination. Foldkit's `PaginatedQuery` also supports stream pages. The
+ * stream-query API may change.
  */
 import type {
   PaginationOptions as ConvexPaginationOptions,
@@ -72,48 +66,101 @@ import * as QueryStreamReadBudget from "./QueryStreamReadBudget";
 const OrderDirection = Schema.Literals(["asc", "desc"]);
 
 /**
- * A page exhausted its read budget without a safe logical continuation.
+ * Typed pagination failure when a valid read budget runs out before the page
+ * can advance or split a pinned range at an interior key. Increase the budget
+ * or reduce the underlying reads; retrying the same split alone cannot make
+ * progress.
+ *
+ * @category Errors
  *
  * @experimental
+ *
+ * @see {@link paginate}
  */
 export class ReadBudgetExceededError extends Schema.TaggedError<
   ReadBudgetExceededError,
   {}
 >()("ReadBudgetExceededError", {
+  /**
+   * Physical documents read, including filtered documents and repeated reads.
+   *
+   * @category Getters
+   */
   rowsRead: Schema.Natural,
+  /**
+   * Estimated bytes charged across those reads, not Convex's billed bytes.
+   *
+   * @category Getters
+   */
   bytesRead: Schema.Natural,
 }) {
+  /**
+   * Returns a message explaining how to make progress after exhausting the
+   * budget.
+   *
+   * @category Getters
+   */
   override get message() {
     return "The read budget was exhausted before a safe page boundary; increase the budget or simplify the query";
   }
 }
 
 /**
- * Thrown by `merge` when inputs have different directions, visible ordering
- * labels, or implicit-ID positions. The payload identifies the expected and
- * actual direction and layout; map and relabel compatible inputs before
- * merging.
+ * Error thrown by `merge` during composition when inputs differ in direction,
+ * visible key labels, or implicit ID positions. The first input supplies the
+ * expected order and layout.
+ *
+ * @category Errors
  *
  * @experimental
+ *
+ * @see {@link merge}
  */
 export class IncompatibleStreamsError extends Schema.TaggedError<
   IncompatibleStreamsError,
   {}
 >()("IncompatibleStreamsError", {
+  /**
+   * Direction of the first merge input, which defines the expected order.
+   *
+   * @category Getters
+   */
   expectedOrderDirection: OrderDirection,
+  /**
+   * Direction of an incompatible merge input.
+   *
+   * @category Getters
+   */
   actualOrderDirection: OrderDirection,
+  /**
+   * Layout of the first merge input, including implicit-ID positions.
+   *
+   * @category Getters
+   */
   expectedKeyLayout: QueryStreamKeyLayout.QueryStreamKeyLayout,
+  /**
+   * Layout of an incompatible merge input.
+   *
+   * @category Getters
+   */
   actualKeyLayout: QueryStreamKeyLayout.QueryStreamKeyLayout,
 }) {
+  /**
+   * Returns a message comparing the incompatible directions and key layouts.
+   *
+   * @category Getters
+   */
   override get message(): string {
     return `QueryStream.merge: all streams must share an order and key layout (got ${this.expectedOrderDirection} ${QueryStreamKeyLayout.format(this.expectedKeyLayout)} and ${this.actualOrderDirection} ${QueryStreamKeyLayout.format(this.actualKeyLayout)})`;
   }
 }
 
 /**
- * A `flatMap` inner stream runs in a different direction from its outer stream.
- * The join dies with this error when it runs; `expectedOrderDirection` is the
- * outer direction and `actualOrderDirection` is the inner direction.
+ * Defect from running `flatMap` when an inner stream traverses its index in a
+ * different direction from the outer stream. The payload identifies both
+ * directions.
+ *
+ * @category Errors
  *
  * @experimental
  */
@@ -121,18 +168,35 @@ export class InnerStreamOrderMismatchError extends Schema.TaggedError<
   InnerStreamOrderMismatchError,
   {}
 >()("InnerStreamOrderMismatchError", {
+  /**
+   * Direction required by the outer stream.
+   *
+   * @category Getters
+   */
   expectedOrderDirection: OrderDirection,
+  /**
+   * Direction returned by the inner-stream callback.
+   *
+   * @category Getters
+   */
   actualOrderDirection: OrderDirection,
 }) {
+  /**
+   * Returns a message comparing the inner and outer directions.
+   *
+   * @category Getters
+   */
   override get message(): string {
     return `QueryStream.flatMap: inner stream order (${this.actualOrderDirection}) differs from the outer stream's (${this.expectedOrderDirection})`;
   }
 }
 
 /**
- * A `flatMap` inner stream does not match the supplied `innerKeyLayout`,
- * including visible labels and implicit-ID positions. The join dies with this
- * error when it runs; the payload contains the expected and actual layouts.
+ * Defect from running `flatMap` when an inner stream's visible labels or
+ * implicit ID positions differ from the `innerKeyLayout` template. The payload
+ * identifies both layouts.
+ *
+ * @category Errors
  *
  * @experimental
  */
@@ -140,9 +204,24 @@ export class InnerStreamLayoutMismatchError extends Schema.TaggedError<
   InnerStreamLayoutMismatchError,
   {}
 >()("InnerStreamLayoutMismatchError", {
+  /**
+   * Layout supplied as flatMap's innerKeyLayout template.
+   *
+   * @category Getters
+   */
   expectedKeyLayout: QueryStreamKeyLayout.QueryStreamKeyLayout,
+  /**
+   * Layout of the stream returned by the callback.
+   *
+   * @category Getters
+   */
   actualKeyLayout: QueryStreamKeyLayout.QueryStreamKeyLayout,
 }) {
+  /**
+   * Returns a message comparing the inner layout with the required template.
+   *
+   * @category Getters
+   */
   override get message(): string {
     return `QueryStream.flatMap: inner stream key layout (${QueryStreamKeyLayout.format(this.actualKeyLayout)}) differs from innerKeyLayout (${QueryStreamKeyLayout.format(this.expectedKeyLayout)})`;
   }
@@ -167,25 +246,50 @@ export class MissingReversalRecipeError extends Schema.TaggedError<
 }
 
 /**
- * `paginate` dies with this error for `numItems: 0` and `cursor: null`, because
- * an empty initial page cannot establish a continuation boundary. Request a
- * positive number of items for the first page.
+ * Defects from `paginate` for an invalid page size or an initial request that
+ * cannot establish a cursor.
+ *
+ * @category Errors
  *
  * @public
  *
  * @experimental
  */
 export {
+  /**
+   * Defect from requesting `numItems: 0` with `cursor: null`. Request a
+   * positive size to establish the first continuation boundary; a resumed page
+   * can use zero.
+   *
+   * @category Errors
+   *
+   * @public
+   */
   EmptyInitialPageError,
+  /**
+   * Defect from requesting a page size that is not a nonnegative integer. The
+   * `numItems` payload records the rejected number.
+   *
+   * @category Errors
+   *
+   * @public
+   */
   InvalidPageSizeError,
 } from "./QueryStreamPagination";
 
 /**
- * Invalid numeric read limits.
+ * Defect from `paginate` when `maximumRowsRead` or `maximumBytesRead` is not a
+ * nonnegative integer. The `cause` is the `SchemaError` identifying the invalid
+ * limit. A valid budget that cannot support safe progress produces a typed
+ * `ReadBudgetExceededError` instead.
+ *
+ * @category Errors
  *
  * @public
  *
  * @experimental
+ *
+ * @see {@link ReadBudgetExceededError}
  */
 export { InvalidReadLimitError } from "./QueryStreamReadBudget";
 
@@ -225,32 +329,31 @@ export class Element<Doc> extends Data.Class<{
 // -----------------------------------------------------------------------------
 
 /**
- * An Effect `Stream` whose stored keys determine its order and pagination
- * boundaries independently of its emitted values.
+ * An Effect `Stream` that retains its index keys for ordered merges and
+ * pagination, independently of the values it emits. Start with the table
+ * reader's `stream` method; TypeScript infers the document type and ordering
+ * from the table and index range.
  *
- * TypeScript normally infers all five parameters from the table's `stream`
- * method and subsequent composition:
+ * **Details**
  *
- * - `Doc` is the emitted value: a decoded document or a mapped or joined result.
- * - `KeyLabels` is the branded readonly tuple of visible ordering names,
- *   initially the index fields not pinned by `eq`. `flatMap` appends labels and
- *   `renameKey` replaces them. Implicit ID tiebreakers are omitted from labels
- *   but retained in `keyLayout`.
- * - `OrderDirection` is `"asc"` or `"desc"`; the type defaults to their union.
- * - `E` contains typed failures while reading or transforming values. `never`
- *   means no typed failures, not no defects.
- * - `R` contains Effect services required to run the stream. The stream retains
- *   the database access supplied at creation, so it doesn't require providing
- *   `DatabaseReader` again; effectful callbacks can add requirements.
+ * - `Doc` is the decoded document or the output of a mapping or join.
+ * - `KeyLabels` is the tuple of visible ordering names. It omits fields pinned by
+ *   `eq` and implicit document IDs. `keyLayout` retains the positions of those
+ *   IDs; reuse it with `empty` or as `flatMap`'s `innerKeyLayout`.
+ * - `OrderDirection` is `"asc"` or `"desc"`. Merge requires matching directions
+ *   and layouts, including implicit ID positions.
+ * - `E` contains typed read or callback failures. `never` does not rule out
+ *   defects.
+ * - `R` contains the services needed to run callbacks. The stream retains the
+ *   database access supplied at creation.
  *
- * Known label or direction mismatches prevent merging at compile time. Runtime
- * checks also compare implicit-ID positions. Reuse a compatible stream's
- * `keyLayout` for `empty` or `flatMap`'s `innerKeyLayout`.
+ * **Gotchas**
  *
- * Consume with Effect's `Stream.runCollect` or `Stream.runHead`, or use
- * `unique` or `paginate`. A plain `Stream` transform such as `Stream.take`
- * returns an ordinary stream that can be consumed but no longer merged or
- * paginated with this module.
+ * Effect consumers such as `Stream.runHead` can read a query stream directly.
+ * Plain transforms such as `Stream.take` return ordinary streams, so you cannot
+ * merge or paginate their results with this module.
+ *
+ * @category Models
  *
  * @experimental
  */
@@ -286,6 +389,13 @@ export class QueryStream<
    * @internal
    */
   declare readonly [Stream.TypeId]: Stream.VarianceStruct<Doc, E, R>;
+  /**
+   * Applies functions from left to right. Use query-stream combinators to
+   * retain ordered merging and pagination; a plain Effect `Stream` transform
+   * discards the query-stream metadata.
+   *
+   * @category Combinators
+   */
   declare readonly pipe: Pipeable["pipe"];
   /**
    * @internal
@@ -305,13 +415,20 @@ export class QueryStream<
    */
   constructor(
     /**
+     * Traversal direction, `"asc"` or `"desc"`. Reversal flips the direction
+     * without changing the key layout.
+     *
+     * @category Getters
+     *
      * @public
      */
     readonly orderDirection: OrderDirection,
     /**
-     * Shared description of the key positions, including visible labels and
-     * implicit IDs. Reuse with `empty` or `flatMap`'s `innerKeyLayout`. Reading
-     * this property does not read documents. Direction is in `orderDirection`.
+     * Layout of the stream's visible key labels and implicit ID positions.
+     * Reuse it with `empty` or `flatMap`'s `innerKeyLayout` without reading
+     * documents. Direction is stored separately in `orderDirection`.
+     *
+     * @category Getters
      *
      * @public
      */
@@ -445,8 +562,15 @@ Object.defineProperties(queryStreamPrototype, {
 export type Any = QueryStream<any, any, any, any, any>;
 
 /**
- * Check whether a value retains query-stream ordering and pagination support.
- * Plain `Stream` transforms return ordinary streams, for which this is false.
+ * Checks whether a value is a query stream without reading any documents. An
+ * ordinary Effect `Stream`, including the result of a plain stream transform,
+ * does not pass the check.
+ *
+ * @category Guards
+ *
+ * @param u - Unknown value to test without consuming it.
+ *
+ * @returns Whether the value carries the QueryStream brand; narrows its type.
  *
  * @experimental
  */
@@ -454,13 +578,22 @@ export const isQueryStream = (u: unknown): u is Any =>
   Predicate.hasProperty(u, TypeId);
 
 /**
- * Create a stream with no documents but a known key layout and direction. Use
- * it when a dynamic list of streams is empty, since `merge` requires at least
- * one input. The direction defaults to `"asc"`.
+ * Creates an empty query stream with the supplied key layout and direction.
+ * Supply the document type in the first call, then pass a compatible stream's
+ * layout: `empty<NotesDoc>()(source.keyLayout, "desc")`. The default direction
+ * is ascending.
  *
- * Supply the document type in the first call, then reuse a compatible stream's
- * layout: `QueryStream.empty<NotesDoc>()(source.keyLayout, "desc")`. Creating
- * the source solely to obtain its layout does not read documents.
+ * **When to use**
+ *
+ * Use when a dynamic list of index ranges has no entries but the caller still
+ * needs a stream it can merge or paginate. Reading a source's layout does not
+ * execute the query.
+ *
+ * @category Constructors
+ *
+ * @returns A constructor accepting a layout and optional direction. The
+ *   resulting stream emits nothing and has no typed failures or service
+ *   requirements.
  *
  * @experimental
  */
@@ -879,18 +1012,33 @@ const mergeStep =
     });
 
 /**
- * Combine streams sharing a key layout into one stream in key order. Use this
- * to query several index ranges at once, such as notes by multiple roles.
+ * Merges a nonempty tuple of query streams by their stored keys, emitting the
+ * smallest next key in ascending order or the largest in descending order. The
+ * order does not depend on when reads complete.
  *
- * The merge emits the smallest next key when ascending and the largest when
- * descending. Unlike `Stream.merge`, it does not interleave by arrival time.
- * Overlapping inputs are not deduplicated: a document matched twice appears
- * twice. Supply at least one input; use `empty` for an empty dynamic list.
+ * **When to use**
  *
- * Inputs need compatible document types and identical key layouts and
- * directions. TypeScript rejects known mismatches; runtime mismatches throw
- * `IncompatibleStreamsError` when combined. Map to a common value shape and use
- * `renameKey` when compatible indexes have different field names.
+ * Use to query several index ranges as one feed, for example notes written by
+ * any of several roles.
+ *
+ * **Gotchas**
+ *
+ * - Overlapping inputs emit duplicate matches. If a page ends between two
+ *   occurrences of the same key, its exclusive continuation skips the remaining
+ *   occurrence. Use disjoint ranges when every match must survive pagination.
+ * - Inputs must agree on direction, visible labels, and implicit ID positions; an
+ *   unchecked mismatch throws at composition time. Map differing document types
+ *   to a common shape and use `renameKey` only for fields whose values have
+ *   comparable meaning. For an empty list, return an `empty` stream instead.
+ *
+ * @category Merging
+ *
+ * @param streams - Nonempty tuple of streams with compatible values, labels,
+ *   implicit-ID positions, and direction.
+ *
+ * @returns A lazy ordered stream retaining the inputs' error and service types.
+ *
+ * @throws IncompatibleStreamsError if runtime layouts or directions differ.
  *
  * @experimental
  */
@@ -1060,7 +1208,11 @@ const transformEffect = <
   );
 
 /**
- * Control concurrent callback evaluation in `filterEffect` and `mapEffect`.
+ * Concurrency options for the effectful callbacks in `filterEffect` and
+ * `mapEffect`. Concurrency changes when reads run, not the stream's output
+ * order.
+ *
+ * @category Configuration
  *
  * @experimental
  */
@@ -1069,21 +1221,33 @@ export interface EffectOptions {
    * Maximum number of document effects running at once, or `"unbounded"`.
    * Defaults to one at a time. Results retain stream order regardless of
    * completion order; callbacks must remain deterministic and read-only.
+   *
+   * @category Configuration
    */
   readonly concurrency?: number | "unbounded" | undefined;
 }
 
 /**
- * Keep values that satisfy a pure predicate without changing their stored keys.
- * Like `Stream.filter`, this removes emitted values, but it retains the
- * ordering information needed to merge and paginate the result.
+ * Keeps documents that satisfy a pure predicate while preserving their stored
+ * keys for merging and pagination.
+ *
+ * **Gotchas**
  *
  * Rejected documents still count as reads and advance cursors. Filtering before
- * `distinct` selects each group's first matching document; filtering after it
- * tests only the chosen representative. Use `filterEffect` for predicates that
- * read another table, use a service, or fail with a typed error.
+ * `distinct` selects each group's first matching document; filtering afterward
+ * tests only the chosen representative.
+ *
+ * @category Filtering
+ *
+ * @param self - Input query stream in the data-first form.
+ * @param predicate - Pure, deterministic test of each emitted document.
+ *
+ * @returns A query stream, or a pipeable function when only the predicate is
+ *   supplied; rejected documents do not change the stream's key layout.
  *
  * @experimental
+ *
+ * @see {@link filterEffect} for a predicate that reads another table or uses a service.
  */
 export const filter = dual<
   <Doc>(
@@ -1111,17 +1275,33 @@ export const filter = dual<
 );
 
 /**
- * Keep values that satisfy an effectful predicate, preserving stored keys and
- * cursor progress just like `filter`. The predicate can read other tables or
- * use services; its errors and requirements become part of the stream's types.
+ * Keeps documents that satisfy an effectful predicate. The resulting stream
+ * preserves the original keys and order and requires any services used by the
+ * predicate.
  *
- * Effects run one document at a time by default. Pass `{ concurrency }` to run
- * several at once while retaining stream order. Keep the predicate
- * deterministic and read-only, since seeks and pagination can run it again.
- * Separate lookups inside the predicate are not counted by pagination's read
- * budgets.
+ * **Details**
+ *
+ * Callbacks run one at a time by default. Set `concurrency` to overlap
+ * independent reads without changing output order.
+ *
+ * **Gotchas**
+ *
+ * Keep the predicate deterministic and read-only: seeks and pagination can run
+ * it again. Separate database lookups inside the callback do not count toward
+ * the stream's pagination budget.
+ *
+ * @category Filtering
+ *
+ * @param self - Input query stream in the data-first form.
+ * @param predicate - Read-only effectful test of each emitted document.
+ * @param options - Optional callback concurrency; output order is preserved.
+ *
+ * @returns A filtered query stream (or pipeable function) whose error and
+ *   service requirements include those of the predicate.
  *
  * @experimental
+ *
+ * @see {@link filter} for a pure predicate.
  */
 export const filterEffect = dual<
   <Doc, E2, R2>(
@@ -1162,17 +1342,28 @@ export const filterEffect = dual<
 );
 
 /**
- * Transform emitted values with a pure function while keeping their stored key
- * values. The result retains merge and pagination support, unlike the plain
- * stream returned by `Stream.map`.
+ * Maps emitted values with a pure function while retaining the original keys
+ * for merging and pagination.
  *
- * The mapper may replace any fields, including indexed fields, or return a
- * different shape entirely. It does not recompute keys or sort by the new
- * values: mapping note text to its length still orders by the original text,
- * creation time, and ID, not by length. Preserve the input value rather than
- * mutating it. Use `mapEffect` when the mapper needs an effect.
+ * **Gotchas**
+ *
+ * Changing an indexed field does not re-sort the stream. For example, mapping
+ * text to its length still orders by the original index key, not by length.
+ * Return a new value rather than mutating the input.
+ *
+ * @category Mapping
+ *
+ * @param self - Input query stream in the data-first form.
+ * @param f - Pure, deterministic function from a decoded value to its
+ *   replacement.
+ *
+ * @returns A mapped query stream, or a pipeable function when only f is
+ *   supplied. Keys, ordering, error types, and service requirements remain
+ *   unchanged.
  *
  * @experimental
+ *
+ * @see {@link mapEffect} for a mapper that performs an effect.
  */
 export const map = dual<
   <Doc, Doc2>(
@@ -1199,16 +1390,33 @@ export const map = dual<
 >(2, (self, f) => transform(self, (doc) => Option.some(f(doc))));
 
 /**
- * Transform emitted values with an effect, preserving the original stored keys
- * just like `map`. The mapper may read another table or use services; its
- * errors and requirements become part of the stream's types.
+ * Maps each emitted value with an effect, retaining the original index keys and
+ * output order. The stream inherits any errors or service requirements of the
+ * mapper.
  *
- * Effects run one document at a time by default. Pass `{ concurrency }` for
- * concurrent reads without changing output order. Keep the mapper deterministic
- * and read-only: seeks, reversal, and pagination can reevaluate it. Separate
- * lookups inside the mapper are not counted by pagination's read budgets.
+ * **Details**
+ *
+ * Callbacks run one at a time by default. Set `concurrency` to overlap
+ * independent reads without changing output order.
+ *
+ * **Gotchas**
+ *
+ * Keep the mapper deterministic and read-only: seeks, reversal, and pagination
+ * can run it again. Separate database lookups inside the callback do not count
+ * toward the stream's pagination budget.
+ *
+ * @category Mapping
+ *
+ * @param self - Input query stream in the data-first form.
+ * @param f - Read-only effect producing each replacement value.
+ * @param options - Optional callback concurrency; output order is preserved.
+ *
+ * @returns A mapped query stream (or pipeable function), adding the mapper's
+ *   error and service types while preserving stored keys.
  *
  * @experimental
+ *
+ * @see {@link map} for a pure mapper.
  */
 export const mapEffect = dual<
   <Doc, Doc2, E2, R2>(
@@ -1243,37 +1451,42 @@ export const mapEffect = dual<
 );
 
 /**
- * Run an inner query stream for each outer document and concatenate the
- * results. Like sequential `Stream.flatMap`, each inner stream finishes before
- * the next begins. The joined key is the outer key followed by the inner key,
- * retaining both document IDs so equal timestamps remain distinguishable.
+ * Joins each outer document to an inner query stream and emits the inner
+ * results before advancing to the next outer document. Joined keys concatenate
+ * the outer and inner keys, including their ID tiebreakers.
  *
- * Supply `options.innerKeyLayout` from a compatible stream's `keyLayout`. For
- * example, comments indexed by `noteId` and pinned to a note have the same
- * layout as comments ordered by creation time: one visible creation-time
- * position followed by an implicit ID. Creating the template reads no
- * documents. For nested joins or renamed streams, apply the same composition or
- * renaming to the template before reusing its layout.
+ * **Details**
  *
- * The layout is required when constructing the joined stream, before any outer
- * document is available to pass to `f`, including when the outer stream is
- * empty. It determines the joined key positions and the width of empty-inner
- * markers. It contains no query results or direction.
+ * Supply a compatible stream's `keyLayout` as `innerKeyLayout` so the joined
+ * key is known even when the outer stream is empty. Creating this template does
+ * not read documents. For a nested join or a renamed stream, apply the same
+ * composition or renaming to the template.
  *
- * Every inner stream must match that layout and the outer direction. TypeScript
- * rejects known mismatches; others die with `InnerStreamOrderMismatchError` or
- * `InnerStreamLayoutMismatchError` when the join runs.
+ * An empty inner stream normally emits nothing but advances the cursor past its
+ * outer document. Supply `onEmpty` to emit a placeholder keyed by the outer key
+ * followed by null inner components. An outer document filtered out before the
+ * join remains absent.
  *
- * An empty inner stream emits no value by default, but leaves a filtered marker
- * that advances cursors past its outer document. Pass `options.onEmpty` to emit
- * `onEmpty(outer)` instead. The element type widens to include the placeholder,
- * so map inner values to a common shape when needed. Its key is the outer key
- * followed by null inner components, and pagination steps past it like any
- * element. Outer documents filtered out before the join remain absent.
+ * **Gotchas**
  *
- * Keep `f` and `onEmpty` deterministic and read-only. Pagination, narrowing,
- * and reversal can reevaluate them; both outer and inner index reads count
- * toward pagination's budgets.
+ * Every inner stream must match both the template layout and the outer
+ * direction. A mismatch dies with `InnerStreamLayoutMismatchError` or
+ * `InnerStreamOrderMismatchError` when the join runs. Pagination, narrowing,
+ * and reversal can rerun `f` and `onEmpty`, so keep both deterministic and
+ * read-only. Both outer and inner index reads count toward pagination budgets.
+ *
+ * @category Sequencing
+ *
+ * @param self - Outer query stream in the data-first form.
+ * @param f - Deterministic callback returning an inner QueryStream per outer
+ *   value.
+ * @param options - Required innerKeyLayout template and optional onEmpty
+ *   callback.
+ *
+ * @returns A query stream (or pipeable function) with concatenated outer/inner
+ *   keys and the union of their errors and requirements. onEmpty adds its
+ *   return type to the emitted values; layout/direction mismatches are
+ *   defects.
  *
  * @experimental
  */
@@ -1289,9 +1502,20 @@ export const flatMap = dual<
   >(
     f: (doc: Doc) => QueryStream<Doc2, InnerKeyLabels, OrderDirection, E2, R2>,
     options: {
+      /**
+       * Layout template shared by every inner stream, including implicit IDs.
+       *
+       * @category Configuration
+       */
       readonly innerKeyLayout: QueryStreamKeyLayout.QueryStreamKeyLayout<
         NoInfer<InnerKeyLabels>
       >;
+      /**
+       * Creates the placeholder to emit when this outer document has no inner
+       * values. The callback must be deterministic.
+       *
+       * @category Configuration
+       */
       readonly onEmpty?: ((doc: Doc) => Doc3) | undefined;
     },
   ) => <KeyLabels extends QueryStreamKeyLabels.QueryStreamKeyLabels, E, R>(
@@ -1320,9 +1544,20 @@ export const flatMap = dual<
       doc: Doc,
     ) => QueryStream<Doc2, InnerKeyLabels, NoInfer<OrderDirection>, E2, R2>,
     options: {
+      /**
+       * Layout template shared by every inner stream, including implicit IDs.
+       *
+       * @category Configuration
+       */
       readonly innerKeyLayout: QueryStreamKeyLayout.QueryStreamKeyLayout<
         NoInfer<InnerKeyLabels>
       >;
+      /**
+       * Creates the placeholder to emit when this outer document has no inner
+       * values. The callback must be deterministic.
+       *
+       * @category Configuration
+       */
       readonly onEmpty?: ((doc: Doc) => Doc3) | undefined;
     },
   ) => QueryStream<
@@ -1436,6 +1671,8 @@ const makeFlatMap = <
   innerKeyLayout: QueryStreamKeyLayout.QueryStreamKeyLayout<InnerKeyLabels>,
   /**
    * What an outer document with no inner rows emits, if it is kept.
+   *
+   * @category Options
    */
   onEmpty: Option.Option<(doc: Doc) => Doc3>,
   refinements: InnerRefinements,
@@ -1653,24 +1890,32 @@ const makeFlatMap = <
 };
 
 /**
- * Keep the first document for each distinct value of a key prefix. Similar to
- * `Stream.changes` on that prefix, this groups consecutive equal keys, but
- * seeks past the rest of each group instead of scanning it.
+ * Keeps the first emitted document for each distinct value of a key prefix,
+ * seeking past the rest of each group. Pass leading visible labels in order,
+ * such as `["text"]` for an index on text followed by creation time.
  *
- * Pass a prefix of the visible ordering labels, such as `["text"]` for notes
- * ordered by text and creation time. Prefix validity is checked by TypeScript
- * and at runtime. On a `flatMap` result, a prefix reaching into the inner key
- * also groups by the outer document, including its ID.
+ * **Details**
  *
- * Operation order controls representative selection. Filter before `distinct`
- * to choose the first matching document, or after it to test only the selected
- * representative. `reverse(distinct(q))` keeps those representatives and flips
- * their output order; `distinct(reverse(q))` selects from the other direction.
+ * On a `flatMap` result, a prefix reaching into the inner key includes the
+ * outer document ID, so it groups within each outer document.
  *
- * Narrowing after `distinct` filters the original representatives without
- * selecting replacements. Narrowing before it constrains the input and can
- * change the representatives. Preserving representatives may require extra
- * reads outside output bounds and repeated callback evaluation.
+ * **Gotchas**
+ *
+ * Filter or narrow before `distinct` to control which document represents each
+ * group. Filtering or narrowing afterward tests the original representatives
+ * without choosing replacements. Likewise, `reverse(distinct(q))` keeps the
+ * representatives, while `distinct(reverse(q))` chooses from the other
+ * direction. Preserving representatives can require extra reads outside the
+ * output bounds and repeated callbacks.
+ *
+ * @category Filtering
+ *
+ * @param self - Input query stream in the data-first form.
+ * @param prefixNames - Prefix of visible labels, in order, used to group keys.
+ *
+ * @returns A query stream (or pipeable function) retaining the first emitted
+ *   value per group and the input's layout and direction. An invalid prefix
+ *   throws during composition rather than becoming a typed stream failure.
  *
  * @experimental
  */
@@ -1719,21 +1964,33 @@ export const distinct = dual<
 );
 
 /**
- * Relabel visible key positions without changing values or their order. This
- * does not sort or transform emitted documents.
+ * Renames the visible key positions without changing the emitted documents,
+ * stored key values, traversal order, or positions of implicit IDs.
  *
- * Use it to merge indexes or tables ordered by comparable values under
- * different field names. For example, relabel comments ordered by `["body",
- * "_creationTime"]` as `["text", "_creationTime"]` to merge with notes ordered
- * by text. Map both streams to a common value shape first.
+ * **When to use**
  *
- * Supply exactly as many replacement labels as the original visible labels. The
- * values at corresponding positions must be comparable; relabeling does not
- * establish that semantic compatibility for you. Implicit ID tiebreakers keep
- * their positions. For joined streams, replacement labels cover the combined
- * key, outer labels first.
+ * Use to merge indexes that order comparable values under different field
+ * names. For example, rename `body` to `text` in a comments index before
+ * merging it with a notes index ordered by text; map their document types to a
+ * common shape.
+ *
+ * **Gotchas**
+ *
+ * Supply one name per visible position, outer labels first for a joined stream.
+ * Matching names do not make the underlying values semantically comparable.
+ *
+ * @category Ordering
+ *
+ * @param self - Input query stream in the data-first form.
+ * @param replacementNames - One new name for each visible label, in order.
+ *
+ * @returns A query stream (or pipeable function) with new label types and
+ *   layout, but the same stored values, direction, errors, and service
+ *   requirements. A label-count mismatch throws during composition.
  *
  * @experimental
+ *
+ * @see {@link merge} to combine streams after aligning their keys.
  */
 export const renameKey = dual<
   <const ReplacementNames extends ReadonlyArray<string>>(
@@ -1981,21 +2238,29 @@ const makeDistinct = <
 };
 
 /**
- * Run a composed query stream in the opposite direction without changing its
- * key layout. Use this for bidirectional pagination: a reversed feed can load
- * its earlier pages.
+ * Reverses traversal of the query stream with index scans and seeks rather than
+ * collecting and reversing the emitted values. The key layout stays unchanged.
  *
- * Reversal uses index scans and seeks rather than collecting and reversing
- * values. Merges, filters, maps, flat-maps (including their inner streams),
- * distinct streams, renamed streams, and empty streams all support it.
+ * **When to use**
  *
- * `reverse(distinct(q))` retains each group's original first representative and
- * reverses their output order. `distinct(reverse(q))` instead chooses the first
- * document from the other direction. Preserving representatives can require
- * extra reads to discover groups and seek their original first documents.
+ * Use to read in the opposite direction, for example to load earlier pages of a
+ * feed.
  *
- * A manually constructed stream without `reverseWith` throws
+ * **Gotchas**
+ *
+ * Reversing a `distinct` stream preserves each group's original representative
+ * and may need extra reads to find it. Applying `distinct` after reversal
+ * instead selects the first document from the other direction. Streams from the
+ * table reader and this module's combinators support reversal; manually
+ * constructed streams without a reversal recipe throw
  * `MissingReversalRecipeError`.
+ *
+ * @category Ordering
+ *
+ * @param self - Query stream created by the table reader or these combinators.
+ *
+ * @returns A query stream with the opposite direction and unchanged emitted
+ *   type, layout, typed failures, and service requirements.
  *
  * @experimental
  */
@@ -2021,30 +2286,34 @@ export const reverse = <
 };
 
 /**
- * Restrict a stream to keys between `start` and `end`. Provide at least one
- * endpoint, each with `keyValues` and a required `inclusive` flag; omit the
- * other endpoint to leave that side unbounded.
+ * Restricts the stream to keys between a start and an end in traversal order.
+ * Supply either or both bounds and specify `inclusive` for each one. Repeated
+ * narrowing intersects the bounds.
  *
- * Endpoints follow stream order: `start` is the lower key when ascending and
- * the upper key when descending. Repeated narrowing intersects existing bounds
- * and can only restrict the range further.
+ * **Details**
  *
- * A key may be a prefix of the full key. An inclusive prefix includes every key
- * extending it; an exclusive prefix excludes the whole group. For example,
- * creation-time bounds can use `[startTime]` and `[endTime]` without trailing
- * IDs. Equal endpoints produce an empty range unless both are inclusive, in
- * which case they select that key or prefix group.
+ * `start` is the lower key for ascending streams and the upper key for
+ * descending streams. A prefix such as `[startTime]` includes or excludes the
+ * whole group of keys extending it. Equal endpoints select that key or prefix
+ * group only when both are inclusive.
  *
- * Bounds are pushed into index ranges where that preserves the composition's
- * results. On a distinct stream, full-key bounds filter original
- * representatives without choosing replacements; prefix bounds include or
- * exclude whole groups. This can require reads outside the output bounds. Apply
- * bounds before `distinct` instead to constrain which documents can represent a
- * group. Manually constructed streams without `narrowWith` are filtered in
- * memory.
+ * **Gotchas**
  *
- * For pagination, pass the previous `continueCursor` unchanged to `paginate`;
- * do not decode a cursor into explicit bounds.
+ * Narrowing after `distinct` tests the original representatives, which may
+ * require reads outside the output bounds. Narrow first to change which
+ * documents can represent a group. For pagination, pass the previous
+ * `continueCursor` unchanged to `paginate` rather than decoding it into
+ * bounds.
+ *
+ * @category Filtering
+ *
+ * @param self - Input query stream in the data-first form.
+ * @param narrowBounds - At least one of start/end; each contains keyValues and
+ *   inclusive. Include intervening implicit IDs when specifying complete keys.
+ *
+ * @returns A query stream (or pipeable function) with intersected bounds and
+ *   the same value, ordering, error, and service types. Invalid key widths
+ *   throw during composition, not through the typed stream error channel.
  *
  * @experimental
  */
@@ -2208,8 +2477,11 @@ const narrowInMemory = <
 // -----------------------------------------------------------------------------
 
 /**
- * `unique` found at least two emitted values. Narrow the query if at most one
- * value was expected, or use another consumer to handle multiple results.
+ * Typed failure from `unique` when the stream emits more than one value. Narrow
+ * the query if at most one match is expected, or choose a consumer that accepts
+ * multiple results.
+ *
+ * @category Errors
  *
  * @experimental
  */
@@ -2217,17 +2489,27 @@ export class NotUniqueError extends Schema.TaggedError<NotUniqueError, {}>()(
   "NotUniqueError",
   {},
 ) {
+  /**
+   * Returns a message explaining the at-most-one expectation.
+   *
+   * @category Getters
+   */
   override get message(): string {
     return "Expected the query stream to contain at most one document";
   }
 }
 
 /**
- * Consume a stream expected to emit at most one value. The effect returns
- * `None` for no values and `Some(value)` for one, or fails with
- * `NotUniqueError` for two or more. Like `Stream.runHead` with a uniqueness
- * check, it inspects at most two emitted values; finding them may read
- * additional filtered documents.
+ * Reads up to two emitted values to check uniqueness. Returns `None` for no
+ * match or `Some(value)` for one, and fails with `NotUniqueError` for two.
+ * Finding those values may require reading additional filtered documents.
+ *
+ * @category Running
+ *
+ * @param self - Query stream expected to emit at most one value.
+ *
+ * @returns An effect yielding an `Option`, retaining the stream's failures and
+ *   services and adding `NotUniqueError`.
  *
  * @experimental
  */
@@ -2257,90 +2539,114 @@ export const unique = Effect.fn("QueryStream.unique")(
 // -----------------------------------------------------------------------------
 
 /**
- * Convex pagination options interpreted over a query stream's stored keys. Pass
+ * Convex pagination options for reading a query stream by its stored keys. Pass
  * a paginated query handler's `paginationOpts` directly to `paginate`.
  *
- * - `cursor`: required exclusive start boundary; `null` starts at the beginning.
- * - `numItems`: requested emitted values, excluding filtered documents. With an
- *   `endCursor`, it is not an item limit, but still informs split
- *   recommendations.
- * - `endCursor`: optional inclusive boundary returned by a previous page. Pins
- *   the page to a key range regardless of how many values it holds.
- * - `maximumRowsRead`: optional budget for physical document reads from
- *   underlying query-stream indexes, including filtered documents.
- * - `maximumBytesRead`: optional budget charging estimated document size on every
- *   read, not Convex's exact billed bytes. The final document can take the
- *   total over the limit because its size is known only after reading it.
+ * **Details**
  *
- * With `numItems: 0`, an existing cursor is returned unchanged with an empty
- * page and `isDone: false`; a null cursor dies with `EmptyInitialPageError`.
+ * - `cursor` is an exclusive start boundary; `null` starts at the beginning.
+ * - `numItems` requests a number of emitted values, excluding filtered documents.
+ *   When `endCursor` pins a range, this size informs split recommendations
+ *   rather than limiting results.
+ * - `endCursor` is an optional inclusive boundary from a previous page. It pins
+ *   the page to the same key range even if the number of values changes.
+ * - `maximumRowsRead` limits physical index reads, including filtered documents
+ *   and repeated reads.
+ * - `maximumBytesRead` limits estimated document bytes, not Convex's exact billed
+ *   bytes. The last document can take the total over the limit because its size
+ *   is known only after the read.
+ *
+ * **Gotchas**
+ *
+ * With `numItems: 0`, a valid continuation cursor is returned unchanged with an
+ * empty page and `isDone: false`. A null cursor dies with
+ * `EmptyInitialPageError`.
+ *
+ * @category Configuration
  *
  * @experimental
  */
 export type PaginateOptions = ConvexPaginationOptions;
 
 /**
- * One page in Convex's pagination result shape. Return the whole result to
- * reactive clients so they can pin and split pages; use `page` alone for a
- * one-shot read inside a handler.
+ * One query-stream page in Convex's pagination result shape. Return the whole
+ * result to a reactive client so it can pin and split loaded pages; a one-shot
+ * consumer can use `page` alone.
  *
- * - `page`: emitted values, possibly empty despite progress past filtered keys.
- * - `continueCursor`: the next page's exclusive start. Pass it back unchanged as
- *   `cursor` while `isDone` is false.
- * - `splitCursor`: an optional interior boundary. Pin the left page with this as
- *   `endCursor`; start the right page here, retaining the original end.
- * - `pageStatus`: `"SplitRequired"` when a read budget stops at a safe boundary,
- *   or `"SplitRecommended"` when a pinned page grows too large or a page scans
- *   many keys. Both include a `splitCursor`; otherwise status may be absent.
- * - `isDone`: true confirms the stream's end. Reaching a pinned boundary does not
- *   prove completion. A split recommendation can report false even at the end,
- *   so handle splitting before requesting another page.
+ * **Details**
+ *
+ * - `page` contains emitted values. It can be empty even when the scan progressed
+ *   past filtered keys.
+ * - `continueCursor` is the next page's exclusive start. Pass it back unchanged
+ *   as `cursor` while `isDone` is false.
+ * - `splitCursor` divides a range. Use it as the left page's inclusive
+ *   `endCursor` and the right page's exclusive `cursor`, retaining the original
+ *   end on the right.
+ * - `pageStatus` is `"SplitRequired"` when a read budget stops a page at a safe
+ *   boundary, or `"SplitRecommended"` when a pinned page grows large or a scan
+ *   covers many keys. Both statuses include a `splitCursor`.
+ * - `isDone: true` confirms the end of the stream, not just a pinned boundary. A
+ *   split recommendation can still report false at the end; handle splitting
+ *   before requesting another page.
+ *
+ * @category Models
  *
  * @experimental
  */
 export type PaginationResult<Doc> = ConvexPaginationResult<Doc>;
 
 /**
- * Return an effect producing one page of a composed query stream. Start with
- * `cursor: null`, then pass each returned `continueCursor` back unchanged until
- * `isDone`. Cursors record key boundaries, not offsets or the last visible
- * document: filtered elements can advance the cursor without entering `page`.
+ * Reads a page of emitted values from a composed query stream. Start with
+ * `cursor: null`, then pass each returned `continueCursor` back unchanged. A
+ * cursor marks a key boundary, so filtering can advance it without emitting a
+ * document.
  *
- * `cursor` is exclusive and `endCursor` is inclusive, in stream order. Without
- * an end boundary, `numItems` limits emitted values. With `endCursor`, the page
- * covers the pinned range regardless of its item count, keeping adjacent
- * reactive pages gap-free as data changes. See `PaginateOptions` for read
- * limits and the special case of a zero-sized request.
+ * **Details**
  *
- * Bounds are pushed into underlying index queries where possible, but composed
- * streams may read more documents than they return, including documents read on
- * earlier pages. Budgets count filtered documents, distinct-group discovery,
- * repeated seeks, merge prefetch, and both outer and inner query-stream reads
- * in joins. Arbitrary I/O inside callbacks, such as a separate lookup in
- * `mapEffect`, is not tracked.
+ * Without an end boundary, `numItems` limits emitted values. With `endCursor`,
+ * the page covers the range after `cursor` through that inclusive end, even as
+ * the number of matching documents changes. Return the whole result to reactive
+ * clients. React's `useStreamPaginatedQuery` handles pinned ranges, splitting,
+ * and invalid-cursor resets; `usePaginatedQuery` does not support stream pages.
+ * Foldkit's `PaginatedQuery` also supports them.
  *
- * A budget-limited page returns `SplitRequired` at a safe logical boundary. If
- * the budget prevents safe progress or an interior split of a pinned page, the
- * effect fails with `ReadBudgetExceededError` rather than returning a
- * non-advancing cursor. Increase the budget or reduce the reads needed for
- * progress. See `PaginationResult` for split and completion handling.
+ * Budgets count underlying index reads, including filtered rows, repeated
+ * seeks, merge prefetch, and both sides of a join. They do not count separate
+ * lookups in callbacks. A budget-limited page requests a split at a safe
+ * boundary. If it cannot advance safely or split a pinned range at an interior
+ * key, the effect fails with `ReadBudgetExceededError`; increase the budget or
+ * reduce the reads needed for progress.
  *
- * Malformed or incompatible cursors die with a `ConvexError` whose data is `{
- * paginationError: "InvalidCursor" }`; Confect's pagination clients restart
- * from the first page. Restart pagination whenever filters, ordering, or other
- * query semantics change, even if an old cursor is still accepted.
+ * **Gotchas**
  *
- * Cursors expose boundary field names and key values, including document IDs.
- * They are neither opaque nor signed: clients can read or craft them. Do not
- * publicly paginate over sensitive indexed fields unless pinned with `eq`.
- * Never construct cursors from documents or decode them into `narrow` bounds.
+ * - Malformed cursors or cursors incompatible with the key layout die with a
+ *   `ConvexError` carrying `{ paginationError: "InvalidCursor" }`. Restart
+ *   pagination after changing the filters, ordering, or other semantics even
+ *   when the old cursor is accepted.
+ * - Cursors are unsigned and expose key labels and values, including document
+ *   IDs. Do not paginate over sensitive indexed values that remain in the key.
+ *   Pass cursors back unchanged rather than constructing them from documents or
+ *   decoding them into bounds.
+ * - Invalid `numItems` dies with `InvalidPageSizeError`; a zero-sized initial
+ *   page dies with `EmptyInitialPageError`. Invalid read limits die with
+ *   `InvalidReadLimitError`. These are defects rather than typed budget
+ *   failures.
  *
- * Return the whole result to reactive clients. React's
- * `useStreamPaginatedQuery` handles pinning, splitting, and invalid-cursor
- * resets; `usePaginatedQuery` does not support stream pages. Foldkit's
- * `PaginatedQuery` also supports them.
+ * @category Pagination
+ *
+ * @param self - Query stream in the data-first form.
+ * @param options - Pagination boundaries, requested size, and optional read
+ *   budgets.
+ *
+ * @returns An effect yielding the pagination result, or a pipeable function
+ *   when only options are supplied. The effect retains the stream's failures
+ *   and service requirements and adds `ReadBudgetExceededError` as a typed
+ *   failure.
  *
  * @experimental
+ *
+ * @see {@link PaginateOptions} for cursor boundaries and read limits.
+ * @see {@link PaginationResult} for handling split and completion signals.
  */
 export const paginate: {
   (

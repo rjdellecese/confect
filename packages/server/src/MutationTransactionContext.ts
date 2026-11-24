@@ -9,8 +9,31 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import type { Options as MutationOptions } from "./QueryTransactionContext";
 
+/**
+ * Convex resource limits for one nested transaction call, such as the maximum
+ * number of documents read.
+ *
+ * @category Configuration
+ */
 export type { TransactionLimits } from "convex/server";
+/**
+ * Options that let a mutation limit a nested mutation's resource use without
+ * changing the enclosing transaction's limits.
+ *
+ * @category Configuration
+ */
 export type { Options as MutationOptions } from "./QueryTransactionContext";
+/**
+ * Options that let a mutation limit a nested query's resource use or request a
+ * stale snapshot.
+ *
+ * **Gotchas**
+ *
+ * Specifying `useStaleSnapshot` requires a mutation even when the value is
+ * `false`.
+ *
+ * @category Configuration
+ */
 export type QueryOptions = AdvancedRunQueryOptions;
 
 const make = (
@@ -39,6 +62,11 @@ const make = (
 });
 
 /**
+ * Backs transaction options on the generated runners. In a mutation, pass
+ * `useStaleSnapshot` to the yielded `QueryRunner`'s `runQuery`, or
+ * `transactionLimits` to the yielded `MutationRunner`'s `runMutation`, using
+ * the tags from `confect/_generated/services` instead.
+ *
  * @internal
  */
 export class MutationTransactionContext extends Context.Service<

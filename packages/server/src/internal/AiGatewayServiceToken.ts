@@ -9,35 +9,54 @@ import * as HttpClientError from "effect/http/HttpClientError";
 import * as HttpClientRequest from "effect/http/HttpClientRequest";
 
 /**
- * The current team is on the free plan or has the Convex AI gateway disabled.
- * Upgrade to a paid plan, or contact Convex support if this looks wrong.
+ * Tagged error indicating that the team's plan or settings disable the Convex
+ * AI gateway. Check that the team has a paid plan, or contact Convex support if
+ * access should be enabled.
+ *
+ * @category Errors
  */
 export class AiGatewayDisabled extends Schema.TaggedError<
   AiGatewayDisabled,
   {}
 >()("AiGatewayDisabled", {}) {
+  /**
+   * Returns guidance for restoring the team's gateway access.
+   *
+   * @category Getters
+   */
   override get message(): string {
     return "The Convex AI gateway is disabled. Your team may be on the free plan, or the gateway may have been disabled for your team. Upgrade to a paid plan, or email support@convex.dev if this looks wrong.";
   }
 }
 
 /**
- * The current deployment is anonymous, outdated, or self-hosted and cannot use
- * the Convex AI gateway. Authenticated, project-linked local deployments are
- * supported.
+ * Tagged error indicating that the deployment cannot use the Convex AI gateway.
+ * For local development, log in, link the deployment to a project, and update
+ * the CLI and backend. Anonymous and self-hosted deployments cannot use the
+ * gateway.
+ *
+ * @category Errors
  */
 export class AiGatewayUnavailable extends Schema.TaggedError<
   AiGatewayUnavailable,
   {}
 >()("AiGatewayUnavailable", {}) {
+  /**
+   * Returns the local deployment requirements and an alternative for
+   * unsupported deployments.
+   *
+   * @category Getters
+   */
   override get message(): string {
     return "The Convex AI gateway is unavailable on this deployment. For local development, log in, link the deployment to a Convex project, and update the Convex CLI and local backend. Anonymous and self-hosted deployments cannot use the gateway; call the model provider directly with your own API key instead.";
   }
 }
 
 /**
- * A schema for the possible failures that can occur while obtaining a Convex AI
- * gateway service token.
+ * Schema for the two gateway availability errors: {@link AiGatewayDisabled} and
+ * {@link AiGatewayUnavailable}.
+ *
+ * @category Schemas
  */
 export const AiGatewayError = Schema.Union([
   AiGatewayDisabled,
@@ -45,8 +64,11 @@ export const AiGatewayError = Schema.Union([
 ]);
 
 /**
- * The possible failures that can occur while obtaining a Convex AI gateway
- * service token.
+ * Union of the tagged errors that a gateway client layer can return when
+ * checking access. Unexpected token-service rejections are defects, not members
+ * of this union.
+ *
+ * @category Errors
  */
 export type AiGatewayError = typeof AiGatewayError.Type;
 

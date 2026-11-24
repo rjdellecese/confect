@@ -31,6 +31,7 @@ jobs:
       - uses: ./.github/actions/confect-setup
       - run: pnpm typecheck
       - run: pnpm typecheck:inexact
+      - run: pnpm check:examples
 
   lint:
     name: Lint

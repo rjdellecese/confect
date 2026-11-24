@@ -14,22 +14,97 @@ import * as Document from "./Document";
 import type * as TableInfo from "./TableInfo";
 import type * as Table from "./Table";
 
+/**
+ * Ordered reads from the standard index selected by
+ * `reader.table(handle).index(...)` or the relevance-ranked results of
+ * `.search(...)`. Each consumer decodes stored documents with the table codec.
+ * Decoding can fail with `DocumentDecodeError`; native query failures are
+ * defects.
+ *
+ * @category Models
+ */
 export type OrderedQuery<
   TableInfo_ extends TableInfo.AnyWithProps,
   Doc = TableInfo_["document"],
 > = {
+  /**
+   * Reads the first match in query order, returning `None` when no document
+   * matches.
+   *
+   * @category Reading
+   *
+   * @returns An effect yielding `Some(document)` or `None` when there is no
+   *   match; decoding the stored document can fail with `DocumentDecodeError`.
+   */
   readonly first: () => Effect.Effect<
     Option.Option<Doc>,
     Document.DocumentDecodeError
   >;
+  /**
+   * Reads up to `n` matching documents in query order.
+   *
+   * @category Reading
+   *
+   * @param n - Maximum number of documents to return, validated by Convex.
+   *
+   * @returns An effect yielding up to n decoded documents, possibly an empty
+   *   array. A decoding failure fails the effect with `DocumentDecodeError`.
+   */
   readonly take: (
     n: number,
   ) => Effect.Effect<ReadonlyArray<Doc>, Document.DocumentDecodeError>;
+  /**
+   * Reads and decodes every matching document in query order.
+   *
+   * **Gotchas**
+   *
+   * Collecting a large result can exceed Convex's transaction limits. Bound the
+   * result with `take` or read one page at a time with `paginate`.
+   *
+   * @category Reading
+   *
+   * @returns An effect yielding a readonly array, or failing with
+   *   `DocumentDecodeError`.
+   */
   readonly collect: () => Effect.Effect<
     ReadonlyArray<Doc>,
     Document.DocumentDecodeError
   >;
+  /**
+   * Returns a plain Effect `Stream` that decodes matching documents as they are
+   * consumed.
+   *
+   * **When to use**
+   *
+   * Use to consume one ordered query with Effect's stream operators. For a
+   * mergeable, paginable query stream, start from
+   * `reader.table(handle).stream(index)` instead.
+   *
+   * @category Reading
+   *
+   * @returns A plain stream of decoded documents with `DocumentDecodeError` in
+   *   its error channel.
+   */
   readonly stream: () => Stream.Stream<Doc, Document.DocumentDecodeError>;
+  /**
+   * Reads one native Convex page and decodes its documents. Pass the handler's
+   * `paginationOpts` through unchanged and return the whole result so the
+   * client receives Convex's continuation and split information.
+   *
+   * @category Reading
+   *
+   * @param options - Convex pagination options, normally the handler's
+   *   `paginationOpts` unchanged. `cursor: null` starts a query; `numItems`
+   *   requests its page size. Optional protocol fields are forwarded to
+   *   Convex.
+   * @param filter - Optional native Convex filter builder over stored field
+   *   values, for example `q => q.eq(q.field("author"), author)`.
+   *
+   * @returns An effect yielding the decoded `page`, `isDone`, and
+   *   `continueCursor`, with `splitCursor` and `pageStatus` when supplied by
+   *   Convex. Decoding can fail with `DocumentDecodeError`; native failures are
+   *   defects.
+   */
   readonly paginate: (
     options: PaginationOptions,
     filter?: (

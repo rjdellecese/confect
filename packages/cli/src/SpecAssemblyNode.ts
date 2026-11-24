@@ -160,6 +160,13 @@ export const render = Effect.fnUntraced(function* (
 
   yield* cbw.blankLine();
 
+  yield* cbw.writeLine(`/**
+ * Function contract for the application, assembled from its group specs. Use it
+ * to inspect the complete function tree without loading handler implementations
+ * or evaluating the functions' schema factories.
+ *
+ * @category models
+ */`);
   yield* cbw.write("const spec: ");
   yield* Array.match(nodes, {
     onEmpty: () => cbw.write("Spec.Spec"),

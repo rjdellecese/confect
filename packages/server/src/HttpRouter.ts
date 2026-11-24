@@ -43,9 +43,12 @@ type WithSchema<
 }[DatabaseSchema.TypeId];
 
 /**
- * The Confect services available to HTTP route handlers and middleware,
- * supplied per request from the Convex action context. Pass the application
- * schema type to include its vector search service.
+ * Confect service requirements that an HTTP route handler or its middleware can
+ * leave to the router. The services come from the current request's Convex
+ * action context; supplying the application schema type includes its vector
+ * search service.
+ *
+ * @category Context
  */
 export type Services<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps = never,
@@ -67,25 +70,26 @@ export type Services<
     >;
 
 /**
- * A layer that registers routes on the HTTP router—the input to {@link make}.
+ * Route registration layer accepted by {@link make}. Handlers and middleware
+ * can require the Confect {@link Services} that the router supplies per
+ * request.
  *
- * Compose it from Effect's `effect/http` and `effect/http-api` modules:
- * `HttpApiBuilder.layer(api)` registers an `HttpApi`'s endpoints (provide its
- * group handler layers with `Layer.provide`), `HttpApiScalar.layer(api, ...)`
- * serves interactive API docs, `HttpRouter.add` registers a plain route, and
- * `HttpRouter.middleware(fn, { global: true })` applies middleware to every
- * route. Merge any number of these with `Layer.mergeAll`.
+ * **Details**
  *
- * Route handlers and middleware may require any of the Confect {@link Services},
- * which surface as request-level `Requires` markers and are supplied per
- * request. Anything else the layer requires is a type error—notably, an
- * `HttpApiBuilder.layer(api)` whose group handler layers are not provided
- * leaves an `HttpApiGroup.ToService` requirement behind, so a missing handler
- * group is caught at compile time.
+ * Compose route layers from `effect/http` and `effect/http-api` with
+ * `Layer.mergeAll`. Use `HttpApiBuilder.layer(api)` for an API,
+ * `HttpRouter.add` for plain routes, `HttpApiScalar.layer` for interactive
+ * documentation, and `HttpRouter.middleware(fn, { global: true })` for
+ * middleware shared by all routes. Convex environment configuration is
+ * available while these layers are built and while handlers run.
  *
- * Layers are built with Confect's Convex-aware `ConfigProvider` in context, so
- * `Config` reads (e.g. in `Layer.unwrap`) resolve against Convex environment
- * variables.
+ * **Gotchas**
+ *
+ * Supply each API group's handler layer with `Layer.provide` before mounting
+ * the API. A missing group leaves an unsatisfied requirement and the route
+ * layer fails to typecheck.
+ *
+ * @category Layers
  */
 export type Routes<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps = never,
@@ -104,17 +108,25 @@ export type Routes<
 >;
 
 /**
- * Create a Convex HTTP router. Pass the application's database schema as a type
- * argument for schema-typed vector search in handlers and middleware.
+ * Creates a Convex HTTP router that serves Effect routes. It registers a
+ * catch-all HTTP action at `/` for every routable method; the Effect router
+ * matches the path and returns a 404 if no route matches.
  *
- * A single catch-all `httpAction` is registered for every routable method under
- * the path prefix `"/"`, making the Effect router the single source of truth
- * for paths: place an API with `HttpApi.prefix` or absolute route paths.
- * Requests that match no route receive the Effect router's 404 response.
+ * **Details**
  *
- * Plain Convex routes can still be added to the returned router—Convex matches
- * exact paths first and longer path prefixes before the catch-all, so they take
- * precedence.
+ * Use absolute route paths or `HttpApi.prefix` to mount an API under a prefix.
+ * Native Convex routes added to the returned router take precedence when they
+ * match an exact path or a longer prefix.
+ *
+ * @category Constructors
+ *
+ * @param routes - Layer that registers routes and supplies group handlers. Use
+ *   `make<typeof schema>(routes)` with a type-only schema import when a handler
+ *   or middleware requires schema-typed vector search.
+ *
+ * @returns A native Convex router for the default export of `confect/http.ts`.
+ *
+ * @see {@link Routes} for the layer requirements.
  */
 export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
   routes: Routes<DatabaseSchema_>,
