@@ -26,6 +26,13 @@ export type TypeId = typeof TypeId;
  */
 export type FinalizationStatus = "Unfinalized" | "Finalized";
 
+/**
+ * Service that distinguishes a group still awaiting implementations from one
+ * ready for code generation. Build the group with {@link make}, provide its
+ * implementation layers, and pass the result to {@link finalize}.
+ *
+ * @category Services
+ */
 export interface GroupImpl<
   FinalizationStatus_ extends FinalizationStatus = "Unfinalized",
 > {
@@ -114,8 +121,21 @@ export const GroupImpl = <FinalizationStatus_ extends FinalizationStatus>({
   );
 
 /**
- * Begin a group's impl layer. Its spec determines the function and middleware
- * implementations that must be provided before finalization.
+ * Creates an unfinalized layer for a group that requires the implementations of
+ * its declared functions and attached middleware.
+ *
+ * **Details**
+ *
+ * Import `GroupImpl` from `_generated/server` and supply each implementation
+ * using `Layer.provide`. If a function's middleware requires a service, the
+ * group or function must have middleware that provides it.
+ *
+ * @category Layers
+ *
+ * @param _group - Group declaration from the sibling `.spec.ts` module.
+ *
+ * @returns An unfinalized layer to pass to {@link finalize} after supplying all
+ *   implementations.
  */
 export const make = <Group extends GroupSpec.AnyWithProps>(
   _group: Group &
@@ -148,17 +168,24 @@ const findUnfinalizedGroupImpl = <S>(
   Array.findFirst(context.mapUnsafe.values(), isUnfinalizedGroupImpl);
 
 /**
- * Mark a `GroupImpl` layer as fully implemented. The parameter type defaults
- * `RIn = never`, so passing a layer that still requires any `FunctionImpl`
- * service produces a type error at the impl author's site. The codegen boundary
- * requires the resulting `"Finalized"` brand, so omitting this call is also
- * rejected downstream.
+ * Returns the finalized group layer to default-export from the group's
+ * `.impl.ts` module.
  *
- * As a side effect of finalization, the names of every `FunctionImpl` that
- * registered into this group's scope are snapshotted onto the produced service
- * value's `registeredFunctionNames` field, so consumers can verify impl
- * completeness against a `GroupSpec`'s expected functions without having to
- * inspect the `Registry` themselves.
+ * **Gotchas**
+ *
+ * The input type rejects groups with outstanding function or middleware
+ * implementations. If a layer supplied outside that type contract builds a
+ * context with no unfinalized group service, building the finalized layer dies
+ * with a defect.
+ *
+ * @category Combinators
+ *
+ * @param group - Unfinalized group layer with no remaining requirements.
+ *
+ * @returns A layer whose finalized group records the registered function names
+ *   and middleware keys.
+ *
+ * @see {@link make} to start a group implementation.
  */
 export const finalize = (
   group: Layer.Layer<GroupImpl<"Unfinalized">>,

@@ -7,17 +7,25 @@ import * as Layer from "effect/Layer";
 declare const process: { env: Record<string, string | undefined> };
 
 /**
- * A `ConfigProvider` that reads configuration directly from `process.env` by
- * exact path lookup.
+ * Creates an Effect configuration provider that looks up Convex environment
+ * variables by exact key. Confect already supplies it to function handlers and
+ * HTTP routes.
  *
- * The Convex runtime exposes `process.env` for direct key access but does not
- * make it enumerable, so the built-in `ConfigProvider.fromEnv` (which builds a
- * trie over the environment to resolve and enumerate config paths) cannot be
- * used. This provider resolves each requested path to a single environment
- * variable, joining the path segments with `"_"` to match the key convention
- * `fromEnv` uses. As with the built-in providers, an empty string is treated as
- * a missing value, so `Config.withDefault` and `Config.option` recover from
- * it.
+ * **Details**
+ *
+ * The provider joins path segments with `_`, so a nested path such as
+ * `DATABASE`, `HOST` reads `DATABASE_HOST`. An empty string counts as missing,
+ * allowing `Config.withDefault` and `Config.option` to recover.
+ *
+ * **Gotchas**
+ *
+ * Convex does not expose an enumerable `process.env`. Configuration that needs
+ * to discover child keys cannot use this provider.
+ *
+ * @category Constructors
+ *
+ * @returns A provider that resolves exact configuration paths against
+ *   `process.env`.
  */
 export const make = (): ConfigProvider.ConfigProvider =>
   ConfigProvider.make((path) => {

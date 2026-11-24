@@ -33,9 +33,23 @@ export const make = (webSocketClient: WebSocketClient.WebSocketClient) =>
   });
 
 /**
- * The application-scoped Confect client used by Foldkit Commands and
- * Subscriptions. It combines the WebSocket API with the pagination-session id
- * allocator required by Convex's query cache.
+ * Service tag for the application-scoped Confect client that Foldkit commands
+ * and subscriptions share.
+ *
+ * **Details**
+ *
+ * The service exposes `url`, `query`, `mutation`, `action`, `reactiveQuery`,
+ * `reactiveQueryResult`, and `setAuth` from
+ * {@link WebSocketClient.WebSocketClient}. Calls accept decoded arguments and
+ * return decoded results. One-shot calls and `reactiveQuery` can fail with a
+ * declared error, `WebSocketClientError`, or `Schema.SchemaError`;
+ * `reactiveQueryResult` emits those failures as values so a listener can
+ * recover. `setAuth` takes an effectful token supplier and an optional
+ * effectful authentication callback.
+ *
+ * @category Tags
+ *
+ * @see {@link layer} provides this service for the application's resources.
  */
 export const Client =
   // oxlint-disable-next-line effecttsgo/service-not-as-class -- Preserve the public structural Identifier and Effect requirement types; class identifiers would change those contracts.
@@ -43,10 +57,34 @@ export const Client =
     "@confect/foldkit/Client",
   );
 
+/**
+ * Service type required by Foldkit commands and subscriptions that call
+ * Confect.
+ *
+ * @category Services
+ */
 export type Client = typeof Client.Identifier;
 
 /**
- * Constructs one scoped client for a Foldkit application's `resources`.
+ * Creates a layer for the Foldkit application's `resources`. Commands and
+ * subscriptions that use the same client share its connection, authentication,
+ * and pagination IDs. The connection closes when the resource scope ends.
+ *
+ * **Example** (Sharing a client through Foldkit resources)
+ *
+ * ```ts
+ * import * as Client from "@confect/foldkit/Client";
+ *
+ * export const resources = Client.layer("https://example.convex.cloud");
+ * ```
+ *
+ * @category Layers
+ *
+ * @param address - Convex deployment URL.
+ * @param options - Options forwarded unchanged to Convex's `ConvexClient`.
+ *
+ * @returns A layer providing Client; connection construction errors are
+ *   defects.
  */
 export const layer = (
   address: string,
@@ -57,4 +95,11 @@ export const layer = (
     Effect.flatMap(WebSocketClient.WebSocketClient, make),
   ).pipe(Layer.provide(WebSocketClient.layer(address, options)));
 
+/**
+ * Transport or undeclared backend failure from the underlying WebSocket client.
+ * Its `cause` preserves the original failure. Commands and subscriptions pass
+ * this error to `onError`; pagination includes it in settlement failures.
+ *
+ * @category Errors
+ */
 export { WebSocketClientError } from "@confect/js/WebSocketClient";

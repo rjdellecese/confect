@@ -1,3 +1,13 @@
+/**
+ * Registers Node actions in generated deployment modules. Implement actions
+ * with `FunctionImpl.make` from `confect/_generated/server` rather than
+ * importing this subpath.
+ *
+ * @module
+ *
+ * @internal
+ */
+
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import {
   actionGeneric,
@@ -21,6 +31,10 @@ import type * as RegisteredFunctions from "./RegisteredFunctions";
 import { mapLeaves } from "./internal/utils";
 
 /**
+ * Generated modules register a Node group's actions. Define the group with
+ * `GroupSpec.makeNode()` and implement its actions with `FunctionImpl.make`
+ * from `confect/_generated/server` instead of registering them directly.
+ *
  * @internal
  */
 export const buildForGroup = <Group extends GroupSpec.AnyWithProps>(

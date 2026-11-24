@@ -41,6 +41,10 @@ Confect is a library that integrates Effect with the Convex backend platform. It
 - `apps/example` - Vite + React example app demonstrating Confect usage
 - `apps/docs` - Documentation site powered by Mintlify
 
+## Public API documentation
+
+Follow the [local JSDoc skill](.agents/skills/jsdocs/SKILL.md) for public API documentation. It adapts [Effect’s JSDoc skill at `9a91b192`](https://github.com/Effect-TS/effect/tree/9a91b1926a5fbfaffd302a7a41a94d4d53a1154e/.agents/skills/jsdocs) under its [MIT license](.agents/skills/jsdocs/LICENSE).
+
 ## Tools
 
 - `tools/bench-harness` - Private package that runs `@ark/attest` type benchmarks on tsrs; see its README
@@ -82,6 +86,7 @@ Build, lint, and format run through Vite+ (`vp`), which orders packages by their
 - `pnpm dev:example`/`pnpm dev:docs` - Run the example app/docs site
 - `pnpm test` - Run all package test suites via Vitest (`vitest run`)
 - `pnpm typecheck` - Typecheck the package graph and test suites via `tsrs -b` (project references, incremental)
+- `pnpm check:examples` - After `pnpm build`, typecheck fenced public API examples with `@effect/docgen` and `tsrs`. Imports from `confect/_generated/*` resolve to the example app. Snippets are not executed and docgen's Markdown is discarded.
 - `pnpm typecheck:inexact` - Refresh normal package declarations, then typecheck every package's sources and tests with `exactOptionalPropertyTypes: false`
 - `pnpm --filter example typecheck:inexact` - Typecheck both example projects with `exactOptionalPropertyTypes: false` (run `pnpm build` first)
 - `pnpm lint`/`pnpm lint:fix` - Lint (Oxlint + Syncpack); `lint:fix` writes fixes
