@@ -20,8 +20,8 @@
     "@types/react-dom": "19.3.0",
     "@vitejs/plugin-react": "6.3.0",
     "concurrently": "10.0.7",
-    "tsrs": "0.25.0-ts7.1.0-beta",
-    "vite-plus": "1.6.0"
+    "tsrs": "7.1.0-beta.tsrs3",
+    "vite-plus": "1.7.0"
   },
   "private": true,
   "scripts": {
