@@ -143,6 +143,18 @@ type UseQueryArgs<Query extends Ref.AnyPublicQuery> =
     ? [args?: Ref.Args<Query> | "skip"]
     : [args: Ref.Args<Query> | "skip"];
 
+const isSubscriptionError = (value: unknown): value is Error => {
+  if (typeof Error.isError === "function") {
+    return Error.isError(value);
+  }
+  const tag = Object.prototype.toString.call(value);
+  return (
+    value instanceof Error ||
+    tag === "[object Error]" ||
+    tag === "[object DOMException]"
+  );
+};
+
 /**
  * Subscribes to a public query through the surrounding Convex React provider.
  * The result distinguishes a pending or skipped query from a decoded value or a
@@ -201,18 +213,19 @@ export const useQuery = <Query extends Ref.AnyPublicQuery>(
   const value: unknown = useConvexQueries(current.queries).query;
 
   return useMemo(() => {
-    if (!(value instanceof Error)) {
-      return value === undefined
-        ? QueryResult.load(skipped)
-        : QueryResult.succeed(Ref.decodeReturnsSync(ref, value));
-    }
     if (Ref.isConvexError(value)) {
       const decoded = Ref.decodeErrorOption(ref, value.data);
       if (Option.isSome(decoded)) {
         return QueryResult.fail(decoded.value);
       }
+      throw value;
     }
-    throw value;
+    if (isSubscriptionError(value)) {
+      throw value;
+    }
+    return value === undefined
+      ? QueryResult.load(skipped)
+      : QueryResult.succeed(Ref.decodeReturnsSync(ref, value));
   }, [ref, skipped, value]);
 };
 

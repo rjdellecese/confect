@@ -1,6 +1,7 @@
 import { FunctionSpec, Ref } from "@confect/core";
 import { it } from "@effect/vitest";
 import { renderHook } from "@testing-library/react";
+import { runInNewContext } from "node:vm";
 import { ConvexError } from "convex/values";
 import type { Value } from "convex/values";
 import type { FunctionReference } from "convex/server";
@@ -168,6 +169,12 @@ beforeEach(() => {
   useConvexPaginatedQueryInternalMock.mockReset();
 });
 
+const foreignError = () => {
+  const error: unknown = runInNewContext('new Error("foreign failure")');
+  assert(Error.isError(error));
+  return error;
+};
+
 describe("useQuery", () => {
   test("returns Loading when convex returns undefined", () => {
     useConvexQueriesMock.mockReturnValue({});
@@ -199,6 +206,60 @@ describe("useQuery", () => {
     assert(QueryResult.isFailure(result.current));
     expect(result.current.error).toBeInstanceOf(NotFound);
     expect(result.current.error.id).toBe("abc");
+  });
+
+  test("decodes a declared ConvexError from another realm", () => {
+    const error = Object.assign(foreignError(), {
+      [Symbol.for("ConvexError")]: true,
+      data: { _tag: "NotFound", id: "abc" },
+    });
+    expect(error).not.toBeInstanceOf(Error);
+    useConvexQueriesMock.mockReturnValue({ query: error });
+
+    const { result } = renderHook(() =>
+      useQuery(queryWithError, { id: "abc" }),
+    );
+
+    assert(QueryResult.isFailure(result.current));
+    expect(result.current.error).toBeInstanceOf(NotFound);
+    expect(result.current.error.id).toBe("abc");
+  });
+
+  test.each(["ConvexError", "Error"])(
+    "rethrows an undeclared foreign %s unchanged",
+    (kind) => {
+      const error =
+        kind === "ConvexError"
+          ? Object.assign(foreignError(), {
+              [Symbol.for("ConvexError")]: true,
+              data: { _tag: "Other" },
+            })
+          : foreignError();
+      expect(error).not.toBeInstanceOf(Error);
+      useConvexQueriesMock.mockReturnValue({ query: error });
+
+      const thrown = Result.try(() =>
+        renderHook(() => useQuery(queryWithError, { id: "abc" })),
+      ).pipe(Result.flip, Result.getOrThrow);
+      expect(thrown).toBe(error);
+    },
+  );
+
+  test("decodes an error-shaped Convex record as a success", () => {
+    useConvexQueriesMock.mockReturnValue({
+      query: {
+        name: "ConvexError",
+        message: "ordinary data",
+        data: { _tag: "NotFound", id: "abc" },
+        text: "hello",
+      },
+    });
+
+    const { result } = renderHook(() =>
+      useQuery(queryWithError, { id: "abc" }),
+    );
+
+    expect(result.current).toEqual(QueryResult.succeed({ text: "hello" }));
   });
 
   test("rethrows a non-ConvexError as a defect", () => {
