@@ -64,7 +64,38 @@ const fixture = Effect.gen(function* () {
   git("update-ref", "refs/remotes/origin/main", sha);
   const prepare = (ref = sha, target = destination) =>
     Bun.spawnSync(["bash", script, ref, target], { cwd: source });
-  return { source, destination, git, write, sha, prepare };
+  const addGenerator = Effect.gen(function* () {
+    yield* write(
+      "package.json",
+      '{"type":"module","scripts":{"docs:api":"node scripts/docsApi.ts"}}',
+    );
+    yield* write("packages/core/src/Api.ts", "Selected source API");
+    yield* write("apps/docs/.gitignore", "api/reference/\n");
+    yield* write(
+      "scripts/docsApi.ts",
+      `
+import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { join, resolve } from "node:path";
+assert.equal(process.argv[2], "--check");
+assert.equal(process.argv[3], "--out");
+const output = process.argv[4];
+assert.notEqual(resolve(output), resolve("apps/docs"));
+const source = readFileSync("packages/core/src/Api.ts", "utf8");
+const sha = execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim();
+mkdirSync(join(output, "api/reference"), { recursive: true });
+writeFileSync(join(output, "api/reference/source.mdx"), sha + "\\n" + source);
+writeFileSync(join(output, "docs.json"), JSON.stringify({ navigation: { groups: [{ group: "API Reference", pages: ["api/reference/source"] }] } }));
+if (source === "invalid") process.exit(1);
+`,
+    );
+    git("add", ".");
+    git("commit", "-m", "Add fixture generator");
+    git("update-ref", "refs/remotes/origin/main", "HEAD");
+    return git("rev-parse", "HEAD");
+  });
+  return { source, destination, git, write, sha, prepare, addGenerator };
 });
 
 test("stages an exact docs snapshot and removes stale deployment workflows without changing history", () =>
@@ -122,13 +153,41 @@ test("rejects the source checkout, non-root destinations, and dirty release chec
     }),
   ));
 
-test("redirects legacy versioned navigation pages only to existing current pages", () =>
+type NavigationPage = string | { readonly pages: readonly NavigationPage[] };
+
+const navigationPages = (pages: readonly NavigationPage[]): string[] =>
+  Array.flatMap(pages, (page) =>
+    typeof page === "string" ? [page] : navigationPages(page.pages),
+  );
+
+test("redirects legacy guide groups without inventing versioned API reference routes", () =>
   Effect.runPromise(
     Effect.gen(function* () {
-      const pages = Array.flatMap(docsConfig.navigation.groups, (group) =>
-        Array.flatMap(group.pages, (page) =>
-          typeof page === "string" ? [page] : page.pages,
+      const legacyGroups = [
+        "Getting Started",
+        "Concepts",
+        "Server",
+        "Clients",
+        "Guides",
+      ];
+      const guideTabs = Array.filter(
+        docsConfig.navigation.tabs,
+        (tab) => tab.tab === "Guides",
+      );
+      expect(guideTabs).toHaveLength(1);
+      const groups = Array.filter(
+        Array.flatMap(
+          guideTabs,
+          (
+            tab,
+          ): readonly { group: string; pages: readonly NavigationPage[] }[] =>
+            tab.groups,
         ),
+        (group) => legacyGroups.includes(group.group),
+      );
+      expect(Array.map(groups, (group) => group.group)).toEqual(legacyGroups);
+      const pages = Array.flatMap(groups, (group) =>
+        navigationPages(group.pages),
       );
       expect(docsConfig.redirects).toEqual(
         Array.flatMap(["v9", "v10"], (version) =>
@@ -161,8 +220,87 @@ test("rejects prereleases, retired v9, and stable versions without a published a
       }
       git("tag", "-d", "@confect/core@10.0.0");
       git("tag", "@confect/core@10.0.0");
+      git("checkout", "--detach", sha);
       expect(prepare(sha).exitCode).not.toBe(0);
       expect(git("-C", destination, "status", "--porcelain")).toBe("");
+    }),
+  ));
+
+test("generates the selected source snapshot including ignored API pages without changing source files", () =>
+  Effect.runPromise(
+    Effect.gen(function* () {
+      const { source, destination, git, write, prepare, addGenerator } =
+        yield* fixture;
+      const selected = yield* addGenerator;
+      yield* write("packages/core/src/Api.ts", "Later main API");
+      yield* write("scripts/docsApi.ts", "process.exit(1);\n");
+      git("add", ".");
+      git("commit", "-m", "Change later main API");
+      git("update-ref", "refs/remotes/origin/main", "HEAD");
+      git("checkout", "--detach", selected);
+      const result = prepare(selected);
+      expect(result.exitCode).toBe(0);
+      const generated = yield* fs.readFileString(
+        join(destination, "apps/docs/api/reference/source.mdx"),
+      );
+      expect(generated).toBe(`${selected}\nSelected source API`);
+      expect(git("-C", destination, "ls-files")).toContain(
+        "apps/docs/api/reference/source.mdx",
+      );
+      const config = yield* fs.readFileString(
+        join(destination, "apps/docs/docs.json"),
+      );
+      expect(config).toContain("api/reference/source");
+      expect(git("status", "--porcelain", "--ignored")).toBe("");
+      const originalConfig = yield* fs.readFileString(
+        join(source, "apps/docs/docs.json"),
+      );
+      expect(originalConfig).toBe('{"navigation":{"groups":[]}}\n');
+      git("-C", destination, "commit", "-m", "Deploy generated fixture docs");
+      expect(prepare(selected).exitCode).toBe(0);
+      expect(git("-C", destination, "status", "--porcelain")).toBe("");
+    }),
+  ));
+
+test("leaves the destination untouched when API validation fails after writing generated files", () =>
+  Effect.runPromise(
+    Effect.gen(function* () {
+      const { destination, git, write, prepare, addGenerator } = yield* fixture;
+      yield* addGenerator;
+      yield* write("packages/core/src/Api.ts", "invalid");
+      git("add", ".");
+      git("commit", "-m", "Invalidate fixture API");
+      git("update-ref", "refs/remotes/origin/main", "HEAD");
+      const before = git("-C", destination, "write-tree");
+      expect(prepare(git("rev-parse", "HEAD")).exitCode).not.toBe(0);
+      expect(git("-C", destination, "write-tree")).toBe(before);
+      expect(git("-C", destination, "status", "--porcelain", "--ignored")).toBe(
+        "",
+      );
+      const oldDocs = yield* fs.readFileString(
+        join(destination, "apps/docs/old.mdx"),
+      );
+      expect(oldDocs).toBe("Old docs");
+      expect(git("status", "--porcelain", "--ignored")).toBe("");
+    }),
+  ));
+
+test("rejects mismatched HEAD and staged or unstaged source changes before publication", () =>
+  Effect.runPromise(
+    Effect.gen(function* () {
+      const { destination, git, write, prepare, addGenerator } = yield* fixture;
+      const selected = yield* addGenerator;
+      git("commit", "--allow-empty", "-m", "Advance source HEAD");
+      git("update-ref", "refs/remotes/origin/main", "HEAD");
+      expect(prepare(selected).exitCode).not.toBe(0);
+      git("checkout", "--detach", selected);
+      yield* write("packages/core/src/Api.ts", "Uncommitted API");
+      expect(prepare(selected).exitCode).not.toBe(0);
+      git("add", ".");
+      expect(prepare(selected).exitCode).not.toBe(0);
+      expect(git("-C", destination, "status", "--porcelain", "--ignored")).toBe(
+        "",
+      );
     }),
   ));
 
