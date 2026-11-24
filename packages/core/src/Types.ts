@@ -23,7 +23,7 @@ export type OmitKey<T, K extends PropertyKey> = {
  * @internal
  */
 export type IsOptional<T, K extends keyof T> =
-  {} extends Pick<T, K> ? true : false;
+  Record<never, never> extends Pick<T, K> ? true : false;
 
 /**
  * @internal
@@ -121,6 +121,7 @@ export interface TypeDefect<Message extends string, T = never> {
  */
 export type IsRecursive<T> = true extends DetectCycle<T> ? true : false;
 
+// oxlint-disable-next-line typescript/no-explicit-any -- Brand's key is invariant; inferring each key raised the IsRecursive object-union probe from 1,180 to 1,411 instantiations.
 type NonRecursiveLeaf = Brand.Brand<any> | GenericId<string> | ArrayBuffer;
 
 type IsSame<A, B> =

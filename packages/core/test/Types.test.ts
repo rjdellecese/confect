@@ -27,16 +27,23 @@ describe("OmitKey", () => {
 
   test("retains named fields beside an index signature", () => {
     type Remaining = OmitKey<
+      // oxlint-disable-next-line quality/no-unsafe-dictionary-type -- OmitKey must retain an unknown-valued index signature when a known field is removed.
       { [key: string]: unknown; required: string; removed: number },
       "removed"
     >;
     expectTypeOf<Remaining["required"]>().toEqualTypeOf<string>();
     expectTypeOf<Remaining["removed"]>().toBeUnknown();
-    expectTypeOf<{}>().not.toExtend<Remaining>();
+    expectTypeOf({}).not.toExtend<Remaining>();
   });
 });
 
 describe("IsOptional", () => {
+  test("a string index signature requires no particular key", () => {
+    expectTypeOf<
+      IsOptional<Record<string, string>, string>
+    >().toEqualTypeOf<true>();
+  });
+
   test("{ foo?: any } = true", () => {
     expectTypeOf<IsOptional<{ foo?: any }, "foo">>().toEqualTypeOf<true>();
   });
@@ -64,7 +71,8 @@ describe("IsAny", () => {
   });
 
   test("{} = false", () => {
-    expectTypeOf<IsAny<{}>>().toEqualTypeOf<false>();
+    const empty = {};
+    expectTypeOf<IsAny<typeof empty>>().toEqualTypeOf<false>();
   });
 });
 
@@ -241,10 +249,12 @@ describe("IsRecord", () => {
     });
 
     test("Record<string, any>", () => {
+      // oxlint-disable-next-line quality/no-unsafe-dictionary-type -- IsRecord classifies dictionary shapes independently of their any-valued entries.
       expectTypeOf<IsRecord<Record<string, any>>>().toEqualTypeOf<true>();
     });
 
     test("Record<string, unknown>", () => {
+      // oxlint-disable-next-line quality/no-unsafe-dictionary-type -- An unknown-valued string dictionary is itself an input case for IsRecord.
       expectTypeOf<IsRecord<Record<string, unknown>>>().toEqualTypeOf<true>();
     });
 
@@ -375,7 +385,8 @@ describe("IsRecord", () => {
 
   describe("edge cases", () => {
     test("empty object {}", () => {
-      expectTypeOf<IsRecord<{}>>().toEqualTypeOf<false>();
+      const empty = {};
+      expectTypeOf<IsRecord<typeof empty>>().toEqualTypeOf<false>();
     });
 
     test("Record<string, string> & { extraProp: number }", () => {
@@ -567,8 +578,8 @@ describe("IsRecursive", () => {
     });
 
     test("empty object", () => {
-      type EmptyObject = {};
-      expectTypeOf<IsRecursive<EmptyObject>>().toEqualTypeOf<false>();
+      const empty = {};
+      expectTypeOf<IsRecursive<typeof empty>>().toEqualTypeOf<false>();
     });
 
     test("empty array", () => {

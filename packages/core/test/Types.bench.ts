@@ -1,6 +1,7 @@
 import { bench } from "confect-bench-harness";
 import type { IsRecursive } from "@confect/core/Types";
 
+// oxlint-disable-next-line typescript/no-explicit-any -- This baseline primes the exact IsRecursive<any> branch before measuring concrete type instantiations.
 void (false satisfies IsRecursive<any>);
 
 bench("IsRecursive<string>", () => false satisfies IsRecursive<string>).types([

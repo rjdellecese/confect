@@ -15,6 +15,34 @@ const makeInstrumented = () => {
 };
 
 describe("Table", () => {
+  it("returns Convex index declarations without forcing the table schema", () => {
+    let evaluations = 0;
+    const table = Table.make(() => {
+      evaluations += 1;
+      return Schema.Struct({
+        text: Schema.String,
+        kind: Schema.String,
+        embedding: Schema.Array(Schema.Finite),
+      });
+    })
+      .index("by_text", ["text"])
+      .searchIndex("search", { searchField: "text", filterFields: ["kind"] })
+      .vectorIndex("vector", { vectorField: "embedding", dimensions: 3 })(
+      "notes",
+    );
+
+    const { indexes, searchIndexes, vectorIndexes } =
+      Table.indexDefinitions(table);
+    expect(indexes).toEqual({ by_text: ["text"] });
+    expect(searchIndexes).toEqual({
+      search: { searchField: "text", filterFields: ["kind"] },
+    });
+    expect(vectorIndexes).toEqual({
+      vector: { vectorField: "embedding", dimensions: 3 },
+    });
+    expect(evaluations).toBe(0);
+  });
+
   it("indexes a 45-member literal union without forcing schemas or widening field paths", () => {
     const members = [
       "member_01",

@@ -162,8 +162,10 @@ export type MiddlewareOptions<Options_ = never> = {
  */
 export interface AnyMiddlewareImpl {
   (
+    // oxlint-disable-next-line typescript/no-explicit-any -- The registry accepts wrappers with different downstream errors and required services, checked for each MiddlewareImpl at registration.
     effect: Effect.Effect<SuccessValue, any, any>,
     context: MiddlewareOptions | MiddlewareOptions<unknown>,
+    // oxlint-disable-next-line typescript/no-explicit-any -- This erased wrapper may add or provide services and fail with the spec’s declared error; only the enclosing function knows those channels.
   ): Effect.Effect<SuccessValue, any, any>;
 }
 
@@ -289,13 +291,13 @@ export interface AnyMiddlewareSpec {
   readonly [TypeId]: TypeId;
   readonly key: string;
   readonly functionTypes: SupportedFunctionTypes;
-  readonly error?: Schema.Codec<any, any>;
-  readonly options?: Schema.Schema<any>;
-  readonly "~Provides": any;
-  readonly "~Requires": any;
-  readonly "~Error": any;
+  readonly error?: Schema.Codec<unknown>;
+  readonly options?: Schema.Schema<unknown>;
+  readonly "~Provides": unknown;
+  readonly "~Requires": unknown;
+  readonly "~Error": Schema.Codec<unknown>;
   readonly "~FunctionTypes": FunctionType;
-  readonly "~Options": any;
+  readonly "~Options": Schema.Schema<unknown>;
 }
 
 /**
@@ -426,7 +428,13 @@ export type FunctionTypes<MiddlewareSpec_ extends AnyMiddlewareSpec> =
  * @throws If no function kind is enabled.
  */
 export const MiddlewareSpec =
-  <Self, Config extends { provides?: unknown; requires?: unknown } = {}>() =>
+  <
+    Self,
+    Config extends { provides?: unknown; requires?: unknown } = Record<
+      never,
+      never
+    >,
+  >() =>
   <
     const Key_ extends string,
     const FunctionTypesConfig_ extends SupportedFunctionTypes,
@@ -505,7 +513,7 @@ type ValidateFunctionTypesConfig<Config extends SupportedFunctionTypes> =
  */
 export const errorSchemas = (
   middlewareSpecs: ReadonlyArray<AnyMiddlewareSpec>,
-): ReadonlyArray<Schema.Codec<any, any>> =>
+): ReadonlyArray<Schema.Codec<unknown>> =>
   Array.flatMap(middlewareSpecs, (middlewareSpec) =>
     "error" in middlewareSpec && middlewareSpec.error !== undefined
       ? [middlewareSpec.error]

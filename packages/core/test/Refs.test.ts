@@ -145,7 +145,7 @@ describe("make", () => {
       Ref.ConfectRef<
         RuntimeAndFunctionType.ConvexQuery,
         "internal",
-        {},
+        Record<never, never>,
         typeof FnReturns
       >
     >();
@@ -182,7 +182,7 @@ describe("make", () => {
       Ref.ConfectRef<
         RuntimeAndFunctionType.ConvexQuery,
         "internal",
-        {},
+        Record<never, never>,
         typeof FnReturns
       >
     >();
@@ -216,7 +216,7 @@ describe("make", () => {
       Ref.ConfectRef<
         RuntimeAndFunctionType.ConvexQuery,
         "public",
-        {},
+        Record<never, never>,
         typeof FnReturns
       >
     >();

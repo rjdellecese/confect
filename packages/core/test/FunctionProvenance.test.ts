@@ -36,14 +36,15 @@ describe("Confect", () => {
   });
 
   it("does not install an error getter when no error callback is supplied", () => {
+    const fields = {};
     const provenance = FunctionProvenance.Confect(
-      () => ({}),
+      () => fields,
       () => Schema.String,
     );
 
     expectTypeOf(provenance).toEqualTypeOf<
       FunctionProvenance.Confect<
-        {},
+        typeof fields,
         typeof Schema.String,
         never,
         FunctionProvenance.Standard
@@ -92,13 +93,14 @@ describe("ConfectPaginated", () => {
   });
 
   it("preserves the no-error type and absent error property", () => {
+    const fields = {};
     const provenance = FunctionProvenance.ConfectPaginated(
-      () => ({}),
+      () => fields,
       () => Schema.String,
     );
 
     expectTypeOf(provenance).toEqualTypeOf<
-      FunctionProvenance.ConfectPaginated<{}, typeof Schema.String>
+      FunctionProvenance.ConfectPaginated<typeof fields, typeof Schema.String>
     >();
     expect("error" in provenance).toBe(false);
   });

@@ -15,6 +15,21 @@ import type { GenericValidator } from "convex/values";
 import * as Predicate from "effect/Predicate";
 import type * as Schema from "effect/Schema";
 
+type NoIndexes = Record<never, never>;
+
+interface IndexDefinitions {
+  readonly indexes: Record<string, [string, ...Array<string>]>;
+  readonly searchIndexes: Record<string, SearchIndexConfig<string, string>>;
+  readonly vectorIndexes: Record<string, VectorIndexConfig<string, string>>;
+}
+
+/**
+ * @internal
+ */
+export const indexDefinitions = (table: AnyWithProps): IndexDefinitions =>
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion, quality/no-chained-type-assertions -- makeBound stores IndexDefinitions unchanged; the public properties model Convex's implicit tiebreaker and filter-field unions instead.
+  table as unknown as IndexDefinitions;
+
 /**
  * @internal
  */
@@ -75,9 +90,9 @@ export interface Table<
   TableSchema_ extends Schema.Codec<unknown>,
   TableValidator_ extends GenericValidator =
     TableSchemaToTableValidator<TableSchema_>,
-  Indexes_ extends GenericTableIndexes = {},
-  SearchIndexes_ extends GenericTableSearchIndexes = {},
-  VectorIndexes_ extends GenericTableVectorIndexes = {},
+  Indexes_ extends GenericTableIndexes = NoIndexes,
+  SearchIndexes_ extends GenericTableSearchIndexes = NoIndexes,
+  VectorIndexes_ extends GenericTableVectorIndexes = NoIndexes,
 > {
   /**
    * @internal
@@ -135,7 +150,9 @@ export interface Any {
  * @internal
  */
 export type AnyWithProps = Table<
+  // oxlint-disable-next-line typescript/no-explicit-any -- The public erased table accepts any filename literal, including callers deriving a model's indexed name from this slot.
   any,
+  // oxlint-disable-next-line typescript/no-explicit-any -- Erased table consumers decode and encode heterogeneous documents; unknown breaks Document.encode and DatabaseWriter.patch.
   Schema.Codec<any, any>,
   GenericValidator,
   GenericTableIndexes,
@@ -168,9 +185,9 @@ export interface UnnamedTable<
   TableSchema_ extends Schema.Codec<unknown>,
   TableValidator_ extends GenericValidator =
     TableSchemaToTableValidator<TableSchema_>,
-  Indexes_ extends GenericTableIndexes = {},
-  SearchIndexes_ extends GenericTableSearchIndexes = {},
-  VectorIndexes_ extends GenericTableVectorIndexes = {},
+  Indexes_ extends GenericTableIndexes = NoIndexes,
+  SearchIndexes_ extends GenericTableSearchIndexes = NoIndexes,
+  VectorIndexes_ extends GenericTableVectorIndexes = NoIndexes,
 > {
   /**
    * Binds the filename-derived table name in a generated wrapper.
@@ -329,7 +346,7 @@ export interface UnnamedAny {
  * @internal
  */
 export type UnnamedAnyWithProps = UnnamedTable<
-  Schema.Codec<any, any>,
+  AnyWithProps["Fields"],
   GenericValidator,
   GenericTableIndexes,
   GenericTableSearchIndexes,
@@ -415,14 +432,8 @@ export type TablesRecord<Tables extends AnyWithProps> = {
 
 interface UnnamedState<
   TableSchema_ extends Schema.Codec<unknown>,
-  Indexes_ extends GenericTableIndexes,
-  SearchIndexes_ extends GenericTableSearchIndexes,
-  VectorIndexes_ extends GenericTableVectorIndexes,
-> {
+> extends IndexDefinitions {
   readonly lazyFields: () => TableSchema_;
-  readonly indexes: Indexes_;
-  readonly searchIndexes: SearchIndexes_;
-  readonly vectorIndexes: VectorIndexes_;
 }
 
 const makeBound = <
@@ -434,7 +445,7 @@ const makeBound = <
   VectorIndexes_ extends GenericTableVectorIndexes,
 >(
   tableName: Name_,
-  state: UnnamedState<TableSchema_, Indexes_, SearchIndexes_, VectorIndexes_>,
+  state: UnnamedState<TableSchema_>,
 ): Table<
   Name_,
   TableSchema_,
@@ -444,19 +455,12 @@ const makeBound = <
   VectorIndexes_
 > => {
   const bound = {
-    [TypeId]: TypeId as TypeId,
+    [TypeId]: TypeId,
     tableName,
     indexes: state.indexes,
     searchIndexes: state.searchIndexes,
     vectorIndexes: state.vectorIndexes,
-  } as Table<
-    Name_,
-    TableSchema_,
-    TableValidator_,
-    Indexes_,
-    SearchIndexes_,
-    VectorIndexes_
-  >;
+  } as const;
 
   Lazy.defineProperty(bound, "Fields", () => state.lazyFields());
 
@@ -464,7 +468,15 @@ const makeBound = <
     SystemFields.extendWithSystemFields(tableName, bound.Fields),
   );
 
-  return bound;
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion, quality/no-chained-type-assertions -- The installed codecs are real; Convex's modeled indexes and ~TableValidator witness describe types, not additional runtime data.
+  return bound as unknown as Table<
+    Name_,
+    TableSchema_,
+    TableValidator_,
+    Indexes_,
+    SearchIndexes_,
+    VectorIndexes_
+  >;
 };
 
 const makeUnnamed = <
@@ -474,7 +486,7 @@ const makeUnnamed = <
   SearchIndexes_ extends GenericTableSearchIndexes,
   VectorIndexes_ extends GenericTableVectorIndexes,
 >(
-  state: UnnamedState<TableSchema_, Indexes_, SearchIndexes_, VectorIndexes_>,
+  state: UnnamedState<TableSchema_>,
 ): UnnamedTable<
   TableSchema_,
   TableValidator_,
@@ -515,10 +527,7 @@ const makeUnnamed = <
   const index: UnnamedTableFunction<"index"> = (name, fields) =>
     makeUnnamed({
       lazyFields: state.lazyFields,
-      indexes: {
-        ...state.indexes,
-        [name]: fields,
-      } as any,
+      indexes: { ...state.indexes, [name]: fields },
       searchIndexes: state.searchIndexes,
       vectorIndexes: state.vectorIndexes,
     });
@@ -533,7 +542,7 @@ const makeUnnamed = <
       searchIndexes: {
         ...state.searchIndexes,
         [name]: indexConfig,
-      } as any,
+      },
       vectorIndexes: state.vectorIndexes,
     });
 
@@ -548,9 +557,10 @@ const makeUnnamed = <
       vectorIndexes: {
         ...state.vectorIndexes,
         [name]: indexConfig,
-      } as any,
+      },
     });
 
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion, quality/no-chained-type-assertions -- Deployment metadata models Convex's implicit tiebreaker and filter-field unions, and ~TableValidator has no runtime value.
   return Object.assign(bind, {
     [TypeId]: TypeId,
     indexes: state.indexes,
@@ -559,7 +569,7 @@ const makeUnnamed = <
     index,
     searchIndex,
     vectorIndex,
-  }) as UnnamedTable_;
+  }) as unknown as UnnamedTable_;
 };
 
 /**
@@ -593,7 +603,13 @@ export const make = <const TableSchema_ extends Schema.Codec<unknown>>(
 ): UnnamedTable<TableSchema_, TableSchemaToTableValidator<TableSchema_>> => {
   type TableValidator_ = TableSchemaToTableValidator<TableSchema_>;
 
-  return makeUnnamed<TableSchema_, TableValidator_, {}, {}, {}>({
+  return makeUnnamed<
+    TableSchema_,
+    TableValidator_,
+    NoIndexes,
+    NoIndexes,
+    NoIndexes
+  >({
     lazyFields,
     indexes: {},
     searchIndexes: {},

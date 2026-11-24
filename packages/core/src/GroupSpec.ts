@@ -189,13 +189,13 @@ export interface Any {
 /**
  * @internal
  */
-export interface AnyWithProps extends GroupSpec<
+export type AnyWithProps = GroupSpec<
   RuntimeAndFunctionType.Runtime,
   string,
   FunctionSpec.AnyWithProps,
   AnyWithProps,
   MiddlewareSpec.AnyMiddlewareSpec
-> {}
+>;
 
 /**
  * @internal
@@ -386,6 +386,7 @@ const makeProto = <
   Groups_,
   MiddlewareAttachments_[number]["spec"]
 > =>
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- GroupSpec exposes type-only function and subgroup unions; the shared prototype and these own fields are its runtime representation.
   Object.assign(Object.create(Proto), {
     runtime,
     experimental_reuseContext:
@@ -493,6 +494,7 @@ export function withName<const Name_ extends string, Group extends Any>(
  */
 export function withName(name: string, group: Any): AnyWithProps {
   validateConfectFunctionIdentifier(name);
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- withName accepts the opaque group brand; the runtime fields come from make or makeNode even when the caller erased their types.
   const group_ = group as AnyWithProps;
 
   if (group_.name === name) {

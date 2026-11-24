@@ -169,74 +169,74 @@ export interface Any {
 /**
  * @internal
  */
-export interface AnyWithProps extends FunctionSpec<
+export type AnyWithProps = FunctionSpec<
   RuntimeAndFunctionType.RuntimeAndFunctionType,
   FunctionVisibility,
   string,
   FunctionProvenance.FunctionProvenance,
   MiddlewareSpec.AnyMiddlewareSpec
-> {}
+>;
 
 /**
  * @internal
  */
-export interface AnyConfect extends FunctionSpec<
+export type AnyConfect = FunctionSpec<
   RuntimeAndFunctionType.RuntimeAndFunctionType,
   FunctionVisibility,
   string,
   FunctionProvenance.AnyConfect,
   MiddlewareSpec.AnyMiddlewareSpec
-> {}
+>;
 
 /**
  * @internal
  */
-export interface AnyConvex extends FunctionSpec<
+export type AnyConvex = FunctionSpec<
   RuntimeAndFunctionType.RuntimeAndFunctionType,
   FunctionVisibility,
   string,
   FunctionProvenance.AnyConvex,
   MiddlewareSpec.AnyMiddlewareSpec
-> {}
+>;
 
 /**
  * @internal
  */
-export interface AnyWithPropsWithRuntime<
+export type AnyWithPropsWithRuntime<
   Runtime extends RuntimeAndFunctionType.Runtime,
-> extends FunctionSpec<
+> = FunctionSpec<
   RuntimeAndFunctionType.WithRuntime<Runtime>,
   FunctionVisibility,
   string,
   FunctionProvenance.FunctionProvenance,
   MiddlewareSpec.AnyMiddlewareSpec
-> {}
+>;
 
 /**
  * @internal
  */
-export interface AnyWithPropsWithFunctionType<
+export type AnyWithPropsWithFunctionType<
   RuntimeAndFunctionType_ extends RuntimeAndFunctionType.RuntimeAndFunctionType,
-> extends FunctionSpec<
+> = FunctionSpec<
   RuntimeAndFunctionType_,
   FunctionVisibility,
   string,
   FunctionProvenance.FunctionProvenance,
   MiddlewareSpec.AnyMiddlewareSpec
-> {}
+>;
 
 /**
  * @internal
  */
-export interface AnyWithPropsWithFunctionProvenance<
+export type AnyWithPropsWithFunctionProvenance<
   FunctionProvenance_ extends FunctionProvenance.FunctionProvenance,
-> extends FunctionSpec<
+> = FunctionSpec<
   RuntimeAndFunctionType.RuntimeAndFunctionType,
   FunctionVisibility,
   string,
   FunctionProvenance_,
   MiddlewareSpec.AnyMiddlewareSpec
-> {}
+>;
 
 /**
  * @internal
@@ -492,7 +492,7 @@ const Proto = {
       );
     }
 
-    return Object.assign(Object.create(Proto), {
+    return makeBuilder({
       runtimeAndFunctionType: this.runtimeAndFunctionType,
       functionVisibility: this.functionVisibility,
       name: this.name,
@@ -503,7 +503,41 @@ const Proto = {
       ],
     });
   },
-} satisfies ThisType<AnyWithProps>;
+} satisfies ThisType<AnyWithProps> &
+  Pick<
+    Builder<
+      RuntimeAndFunctionType.RuntimeAndFunctionType,
+      FunctionVisibility,
+      string,
+      FunctionProvenance.FunctionProvenance,
+      MiddlewareSpec.AnyMiddlewareSpec
+    >,
+    typeof TypeId | "middleware" | "middlewareSpecs"
+  >;
+
+const makeBuilder = <
+  Runtime extends RuntimeAndFunctionType.RuntimeAndFunctionType,
+  Visibility extends FunctionVisibility,
+  Name_ extends string,
+  Provenance extends FunctionProvenance.FunctionProvenance,
+  Middleware extends MiddlewareSpec.AnyMiddlewareSpec = never,
+>(
+  fields: Pick<
+    FunctionSpec<Runtime, Visibility, Name_, Provenance, Middleware>,
+    | "runtimeAndFunctionType"
+    | "functionVisibility"
+    | "name"
+    | "functionProvenance"
+    | "middlewareAttachments"
+  >,
+): Builder<Runtime, Visibility, Name_, Provenance, Middleware> =>
+  // oxlint-disable-next-line typescript/no-unsafe-return -- Object.create erases the shared prototype supplying the builder's middleware method, getter, and TypeId; the own fields retain their spec types.
+  Object.assign(Object.create(Proto), fields);
+
+// oxlint-disable-next-line typescript/no-empty-object-type -- This is the inferred type of the empty fields literal; using ReturnType<typeof emptyArgs> in ref projections raised the small unfiltered probe from 307 to 442 instantiations.
+type EmptyArgsFields = {};
+
+const emptyArgs = (): EmptyArgsFields => ({});
 
 interface Options {
   readonly name: string;
@@ -548,19 +582,20 @@ const make = <
     RuntimeAndFunctionType_,
     FunctionVisibility_,
     Name_,
-    FunctionProvenance.Confect<{}, Returns_, Error_>
+    FunctionProvenance.Confect<EmptyArgsFields, Returns_, Error_>
   >;
   function makeSpec({ name, args, returns, error }: Options) {
     validateConfectFunctionIdentifier(name);
 
-    return Object.assign(Object.create(Proto), {
+    return makeBuilder({
       runtimeAndFunctionType,
       functionVisibility,
       name,
-      functionProvenance:
-        args === undefined
-          ? FunctionProvenance.Confect(() => ({}), returns, error)
-          : FunctionProvenance.Confect(args, returns, error),
+      functionProvenance: FunctionProvenance.Confect(
+        args ?? emptyArgs,
+        returns,
+        error,
+      ),
       middlewareAttachments: [],
     });
   }
@@ -623,19 +658,20 @@ const makePaginated = <
     RuntimeAndFunctionType_,
     FunctionVisibility_,
     Name_,
-    FunctionProvenance.ConfectPaginated<{}, Item_, Error_>
+    FunctionProvenance.ConfectPaginated<EmptyArgsFields, Item_, Error_>
   >;
   function makeSpec({ name, args, item, error }: PaginatedOptions) {
     validateConfectFunctionIdentifier(name);
 
-    return Object.assign(Object.create(Proto), {
+    return makeBuilder({
       runtimeAndFunctionType,
       functionVisibility,
       name,
-      functionProvenance:
-        args === undefined
-          ? FunctionProvenance.ConfectPaginated(() => ({}), item, error)
-          : FunctionProvenance.ConfectPaginated(args, item, error),
+      functionProvenance: FunctionProvenance.ConfectPaginated(
+        args ?? emptyArgs,
+        item,
+        error,
+      ),
       middlewareAttachments: [],
     });
   }
@@ -993,7 +1029,7 @@ const makeConvex =
   > => {
     validateConfectFunctionIdentifier(name);
 
-    return Object.assign(Object.create(Proto), {
+    return makeBuilder({
       runtimeAndFunctionType,
       functionVisibility,
       name,

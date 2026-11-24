@@ -34,7 +34,8 @@ export const isSpec = (u: unknown): u is AnyWithProps =>
  * @category Models
  */
 export interface Spec<
-  Groups_ extends Record.ReadonlyRecord<string, GroupSpec.AnyWithProps> = {},
+  Groups_ extends Record.ReadonlyRecord<string, GroupSpec.AnyWithProps> =
+    Record<never, never>,
 > {
   /**
    * The generated group record, preserving each group's precise declaration

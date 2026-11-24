@@ -12,6 +12,7 @@ import type {
   VLiteral,
   VNull,
   VObject,
+  VOptional,
   VRecord,
   VString,
   VUnion,
@@ -97,19 +98,20 @@ export const compileTableSchema = <TableSchema extends Schema.Codec<unknown>>(
 ): TableSchemaToTableValidator<TableSchema> => {
   const ast = Schema.toEncoded(schema).ast;
 
-  return pipe(
+  const validator = pipe(
     ast,
     Match.value,
-    Match.tag("Objects", ({ indexSignatures }) =>
-      Array.isReadonlyArrayEmpty(indexSignatures)
-        ? // oxlint-disable-next-line effecttsgo/unsafe-effect-type-assertion -- The return type is derived from the input schema and cannot be recovered from the runtime AST.
-          (compileAst(ast) as Effect.Effect<any>)
+    Match.tag("Objects", (objectsAst) =>
+      Array.isReadonlyArrayEmpty(objectsAst.indexSignatures)
+        ? compileAst(objectsAst)
         : Effect.fail(IndexSignaturesAreNotSupportedError.make()),
     ),
     Match.tag("Union", (unionAst) => compileAst(unionAst)),
     Match.orElse(() => Effect.fail(TopLevelMustBeObjectOrUnionError.make())),
     Effect.runSync,
   );
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- The validated AST determines the table's exact validator; the walker only exposes GenericValidator.
+  return validator as TableSchemaToTableValidator<TableSchema>;
 };
 
 // Compiler
@@ -190,7 +192,9 @@ type ConvertValueToValidator<
                 : [Vl] extends [ArrayBuffer]
                   ? VBytes<OptionalValue<ArrayBuffer, Optionality>, Optionality>
                   : IsRecursive<Vl> extends true
-                    ? VAny<any, Optionality>
+                    ? Optionality extends "optional"
+                      ? VOptional<VAny>
+                      : VAny
                     : Vl extends ReadonlyArray<infer El>
                       ? VArray<
                           OptionalValue<MutableValue<Array<El>>, Optionality>,
@@ -226,6 +230,7 @@ type ObjectValueToValidator<Vl, Optionality extends "required" | "optional"> =
       : never
     : ObjectFieldsToValidators<Vl> extends infer VdFields extends Record<
           string,
+          // oxlint-disable-next-line typescript/no-explicit-any -- Expanding PropertyValidators here raised the server's nested optional-object validator benchmark from 1,093 to 9,622 instantiations.
           any
         >
       ? VObject<
@@ -259,7 +264,9 @@ export type UndefinedOrValueToValidator<Vl extends ReadonlyValue | undefined> =
 
 type UnionValueToValidator<Vl, Optionality extends "required" | "optional"> =
   IsRecursive<Vl> extends true
-    ? VAny<any, Optionality>
+    ? Optionality extends "optional"
+      ? VOptional<VAny>
+      : VAny
     : VUnion<
         OptionalValue<MutableValue<Vl>, Optionality>,
         ValueTupleToValidatorTuple<UnionToTuple<Vl>>,
@@ -268,7 +275,8 @@ type UnionValueToValidator<Vl, Optionality extends "required" | "optional"> =
 
 type ValueTupleToValidatorTuple<
   VlTuple extends ReadonlyArray<unknown>,
-  Acc extends Array<Validator<unknown, "required", any>> = [],
+  Acc extends Array<GenericValidator & { readonly isOptional: "required" }> =
+    [],
 > = VlTuple extends
   | [true, false, ...infer VlRest]
   | [false, true, ...infer VlRest]
@@ -288,8 +296,9 @@ type OptionalValueToValidator<Vl> = [Vl] extends [
  */
 export const compileSchema = <T, E>(
   schema: Schema.Codec<T, E>,
-): ValueToValidator<(typeof schema)["Encoded"]> =>
-  Effect.runSync(compileAst(schema.ast)) as any;
+): ValueToValidator<E> =>
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- ValueToValidator retains the codec's exact encoded type, which the runtime AST walker erases.
+  Effect.runSync(compileAst(schema.ast)) as ValueToValidator<E>;
 
 /**
  * @internal
@@ -390,12 +399,11 @@ export const compileAst = (
         Match.tag("Unknown", "Any", () => Effect.succeed(v.any())),
         Match.tag("Declaration", (declaration) =>
           Effect.mapBoth(
-            // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- Codec inputs are context-free, but Effect's SchemaAST.DeclarationRun erases their requirements to `any`.
             declaration.run(declaration.typeParameters)(
               new ArrayBuffer(0),
               declaration,
               {},
-            ) as Effect.Effect<ArrayBuffer, unknown, never>,
+            ),
             {
               onSuccess: () => v.bytes(),
               onFailure: () =>

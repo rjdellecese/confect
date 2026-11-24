@@ -30,8 +30,12 @@ describe("make", () => {
       error: () => Schema.Finite,
     });
 
-    expectTypeOf<FunctionSpec.Args<typeof spec>>().toEqualTypeOf<{}>();
-    expectTypeOf<FunctionSpec.EncodedArgs<typeof spec>>().toEqualTypeOf<{}>();
+    expectTypeOf<FunctionSpec.Args<typeof spec>>().toEqualTypeOf<
+      Record<never, never>
+    >();
+    expectTypeOf<FunctionSpec.EncodedArgs<typeof spec>>().toEqualTypeOf<
+      Record<never, never>
+    >();
     expectTypeOf<FunctionSpec.ReturnsSchema<typeof spec>>().toEqualTypeOf<
       typeof Schema.String
     >();
@@ -41,7 +45,7 @@ describe("make", () => {
     expectTypeOf<FunctionSpec.Error<typeof spec>>().toEqualTypeOf<number>();
     expectTypeOf<
       Ref.OptionalArgs<Ref.FromFunctionSpec<typeof spec>>
-    >().toEqualTypeOf<[args?: {}]>();
+    >().toEqualTypeOf<[args?: Record<never, never>]>();
     expect(spec.functionProvenance.args.fields).toStrictEqual({});
   });
 

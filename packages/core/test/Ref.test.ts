@@ -316,7 +316,7 @@ describe("FunctionReference", () => {
       returns: () => Schema.Void,
     });
     type Ref_ = Ref.FromFunctionSpec<typeof _spec>;
-    expectTypeOf<Ref.Args<Ref_>>().toEqualTypeOf<{}>();
+    expectTypeOf<Ref.Args<Ref_>>().toEqualTypeOf<Record<never, never>>();
     expectTypeOf<Ref.Returns<Ref_>>().toEqualTypeOf<void>();
   });
 
@@ -410,7 +410,9 @@ describe("OptionalArgs", () => {
       returns: () => Schema.Void,
     });
     type Ref_ = Ref.FromFunctionSpec<typeof _spec>;
-    expectTypeOf<Ref.OptionalArgs<Ref_>>().toEqualTypeOf<[args?: {}]>();
+    expectTypeOf<Ref.OptionalArgs<Ref_>>().toEqualTypeOf<
+      [args?: Record<never, never>]
+    >();
   });
 
   test("required tuple when args have keys", () => {
@@ -862,7 +864,7 @@ describe("paginated queries", () => {
         Returns
       >;
       expectTypeOf<
-        NativeQuery<{}, ValidReturns>
+        NativeQuery<Record<never, never>, ValidReturns>
       >().not.toExtend<Ref.AnyPaginatedQuery>();
       expectTypeOf<
         NativeQuery<{ paginationOpts?: ConvexPaginationOptions }, ValidReturns>

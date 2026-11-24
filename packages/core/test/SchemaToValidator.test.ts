@@ -139,14 +139,15 @@ describe("ValueToValidator", () => {
   });
 
   it("constructs required record values independently of object optionality", () => {
+    const record = v.record(v.string(), v.any());
     const expected = v.object({
-      records: v.array(v.record(v.string(), v.any())),
-      optional: v.optional(v.record(v.string(), v.any())),
+      records: v.array(record),
+      optional: v.optional(record),
     });
     expectTypeOf<
       ValueToValidator<{
-        readonly records: ReadonlyArray<Record<string, any>>;
-        readonly optional?: Record<string, any>;
+        readonly records: ReadonlyArray<typeof record.type>;
+        readonly optional?: typeof record.type;
       }>
     >().toEqualTypeOf<typeof expected>();
   });
@@ -192,11 +193,12 @@ describe("ValueToValidator", () => {
   });
 
   it("keeps optional fields in record values", () => {
+    const metadata = v.record(v.string(), v.any());
     const expected = v.record(
       v.string(),
       v.object({
         labels: v.array(v.literal("label")),
-        metadata: v.optional(v.record(v.string(), v.any())),
+        metadata: v.optional(metadata),
       }),
     );
     expectTypeOf<
@@ -205,7 +207,7 @@ describe("ValueToValidator", () => {
           string,
           {
             readonly labels: ReadonlyArray<"label">;
-            readonly metadata?: Record<string, any>;
+            readonly metadata?: typeof metadata.type;
           }
         >
       >
@@ -320,7 +322,8 @@ describe("UndefinedOrValueToValidator", () => {
   it("matches native optional wrapping for arrays, objects, records, and unions", () => {
     type ArrayValue = ReadonlyArray<string>;
     type ObjectValue = { readonly name: string };
-    type RecordValue = Record<string, any>;
+    const record = v.record(v.string(), v.any());
+    const optionalRecord = v.optional(record);
     type UnionValue = string | number | null;
     expectTypeOf<
       UndefinedOrValueToValidator<ArrayValue | undefined>
@@ -329,8 +332,8 @@ describe("UndefinedOrValueToValidator", () => {
       UndefinedOrValueToValidator<ObjectValue | undefined>
     >().toEqualTypeOf<VOptional<ValueToValidator<ObjectValue>>>();
     expectTypeOf<
-      UndefinedOrValueToValidator<RecordValue | undefined>
-    >().toEqualTypeOf<VOptional<ValueToValidator<RecordValue>>>();
+      UndefinedOrValueToValidator<typeof record.type | undefined>
+    >().toEqualTypeOf<typeof optionalRecord>();
     expectTypeOf<
       UndefinedOrValueToValidator<UnionValue | undefined>
     >().toEqualTypeOf<VOptional<ValueToValidator<UnionValue>>>();
