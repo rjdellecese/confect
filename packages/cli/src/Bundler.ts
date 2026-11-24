@@ -708,18 +708,16 @@ export const bundle = Effect.fn("Bundler.bundle")(
   (
     entryPoint: string,
     options?: { readonly plugins?: ReadonlyArray<esbuild.Plugin> },
-  ) => bundleWith(entryPoint, BundleRequire.dynamicImport, options),
+  ) => bundleWith(entryPoint, "import", options),
 );
 
 export const check = Effect.fn("Bundler.check")((entryPoint: string) =>
-  bundleWith(entryPoint).pipe(Effect.asVoid),
+  bundleWith(entryPoint, "check").pipe(Effect.asVoid),
 );
 
 const bundleWith = Effect.fnUntraced(function* (
   entryPoint: string,
-  load?: (
-    ...args: Parameters<typeof BundleRequire.dynamicImport>
-  ) => Promise<unknown>,
+  mode: "import" | "check",
   options?: { readonly plugins?: ReadonlyArray<esbuild.Plugin> },
 ): Effect.fn.Return<Bundled, BundlerError, Path.Path | FileSystem.FileSystem> {
   const path = yield* Path.Path;
@@ -747,17 +745,14 @@ const bundleWith = Effect.fnUntraced(function* (
           entry.value.source,
           entry.value.output,
         );
-        const module = yield* Option.match(Option.fromUndefinedOr(load), {
-          onNone: () => Effect.void,
-          onSome: (loadModule) =>
-            Effect.tryPromise({
-              try: () =>
-                loadModule(pathToFileURL(entry.value.output).href, {
-                  format: "esm",
-                }),
-              catch: (cause) => BundlerError.make({ cause }),
-            }),
-        }).pipe(
+        const module: unknown = yield* (
+          mode === "check"
+            ? Effect.void
+            : Effect.tryPromise({
+                try: () => import(pathToFileURL(entry.value.output).href),
+                catch: (cause) => BundlerError.make({ cause }),
+              })
+        ).pipe(
           Effect.ensuring(
             logCoalescedBuildWarnings(
               Array.filter(
@@ -799,7 +794,8 @@ const bundleWith = Effect.fnUntraced(function* (
     try: () =>
       BundleRequire.bundleRequire<unknown>({
         filepath: entryPoint,
-        require: load ?? constUndefined,
+        require:
+          mode === "check" ? constUndefined : BundleRequire.dynamicImport,
         cwd,
         format: "esm",
         tsconfig: false,

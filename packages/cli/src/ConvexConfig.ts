@@ -182,6 +182,7 @@ const ComponentConfigPluginData = Schema.Struct({ specifier: Schema.String });
 
 interface RootAppDefinition {
   readonly _isRoot: true;
+  // oxlint-disable-next-line quality/no-unknown-returns -- A project's convex.config.ts is loaded from disk; only decoding its export can establish which components the CLI should generate.
   export(): unknown;
 }
 

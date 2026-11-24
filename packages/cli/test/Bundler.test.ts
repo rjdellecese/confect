@@ -21,7 +21,6 @@ import * as References from "effect/References";
 import * as Result from "effect/Result";
 import * as Match from "effect/Match";
 import * as Bundler from "@confect/cli/Bundler";
-import { callFixtureExport } from "./fixtureExport";
 
 const bundleFixture = Effect.fnUntraced(function* (
   ...args: Parameters<typeof Bundler.bundle>
@@ -36,20 +35,10 @@ const importFixture = Effect.fnUntraced(function* (
   name: string,
 ) {
   assert(Predicate.hasProperty(module, name));
-  const loaded = yield* Effect.promise(() =>
-    Promise.resolve(callFixtureExport(module[name], module)),
-  );
+  const loaded = yield* Effect.promise(() => Promise.resolve(module[name]));
   assert(Predicate.isObject(loaded));
   return loaded;
 });
-
-const settle = (load: unknown) =>
-  Effect.promise(() =>
-    Promise.resolve(callFixtureExport(load, undefined)).then(
-      () => "loaded",
-      () => "failed",
-    ),
-  );
 
 const BundlerLayer = Layer.mergeAll(NodePath.layer, NodeFileSystem.layer);
 
@@ -892,13 +881,13 @@ layer(BundlerLayer)("withBatch", (it) => {
       Effect.gen(function* () {
         const { file, fs, path } = yield* fixture({
           "first.ts":
-            'export const root = {}; export const left = () => import("./left"); export const right = () => import("./right");',
+            'export const root = {}; export const branches = { get left() { return import("./left"); }, get right() { return import("./right"); } };',
           "left.ts":
             'export { shared, cycle, basename } from "./shared"; export const side = "left";',
           "right.ts":
             'export { shared, cycle, basename } from "./shared"; export const side = "right";',
           "shared.ts":
-            'export const shared = {}; export const cycle = () => import("./first"); export { basename } from "node:path";',
+            'export const shared = {}; export const cycle = { get first() { return import("./first"); } }; export { basename } from "node:path";',
           "unrelated.ts": 'export { platform } from "node:os";',
         });
         const entries = [file("first.ts"), file("unrelated.ts")] as const;
@@ -965,10 +954,10 @@ layer(BundlerLayer)("withBatch", (it) => {
             expect(
               Bundler.importersOfPackage(first, "node:os", () => true),
             ).toEqual([]);
-            const left = yield* importFixture(first.module, "left");
-            const right = yield* importFixture(first.module, "right");
+            const left = yield* importFixture(first.module.branches, "left");
+            const right = yield* importFixture(first.module.branches, "right");
             expect(left.shared).toBe(right.shared);
-            const cycle = yield* importFixture(left, "cycle");
+            const cycle = yield* importFixture(left.cycle, "first");
             expect(cycle.root).toBe(first.module.root);
             expect(first.metafile).toEqual(snapshot);
             expect(repeated.metafile).toEqual(snapshot);
@@ -1126,7 +1115,7 @@ layer(BundlerLayer)("withBatch", (it) => {
           "first.ts": 'export { shared, load } from "./shared";',
           "second.ts": 'export { shared, load } from "./shared";',
           "shared.ts":
-            'export const shared = {}; export const load = () => import("legacy/sub");',
+            'export const shared = {}; export const load = import("legacy/sub").then(() => "loaded", () => "failed");',
           "node_modules/legacy/package.json":
             '{ "name": "legacy", "main": "index.js" }',
           "node_modules/legacy/index.js": 'module.exports = "main";',
@@ -1141,9 +1130,14 @@ layer(BundlerLayer)("withBatch", (it) => {
           ),
         );
         expect(first.module.shared).toBe(second.module.shared);
-        const actual9 = yield* settle(first.module.load);
-        const actual10 = yield* settle(original.module.load);
-        expect(actual9).toBe(actual10);
+        const batched = yield* Effect.promise(() =>
+          Promise.resolve(first.module.load),
+        );
+        const standalone = yield* Effect.promise(() =>
+          Promise.resolve(original.module.load),
+        );
+        expect(["loaded", "failed"]).toContain(standalone);
+        expect(batched).toBe(standalone);
       }).pipe(Effect.scoped),
   );
 
@@ -1510,11 +1504,11 @@ layer(BundlerLayer)("withBatch", (it) => {
       Effect.gen(function* () {
         const { file } = yield* fixture({
           "shared.ts":
-            'import { createRequire } from "node:module"; const require = createRequire(import.meta.url); export const load = (name) => require(name); export const lazy = () => import("./lazy");',
+            'import { createRequire } from "node:module"; const require = createRequire(import.meta.url); export const load = (name) => require(name); export const probe = { get value() { return load("./value.cjs"); }, get lazy() { return import("./lazy"); } };',
           "value.cjs": 'module.exports = "dynamic";',
           "lazy.ts": 'export default "lazy";',
-          "first.ts": 'export { load, lazy } from "./shared";',
-          "nested/second.ts": 'export { load, lazy } from "../shared";',
+          "first.ts": 'export { load, probe } from "./shared";',
+          "nested/second.ts": 'export { load, probe } from "../shared";',
         });
         const original = yield* bundleFixture(file("first.ts"));
         yield* Bundler.withBatch(
@@ -1522,17 +1516,12 @@ layer(BundlerLayer)("withBatch", (it) => {
           Effect.gen(function* () {
             const first = yield* bundleFixture(file("first.ts"));
             const second = yield* bundleFixture(file("nested/second.ts"));
-            expect(
-              callFixtureExport(first.module.load, first.module, "./value.cjs"),
-            ).toBe(
-              callFixtureExport(
-                original.module.load,
-                original.module,
-                "./value.cjs",
-              ),
-            );
+            assert(Predicate.hasProperty(first.module.probe, "value"));
+            assert(Predicate.hasProperty(original.module.probe, "value"));
+            expect(original.module.probe.value).toBe("dynamic");
+            expect(first.module.probe.value).toBe(original.module.probe.value);
             expect(first.module.load).toBe(second.module.load);
-            const lazy = yield* importFixture(first.module, "lazy");
+            const lazy = yield* importFixture(first.module.probe, "lazy");
             expect(lazy).toMatchObject({ default: "lazy" });
           }),
         );

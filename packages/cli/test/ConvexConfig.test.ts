@@ -166,6 +166,36 @@ layer(TestLayer)("discoverInstalledComponents", (it) => {
         expect(result.failure._tag).toBe("InvalidConvexConfigError");
       }),
   );
+
+  it.effect.each([
+    {
+      body: 'throw new Error("broken app");',
+      reason: "exporting the app definition threw",
+    },
+    {
+      body: "return { childComponents: false };",
+      reason: "installed components could not be read",
+    },
+  ])("reports when $reason", ({ body, reason }) =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const directory = yield* fs.makeTempDirectoryScoped();
+      const file = path.join(directory, "convex.config.ts");
+      yield* fs.writeFileString(
+        file,
+        `export default { _isRoot: true, export() { ${body} } };`,
+      );
+      const result = yield* Effect.result(
+        discoverInstalledComponents(file, "convex/convex.config.ts"),
+      );
+      assert(
+        result._tag === "Failure" &&
+          result.failure._tag === "InvalidConvexConfigError",
+      );
+      expect(result.failure.reason).toContain(reason);
+    }).pipe(Effect.scoped),
+  );
 });
 
 layer(TestLayer)("generateComponents", (it) => {

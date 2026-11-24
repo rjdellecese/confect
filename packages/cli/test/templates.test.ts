@@ -16,7 +16,6 @@ import * as FileSystem from "effect/FileSystem";
 import * as Order from "effect/Order";
 import * as Path from "effect/Path";
 import * as Predicate from "effect/Predicate";
-import { callFixtureExport } from "./fixtureExport";
 import * as Record from "effect/Record";
 import * as Stream from "effect/Stream";
 import * as ChildProcess from "effect/process/ChildProcess";
@@ -344,8 +343,7 @@ export default Table.make(() => {
           path.join(directory, "runtime.ts"),
           `export { default } from "./schema";
 export { reads } from "./reads";
-import notesTable from "./tables/notes";
-export const fields = () => notesTable.Fields;
+export { default as notes } from "./tables/notes";
 `,
         );
         yield* fs.writeFileString(
@@ -363,9 +361,10 @@ export { reads } from "./reads";
         expect(Record.keys(runtime.metafile.inputs)).not.toContain(
           path.join(directory, "convexSchema.ts"),
         );
-        expect(callFixtureExport(runtime.module.fields, runtime.module)).toBe(
-          callFixtureExport(runtime.module.fields, runtime.module),
-        );
+        const { notes } = runtime.module;
+        assert(Predicate.hasProperty(notes, "Fields"));
+        const fields = notes.Fields;
+        expect(notes.Fields).toBe(fields);
         expect(runtime.module.reads).toEqual({ fields: 1 });
 
         const deploy = yield* Bundler.bundle(path.join(directory, "deploy.ts"));

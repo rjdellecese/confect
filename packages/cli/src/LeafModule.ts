@@ -465,6 +465,7 @@ export const validateImpl = Effect.fn("LeafModule.validateImpl")(function* (
   const groupSpec = leaf.spec;
   const expectedFunctionNames = Record.keys(groupSpec.functions);
 
+  // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context, effecttsgo/unsafe-effect-type-assertion, typescript/no-unsafe-type-assertion -- An impl module must default-export GroupImpl.finalize's fully provided, nonfailing layer. Dynamic import erases those channels; we verify the finalized service after building it.
   const context = yield* buildImplLayer(impl as Layer.Layer<unknown>);
   const finalizedGroupImpl = yield* Option.match(
     findFinalizedGroupImpl(context),
