@@ -35,17 +35,15 @@ type TypeId = typeof TypeId;
  * @typeParam E - The type of the decoded typed error in the `Failure` variant.
  */
 export type PaginatedQueryResult<Item, E = never> = [E] extends [never]
-  ?
-      | LoadingFirstPage<Item, E>
-      | LoadingMore<Item, E>
-      | CanLoadMore<Item, E>
-      | Exhausted<Item, E>
-  :
-      | LoadingFirstPage<Item, E>
-      | LoadingMore<Item, E>
-      | CanLoadMore<Item, E>
-      | Exhausted<Item, E>
-      | Failure<Item, E>;
+  ? | LoadingFirstPage<Item, E>
+    | LoadingMore<Item, E>
+    | CanLoadMore<Item, E>
+    | Exhausted<Item, E>
+  : | LoadingFirstPage<Item, E>
+    | LoadingMore<Item, E>
+    | CanLoadMore<Item, E>
+    | Exhausted<Item, E>
+    | Failure<Item, E>;
 
 /**
  * Every variant regardless of `E`—the parameter type for guards and

@@ -44,7 +44,7 @@ overrides:
   react-dom: 19.3.1
 
 patchedDependencies:
-  "@ark/attest@0.58.0": patches/@ark__attest@0.58.0.patch
+  "@ark/attest@0.58.1": patches/@ark__attest@0.58.1.patch
 
 packageExtensions:
   "@mintlify/mdx":
