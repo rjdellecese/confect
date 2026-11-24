@@ -20,7 +20,7 @@
     "oxfmt": {
       "initialization_options": {
         "settings": {
-          "fmt.configPath": "./.oxfmtrc.json",
+          "fmt.configPath": "./oxfmt.config.ts",
           "run": "onSave"
         }
       }
