@@ -2,6 +2,18 @@ import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import * as Schema from "effect/Schema";
 import * as Table from "@confect/core/Table";
 
+const textFields = () => Schema.Struct({ text: Schema.String });
+
+// Each test gets its own counter + thunk so the call count is isolated.
+const makeInstrumented = () => {
+  const calls = { count: 0 };
+  const lazyFields = () => {
+    calls.count += 1;
+    return Schema.Struct({ text: Schema.String });
+  };
+  return { calls, lazyFields };
+};
+
 describe("Table", () => {
   it("indexes a 45-member literal union without forcing schemas or widening field paths", () => {
     const members = [
@@ -103,10 +115,8 @@ describe("Table", () => {
   });
 
   describe("UnnamedTable callable shape", () => {
-    const lazyFields = () => Schema.Struct({ text: Schema.String });
-
     it("Table.make(lazyFields) returns an UnnamedTable", () => {
-      const unnamed = Table.make(lazyFields);
+      const unnamed = Table.make(textFields);
       expect(Table.isUnnamedTable(unnamed)).toBe(true);
       expect(Table.isTable(unnamed)).toBe(false);
       // No `tableName` property on the unnamed callable, so the discriminator
@@ -117,7 +127,7 @@ describe("Table", () => {
     });
 
     it("chaining .index() stays unnamed", () => {
-      const unnamedWithIndex = Table.make(lazyFields).index("by_text", [
+      const unnamedWithIndex = Table.make(textFields).index("by_text", [
         "text",
       ]);
       expect(Table.isUnnamedTable(unnamedWithIndex)).toBe(true);
@@ -125,7 +135,7 @@ describe("Table", () => {
     });
 
     it("invoking the callable with a name produces a bound Table", () => {
-      const named = Table.make(lazyFields)("notes");
+      const named = Table.make(textFields)("notes");
       expect(Table.isTable(named)).toBe(true);
       expect(Table.isUnnamedTable(named)).toBe(false);
       expect(named.tableName).toBe("notes");
@@ -133,15 +143,13 @@ describe("Table", () => {
     });
 
     it("the unnamed callable still has Function.prototype.name and that does not confuse the predicate", () => {
-      const unnamed = Table.make(lazyFields);
-      expect(typeof (unnamed as unknown as { name: unknown }).name).toBe(
-        "string",
-      );
+      const unnamed = Table.make(textFields);
+      expect(typeof unnamed.name).toBe("string");
       expect(Table.isUnnamedTable(unnamed)).toBe(true);
     });
 
     it("invoking the same UnnamedTable with different names produces distinct Tables", () => {
-      const unnamed = Table.make(lazyFields);
+      const unnamed = Table.make(textFields);
       const a = unnamed("notes_a");
       const b = unnamed("notes_b");
       expect(a.tableName).toBe("notes_a");
@@ -152,16 +160,6 @@ describe("Table", () => {
   });
 
   describe("lazy accessors", () => {
-    // Each test gets its own counter + thunk so the call count is isolated.
-    const makeInstrumented = () => {
-      const calls = { count: 0 };
-      const lazyFields = () => {
-        calls.count += 1;
-        return Schema.Struct({ text: Schema.String });
-      };
-      return { calls, lazyFields };
-    };
-
     it("Table.make(lazyFields) does not invoke the callback", () => {
       const { calls, lazyFields } = makeInstrumented();
       Table.make(lazyFields);

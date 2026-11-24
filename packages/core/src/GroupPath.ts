@@ -11,10 +11,10 @@ import type * as GroupSpec from "./GroupSpec";
  */
 export type All<
   Group extends GroupSpec.AnyWithProps,
-  Depth extends 1[] = [],
+  Depth extends Array<1> = [],
 > = Depth["length"] extends 15
   ? string
-  : Group extends any
+  : Group extends unknown
     ? [GroupSpec.Groups<Group>] extends [never]
       ? GroupSpec.Name<Group>
       : GroupSpec.Name<Group> | AllHelper<Group, GroupSpec.Groups<Group>, Depth>
@@ -23,7 +23,7 @@ export type All<
 type AllHelper<
   Parent extends GroupSpec.AnyWithProps,
   Groups_ extends GroupSpec.AnyWithProps,
-  Depth extends 1[] = [],
+  Depth extends Array<1> = [],
 > = Groups_ extends GroupSpec.AnyWithProps
   ? `${GroupSpec.Name<Parent>}.${All<Groups_, [...Depth, 1]>}`
   : never;

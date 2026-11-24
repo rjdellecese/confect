@@ -227,7 +227,7 @@ describe("make", () => {
 
   it("turns a plain Convex spec into refs", () => {
     type ListQueryArgs = { tag: string };
-    type ListQueryReturns = string[];
+    type ListQueryReturns = Array<string>;
 
     const listSpec =
       FunctionSpec.convexPublicQuery<
@@ -313,7 +313,7 @@ describe("make", () => {
 
   it("mixes Confect and plain Convex specs", () => {
     type ConvexQueryArgs = { cursor: string };
-    type ConvexQueryReturns = string[];
+    type ConvexQueryReturns = Array<string>;
 
     const ConfectQueryArgs = { limit: Schema.Finite };
     type ConfectQueryArgs = Schema.Struct.Type<typeof ConfectQueryArgs>;
@@ -365,7 +365,10 @@ describe("make", () => {
 
 describe("middleware error unions", () => {
   it("adds them to Confect refs and keeps them off plain Convex refs", () => {
-    class Blocked extends Schema.TaggedError<Blocked, {}>()("Blocked", {}) {}
+    class Blocked extends Schema.TaggedError<Blocked, unknown>()(
+      "Blocked",
+      {},
+    ) {}
 
     class GateMutations extends MiddlewareSpec.MiddlewareSpec<GateMutations>()(
       "GateMutations",
@@ -385,7 +388,7 @@ describe("middleware error unions", () => {
       )
       .addFunction(
         FunctionSpec.convexPublicQuery<
-          RegisteredQuery<"public", { cursor: string }, Promise<string[]>>
+          RegisteredQuery<"public", { cursor: string }, Promise<Array<string>>>
         >()("search"),
       );
     const spec = {
@@ -401,7 +404,7 @@ describe("middleware error unions", () => {
 });
 
 describe("make with middleware options", () => {
-  class AccessDenied extends Schema.TaggedError<AccessDenied, {}>()(
+  class AccessDenied extends Schema.TaggedError<AccessDenied, unknown>()(
     "AccessDenied",
     {},
   ) {}

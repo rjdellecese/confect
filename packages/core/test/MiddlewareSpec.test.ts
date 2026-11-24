@@ -15,12 +15,12 @@ class CurrentUser extends Context.Service<
   { readonly name: string }
 >()("@confect/core/test/MiddlewareSpec.test/CurrentUser") {}
 
-class NotSignedIn extends Schema.TaggedError<NotSignedIn, {}>()(
+class NotSignedIn extends Schema.TaggedError<NotSignedIn, unknown>()(
   "NotSignedIn",
   {},
 ) {}
 
-class NotFound extends Schema.TaggedError<NotFound, {}>()("NotFound", {
+class NotFound extends Schema.TaggedError<NotFound, unknown>()("NotFound", {
   id: Schema.String,
 }) {}
 
@@ -247,20 +247,31 @@ describe("GroupSpec.middleware", () => {
   });
 
   it("rejects attaching middleware whose functionTypes don't cover a declared function", () => {
+    const group = GroupSpec.make().addFunction(query);
+    expectTypeOf<typeof MutationOnly>().not.toExtend<
+      Parameters<typeof group.middleware<typeof MutationOnly>>[0]
+    >();
     // @ts-expect-error—MutationOnly does not declare function type "query"
-    GroupSpec.make().addFunction(query).middleware(MutationOnly);
+    group.middleware(MutationOnly);
   });
 
   it("rejects adding a function whose type an attached middleware doesn't declare", () => {
+    const group = GroupSpec.make().middleware(MutationOnly);
+    expectTypeOf<typeof query>().not.toExtend<
+      Parameters<typeof group.addFunction<typeof query>>[0]
+    >();
     // @ts-expect-error—MutationOnly does not declare function type "query"
-    GroupSpec.make().middleware(MutationOnly).addFunction(query);
+    group.addFunction(query);
   });
 
   it("accepts functions covered by every attached middleware", () => {
-    GroupSpec.make()
+    const group = GroupSpec.make()
       .middleware(MutationOnly)
       .addFunction(mutation)
       .middleware(RequireUser);
+    expectTypeOf<GroupSpec.Functions<typeof group>>().toEqualTypeOf<
+      typeof mutation
+    >();
   });
 });
 
@@ -298,7 +309,11 @@ describe("requires", () => {
   });
 
   it("rejects a requiring middleware attached before its provider", () => {
-    GroupSpec.make()
+    const group = GroupSpec.make();
+    expectTypeOf<typeof NeedsUser>().not.toExtend<
+      Parameters<typeof group.middleware<typeof NeedsUser>>[0]
+    >();
+    group
       // @ts-expect-error—nothing attached earlier provides CurrentUser
       .middleware(NeedsUser)
       .middleware(ProvideUser);

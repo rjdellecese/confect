@@ -85,7 +85,7 @@ export type IsRecord<T> = [T] extends [never]
  */
 export type DeepMutable<T> =
   IsAny<T> extends true
-    ? any
+    ? T
     : T extends NonRecursiveLeaf
       ? T
       : T extends ReadonlyMap<infer K, infer V>
@@ -121,7 +121,7 @@ export interface TypeDefect<Message extends string, T = never> {
  */
 export type IsRecursive<T> = true extends DetectCycle<T> ? true : false;
 
-type NonRecursiveLeaf = Brand.Brand<any> | GenericId<any> | ArrayBuffer;
+type NonRecursiveLeaf = Brand.Brand<any> | GenericId<string> | ArrayBuffer;
 
 type IsSame<A, B> =
   (<G>() => G extends A ? 1 : 2) extends <G>() => G extends B ? 1 : 2
@@ -145,33 +145,31 @@ type IsAncestor<T, Ancestors> = Ancestors extends unknown
 type DetectCycle<T, Ancestors = never> =
   IsAny<T> extends true
     ? false
-    : [T] extends [any]
-      ? T extends NonRecursiveLeaf
+    : T extends NonRecursiveLeaf
+      ? false
+      : IsObject<T> extends false
         ? false
-        : IsObject<T> extends false
-          ? false
-          : (
-                T extends Ancestors
-                  ? true extends IsAncestor<T, Ancestors>
+        : (
+              T extends Ancestors
+                ? true extends IsAncestor<T, Ancestors>
+                  ? true
+                  : false
+                : false
+            ) extends true
+          ? true
+          : T extends Array<infer U>
+            ? DetectCycle<U, Ancestors | T>
+            : T extends Map<infer _U, infer V>
+              ? DetectCycle<V, Ancestors | T>
+              : T extends Set<infer U>
+                ? DetectCycle<U, Ancestors | T>
+                : T extends object
+                  ? true extends {
+                      [K in keyof T]: DetectCycle<T[K], Ancestors | T>;
+                    }[keyof T]
                     ? true
                     : false
-                  : false
-              ) extends true
-            ? true
-            : T extends Array<infer U>
-              ? DetectCycle<U, Ancestors | T>
-              : T extends Map<infer _U, infer V>
-                ? DetectCycle<V, Ancestors | T>
-                : T extends Set<infer U>
-                  ? DetectCycle<U, Ancestors | T>
-                  : T extends object
-                    ? true extends {
-                        [K in keyof T]: DetectCycle<T[K], Ancestors | T>;
-                      }[keyof T]
-                      ? true
-                      : false
-                    : false
-      : never;
+                  : false;
 
 //////////////////////////////////
 // START: Vendored from Arktype //
@@ -183,9 +181,9 @@ type DetectCycle<T, Ancestors = never> =
  * @internal
  */
 export type UnionToTuple<t> =
-  _unionToTuple<t, []> extends infer result ? conform<result, t[]> : never;
+  _unionToTuple<t, []> extends infer result ? conform<result, Array<t>> : never;
 
-type _unionToTuple<t, result extends unknown[]> =
+type _unionToTuple<t, result extends Array<unknown>> =
   getLastBranch<t> extends infer current
     ? [t] extends [never]
       ? result
@@ -217,9 +215,9 @@ type conform<t, base> = t extends base ? t : base;
 export type IndexFieldTypesForEq<
   ConvexDataModel extends GenericDataModel,
   Table extends TableNamesInDataModel<ConvexDataModel>,
-  T extends string[],
-> = T extends readonly [...infer Rest, any]
-  ? Rest extends readonly string[]
+  T extends Array<string>,
+> = T extends readonly [...infer Rest, unknown]
+  ? Rest extends ReadonlyArray<string>
     ? {
         [K in keyof Rest]: FieldTypeFromFieldPath<
           DocumentByName<ConvexDataModel, Table>,

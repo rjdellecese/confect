@@ -13,7 +13,7 @@ import * as Schema from "effect/Schema";
  *
  * @category Errors
  */
-export class InvalidCursor extends Schema.TaggedError<InvalidCursor, {}>()(
+export class InvalidCursor extends Schema.TaggedError<InvalidCursor, unknown>()(
   "InvalidCursor",
   {
     /**

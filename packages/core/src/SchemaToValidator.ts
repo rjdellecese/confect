@@ -1,4 +1,5 @@
 import type {
+  GenericValidator,
   PropertyValidators,
   Validator,
   VAny,
@@ -23,6 +24,7 @@ import * as Match from "effect/Match";
 import * as Number from "effect/Number";
 import * as Option from "effect/Option";
 import * as Predicate from "effect/Predicate";
+import * as Record from "effect/Record";
 import * as Schema from "effect/Schema";
 import * as SchemaAST from "effect/SchemaAST";
 import * as String from "effect/String";
@@ -68,8 +70,7 @@ export const compileArgsSchema = <ConfectValue, ConvexValue>(
  */
 export const compileReturnsSchema = <ConfectValue, ConvexValue>(
   schema: Schema.Codec<ConfectValue, ConvexValue>,
-): Validator<any, any, any> =>
-  Effect.runSync(compileAst(Schema.toEncoded(schema).ast));
+): GenericValidator => Effect.runSync(compileAst(Schema.toEncoded(schema).ast));
 
 // Table
 
@@ -79,18 +80,19 @@ export const compileReturnsSchema = <ConfectValue, ConvexValue>(
  * @internal
  */
 export type TableSchemaToTableValidator<
-  TableSchema extends Schema.Codec<any, any>,
+  TableSchema extends Schema.Codec<unknown>,
 > =
-  ValueToValidator<TableSchema["Encoded"]> extends infer Vd extends
-    | VObject<any, any, any, any>
-    | VUnion<any, any, any, any>
+  ValueToValidator<TableSchema["Encoded"]> extends infer Vd extends Extract<
+    GenericValidator,
+    { readonly kind: "object" | "union" }
+  >
     ? Vd
     : never;
 
 /**
  * @internal
  */
-export const compileTableSchema = <TableSchema extends Schema.Codec<any, any>>(
+export const compileTableSchema = <TableSchema extends Schema.Codec<unknown>>(
   schema: TableSchema,
 ): TableSchemaToTableValidator<TableSchema> => {
   const ast = Schema.toEncoded(schema).ast;
@@ -125,7 +127,7 @@ export type ReadonlyValue =
   | ReadonlyRecordValue
   | null;
 
-type ReadonlyArrayValue = readonly ReadonlyValue[];
+type ReadonlyArrayValue = ReadonlyArray<ReadonlyValue>;
 
 /**
  * @internal
@@ -136,7 +138,7 @@ export type ReadonlyRecordValue = {
 
 type MutableValue<T> =
   T extends ReadonlyArray<infer El>
-    ? MutableValue<El>[]
+    ? Array<MutableValue<El>>
     : T extends ReadonlyRecordValue
       ? { -readonly [K in keyof T]: MutableValue<Exclude<T[K], undefined>> }
       : T;
@@ -166,7 +168,7 @@ type ConvertValueToValidator<
 > = [Vl] extends [never]
   ? never
   : IsAny<Vl> extends true
-    ? VAny<any, Optionality>
+    ? VAny<Vl, Optionality>
     : [Vl] extends [null]
       ? VNull<OptionalValue<null, Optionality>, Optionality>
       : [Vl] extends [boolean]
@@ -191,7 +193,7 @@ type ConvertValueToValidator<
                     ? VAny<any, Optionality>
                     : Vl extends ReadonlyArray<infer El>
                       ? VArray<
-                          OptionalValue<MutableValue<El[]>, Optionality>,
+                          OptionalValue<MutableValue<Array<El>>, Optionality>,
                           ConvertValueToValidator<El>,
                           Optionality
                         >
@@ -211,9 +213,9 @@ type StringValueToValidator<
 type ObjectValueToValidator<Vl, Optionality extends "required" | "optional"> =
   IsRecord<MutableValue<Vl>> extends true
     ? ValueToValidator<Vl[keyof Vl]> extends infer VdValue extends Validator<
-        any,
+        unknown,
         "required",
-        any
+        string
       >
       ? VRecord<
           OptionalValue<MutableValue<Vl>, Optionality>,
@@ -236,7 +238,7 @@ type ObjectValueToValidator<Vl, Optionality extends "required" | "optional"> =
 type ObjectFieldsToValidators<Vl> = {
   -readonly [K in keyof Vl]-?: IsAny<Vl[K]> extends true
     ? IsOptional<Vl, K> extends true
-      ? VAny<any, "optional">
+      ? VAny<Vl[K], "optional">
       : VAny
     : undefined extends Vl[K]
       ? OptionalValueToValidator<Vl[K]>
@@ -265,8 +267,8 @@ type UnionValueToValidator<Vl, Optionality extends "required" | "optional"> =
       >;
 
 type ValueTupleToValidatorTuple<
-  VlTuple extends readonly unknown[],
-  Acc extends Validator<any, "required", any>[] = [],
+  VlTuple extends ReadonlyArray<unknown>,
+  Acc extends Array<Validator<unknown, "required", any>> = [],
 > = VlTuple extends
   | [true, false, ...infer VlRest]
   | [false, true, ...infer VlRest]
@@ -339,7 +341,7 @@ export const compileAst = (
   ast: SchemaAST.AST,
   isOptionalPropertyOfTypeLiteral = false,
 ): Effect.Effect<
-  Validator<any, any, any>,
+  GenericValidator,
   | UnsupportedSchemaTypeError
   | UnsupportedPropertySignatureKeyTypeError
   | IndexSignaturesAreNotSupportedError
@@ -485,16 +487,16 @@ const handleObjects = (objectsAst: SchemaAST.Objects) =>
 const handleArrays = ({ elements, rest }: SchemaAST.Arrays) =>
   handleArrayElements(elements, rest);
 
+const elementToValidator = (element: SchemaAST.AST) =>
+  SchemaAST.isOptional(element)
+    ? Effect.fail(OptionalTupleElementsAreNotSupportedError.make())
+    : compileAst(element);
+
 const handleArrayElements = Effect.fnUntraced(function* (
   elements: SchemaAST.Arrays["elements"],
   rest: SchemaAST.Arrays["rest"],
 ) {
   const [f, s, ...r] = elements;
-
-  const elementToValidator = (element: SchemaAST.AST) =>
-    SchemaAST.isOptional(element)
-      ? Effect.fail(OptionalTupleElementsAreNotSupportedError.make())
-      : compileAst(element);
 
   const arrayItemsValidator = yield* f === undefined
     ? pipe(
@@ -533,10 +535,10 @@ const handlePropertySignatures = (objectsAst: SchemaAST.Objects) =>
               Effect.gen(function* () {
                 const validator = yield* compileAst(type, isOptional);
 
-                return {
-                  propertyName: name,
-                  validator: isOptional ? v.optional(validator) : validator,
-                };
+                return [
+                  name,
+                  isOptional ? v.optional(validator) : validator,
+                ] as const;
               }),
             onSome: (number) =>
               Effect.fail(
@@ -555,19 +557,7 @@ const handlePropertySignatures = (objectsAst: SchemaAST.Objects) =>
       },
       { concurrency: 1 },
     ),
-    Effect.andThen((propertyNamesWithValidators) =>
-      pipe(
-        propertyNamesWithValidators,
-        Array.reduce(
-          {} as Record<string, Validator<any, any, any>>,
-          (acc, { propertyName, validator }) => ({
-            [propertyName]: validator,
-            ...acc,
-          }),
-        ),
-        Effect.succeed,
-      ),
-    ),
+    Effect.map((entries) => Record.fromEntries(Array.reverse(entries))),
   );
 
 // Errors
@@ -577,7 +567,7 @@ const handlePropertySignatures = (objectsAst: SchemaAST.Objects) =>
  */
 export class TopLevelMustBeObjectError extends Schema.TaggedError<
   TopLevelMustBeObjectError,
-  {}
+  unknown
 >()("TopLevelMustBeObjectError", {}) {
   /* v8 ignore start */
   override get message() {
@@ -591,7 +581,7 @@ export class TopLevelMustBeObjectError extends Schema.TaggedError<
  */
 export class TopLevelMustBeObjectOrUnionError extends Schema.TaggedError<
   TopLevelMustBeObjectOrUnionError,
-  {}
+  unknown
 >()("TopLevelMustBeObjectOrUnionError", {}) {
   /* v8 ignore start */
   override get message() {
@@ -605,7 +595,7 @@ export class TopLevelMustBeObjectOrUnionError extends Schema.TaggedError<
  */
 export class UnsupportedPropertySignatureKeyTypeError extends Schema.TaggedError<
   UnsupportedPropertySignatureKeyTypeError,
-  {}
+  unknown
 >()("UnsupportedPropertySignatureKeyTypeError", {
   propertyKey: Schema.declare<number | symbol>(
     (input): input is number | symbol =>
@@ -624,7 +614,7 @@ export class UnsupportedPropertySignatureKeyTypeError extends Schema.TaggedError
  */
 export class EmptyTupleIsNotSupportedError extends Schema.TaggedError<
   EmptyTupleIsNotSupportedError,
-  {}
+  unknown
 >()("EmptyTupleIsNotSupportedError", {}) {
   /* v8 ignore start */
   override get message() {
@@ -638,7 +628,7 @@ export class EmptyTupleIsNotSupportedError extends Schema.TaggedError<
  */
 export class EmptyUnionIsNotSupportedError extends Schema.TaggedError<
   EmptyUnionIsNotSupportedError,
-  {}
+  unknown
 >()("EmptyUnionIsNotSupportedError", {}) {
   /* v8 ignore start */
   override get message() {
@@ -652,7 +642,7 @@ export class EmptyUnionIsNotSupportedError extends Schema.TaggedError<
  */
 export class UnsupportedSchemaTypeError extends Schema.TaggedError<
   UnsupportedSchemaTypeError,
-  {}
+  unknown
 >()("UnsupportedSchemaTypeError", {
   schemaType: Schema.Literals([
     "Declaration",
@@ -690,7 +680,7 @@ export class UnsupportedSchemaTypeError extends Schema.TaggedError<
  */
 export class IndexSignaturesAreNotSupportedError extends Schema.TaggedError<
   IndexSignaturesAreNotSupportedError,
-  {}
+  unknown
 >()("IndexSignaturesAreNotSupportedError", {}) {
   /* v8 ignore start */
   override get message() {
@@ -704,7 +694,7 @@ export class IndexSignaturesAreNotSupportedError extends Schema.TaggedError<
  */
 export class MixedIndexAndPropertySignaturesAreNotSupportedError extends Schema.TaggedError<
   MixedIndexAndPropertySignaturesAreNotSupportedError,
-  {}
+  unknown
 >()("MixedIndexAndPropertySignaturesAreNotSupportedError", {}) {
   /* v8 ignore start */
   override get message() {
@@ -718,7 +708,7 @@ export class MixedIndexAndPropertySignaturesAreNotSupportedError extends Schema.
  */
 export class OptionalTupleElementsAreNotSupportedError extends Schema.TaggedError<
   OptionalTupleElementsAreNotSupportedError,
-  {}
+  unknown
 >()("OptionalTupleElementsAreNotSupportedError", {}) {
   /* v8 ignore start */
   override get message() {

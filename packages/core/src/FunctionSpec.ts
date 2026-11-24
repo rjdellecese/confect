@@ -318,7 +318,7 @@ export type ReturnsSchema<FunctionSpec_ extends AnyWithProps> =
   FunctionSpec_ extends {
     readonly functionProvenance: {
       readonly _tag: "Confect";
-      readonly returns: infer ReturnsSchema_ extends Schema.Codec<any, any>;
+      readonly returns: infer ReturnsSchema_ extends Schema.Codec<unknown>;
     };
   }
     ? ReturnsSchema_
@@ -334,7 +334,7 @@ export type ErrorSchema<FunctionSpec_ extends AnyWithProps> =
       readonly error?: infer ErrorSchema_;
     };
   }
-    ? Extract<ErrorSchema_, Schema.Codec<any, any>>
+    ? Extract<ErrorSchema_, Schema.Codec<unknown>>
     : never;
 
 /**
@@ -346,7 +346,7 @@ export type Args<FunctionSpec_ extends AnyWithProps> = FunctionSpec_ extends {
   ? ArgsSchema<FunctionSpec_>["Type"]
   : GetFunctionProvenance<FunctionSpec_> extends FunctionProvenance.Convex<
         infer Args_,
-        any
+        unknown
       >
     ? Args_
     : never;
@@ -360,7 +360,7 @@ export type Returns<FunctionSpec_ extends AnyWithProps> =
   }
     ? ReturnsSchema<FunctionSpec_>["Type"]
     : GetFunctionProvenance<FunctionSpec_> extends FunctionProvenance.Convex<
-          any,
+          DefaultFunctionArgs,
           infer Returns_
         >
       ? Awaited<Returns_>
@@ -376,7 +376,7 @@ export type EncodedArgs<FunctionSpec_ extends AnyWithProps> =
     ? ArgsSchema<FunctionSpec_>["Encoded"]
     : GetFunctionProvenance<FunctionSpec_> extends FunctionProvenance.Convex<
           infer Args_,
-          any
+          unknown
         >
       ? Args_
       : never;
@@ -390,7 +390,7 @@ export type EncodedReturns<FunctionSpec_ extends AnyWithProps> =
   }
     ? ReturnsSchema<FunctionSpec_>["Encoded"]
     : GetFunctionProvenance<FunctionSpec_> extends FunctionProvenance.Convex<
-          any,
+          DefaultFunctionArgs,
           infer Returns_
         >
       ? Returns_
@@ -508,8 +508,8 @@ const Proto = {
 interface Options {
   readonly name: string;
   readonly args?: () => FunctionProvenance.ArgsFields;
-  readonly returns: () => Schema.Codec<any, any>;
-  readonly error?: () => Schema.Codec<any, any>;
+  readonly returns: () => Schema.Codec<unknown>;
+  readonly error?: () => Schema.Codec<unknown>;
 }
 
 const make = <
@@ -522,8 +522,8 @@ const make = <
   function makeSpec<
     const Name_ extends string,
     const ArgsFields_ extends FunctionProvenance.ArgsFields,
-    Returns_ extends Schema.Codec<any, any>,
-    Error_ extends Schema.Codec<any, any> = never,
+    Returns_ extends Schema.Codec<unknown>,
+    Error_ extends Schema.Codec<unknown> = never,
   >(options: {
     name: Name_;
     args: () => ArgsFields_;
@@ -537,8 +537,8 @@ const make = <
   >;
   function makeSpec<
     const Name_ extends string,
-    Returns_ extends Schema.Codec<any, any>,
-    Error_ extends Schema.Codec<any, any> = never,
+    Returns_ extends Schema.Codec<unknown>,
+    Error_ extends Schema.Codec<unknown> = never,
   >(options: {
     name: Name_;
     args?: never;
@@ -583,8 +583,8 @@ type ForbidPaginationOpts<
 interface PaginatedOptions {
   readonly name: string;
   readonly args?: () => FunctionProvenance.ArgsFields;
-  readonly item: () => Schema.Codec<any, any>;
-  readonly error?: () => Schema.Codec<any, any>;
+  readonly item: () => Schema.Codec<unknown>;
+  readonly error?: () => Schema.Codec<unknown>;
 }
 
 const makePaginated = <
@@ -597,8 +597,8 @@ const makePaginated = <
   function makeSpec<
     const Name_ extends string,
     const UserArgsFields_ extends FunctionProvenance.ArgsFields,
-    Item_ extends Schema.Codec<any, any>,
-    Error_ extends Schema.Codec<any, any> = never,
+    Item_ extends Schema.Codec<unknown>,
+    Error_ extends Schema.Codec<unknown> = never,
   >(options: {
     name: Name_;
     args: () => UserArgsFields_ & ForbidPaginationOpts<UserArgsFields_>;
@@ -612,8 +612,8 @@ const makePaginated = <
   >;
   function makeSpec<
     const Name_ extends string,
-    Item_ extends Schema.Codec<any, any>,
-    Error_ extends Schema.Codec<any, any> = never,
+    Item_ extends Schema.Codec<unknown>,
+    Error_ extends Schema.Codec<unknown> = never,
   >(options: {
     name: Name_;
     args?: never;
@@ -931,36 +931,40 @@ type MatchingRegisteredFunction<
   FunctionVisibility_ extends FunctionVisibility,
 > =
   RuntimeAndFunctionType.GetFunctionType<RuntimeAndFunctionType_> extends "query"
-    ? RegisteredQuery<FunctionVisibility_, any, any>
+    ? RegisteredQuery<FunctionVisibility_, never, unknown>
     : RuntimeAndFunctionType.GetFunctionType<RuntimeAndFunctionType_> extends "mutation"
-      ? RegisteredMutation<FunctionVisibility_, any, any>
+      ? RegisteredMutation<FunctionVisibility_, never, unknown>
       : RuntimeAndFunctionType.GetFunctionType<RuntimeAndFunctionType_> extends "action"
-        ? RegisteredAction<FunctionVisibility_, any, any>
+        ? RegisteredAction<FunctionVisibility_, never, unknown>
         : never;
 
 type ExtractArgs<F> =
-  F extends RegisteredQuery<any, infer A extends DefaultFunctionArgs, any>
+  F extends RegisteredQuery<
+    FunctionVisibility,
+    infer A extends DefaultFunctionArgs,
+    unknown
+  >
     ? A
     : F extends RegisteredMutation<
-          any,
+          FunctionVisibility,
           infer A extends DefaultFunctionArgs,
-          any
+          unknown
         >
       ? A
       : F extends RegisteredAction<
-            any,
+            FunctionVisibility,
             infer A extends DefaultFunctionArgs,
-            any
+            unknown
           >
         ? A
         : never;
 
 type ExtractReturns<F> =
-  F extends RegisteredQuery<any, any, infer R>
+  F extends RegisteredQuery<FunctionVisibility, never, infer R>
     ? R
-    : F extends RegisteredMutation<any, any, infer R>
+    : F extends RegisteredMutation<FunctionVisibility, never, infer R>
       ? R
-      : F extends RegisteredAction<any, any, infer R>
+      : F extends RegisteredAction<FunctionVisibility, never, infer R>
         ? R
         : never;
 
@@ -998,7 +1002,7 @@ const makeConvex =
         ExtractReturns<F>
       >(),
       middlewareAttachments: [],
-    }) as any;
+    });
   };
 
 /**

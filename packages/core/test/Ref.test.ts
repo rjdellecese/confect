@@ -96,11 +96,11 @@ describe("make", () => {
     expectTypeOf<Ref.OptionalArgs<typeof requiredArgs>>().toEqualTypeOf<
       [args: { readonly value: number }]
     >();
-    // @ts-expect-error
+    // @ts-expect-error - count queries with required arguments cannot omit the argument object
     expectTypeOf(client.query(requiredArgs)).toEqualTypeOf<
       Effect.Effect<number, Schema.SchemaError>
     >();
-    // @ts-expect-error
+    // @ts-expect-error - callers supply the decoded number, not the encoded string
     expectTypeOf(client.query(requiredArgs, { value: "1" })).toEqualTypeOf<
       Effect.Effect<number, Schema.SchemaError>
     >();
@@ -110,8 +110,12 @@ describe("make", () => {
   });
 
   test("constructs references without forcing lazy schemas", () => {
-    const args = vi.fn(() => ({ count: Schema.FiniteFromString }));
-    const returns = vi.fn(() => Schema.FiniteFromString);
+    const args = vi.fn<() => { count: typeof Schema.FiniteFromString }>(() => ({
+      count: Schema.FiniteFromString,
+    }));
+    const returns = vi.fn<() => typeof Schema.FiniteFromString>(
+      () => Schema.FiniteFromString,
+    );
     const spec = FunctionSpec.publicQuery({ name: "count", args, returns });
     const ref = Ref.make("queries", spec);
     const refWithAttachments = Ref.make("queries", spec, []);
@@ -125,16 +129,16 @@ describe("make", () => {
 });
 
 describe("runWithCodec", () => {
-  class NotFound extends Schema.TaggedError<NotFound, {}>()("NotFound", {
+  class NotFound extends Schema.TaggedError<NotFound, unknown>()("NotFound", {
     id: Schema.String,
   }) {}
 
-  class TransportFailure extends Schema.TaggedError<TransportFailure, {}>()(
-    "TransportFailure",
-    {
-      cause: Schema.Unknown,
-    },
-  ) {}
+  class TransportFailure extends Schema.TaggedError<
+    TransportFailure,
+    unknown
+  >()("TransportFailure", {
+    cause: Schema.Unknown,
+  }) {}
 
   const ref = Ref.make(
     "notes",
@@ -150,8 +154,8 @@ describe("runWithCodec", () => {
     "defers encoding and invocation and repeats the codec workflow",
     () =>
       Effect.gen(function* () {
-        const readCount = vi.fn(() => 1);
-        const invoke = vi.fn(() => Promise.resolve("2"));
+        const readCount = vi.fn<() => number>(() => 1);
+        const invoke = vi.fn<() => Promise<string>>(() => Promise.resolve("2"));
         const effect = Ref.runWithCodec(
           ref,
           {
@@ -300,7 +304,7 @@ describe("FunctionReference", () => {
     expectTypeOf<Ref.ArgsSchema<Ref_>["fields"]>().toEqualTypeOf<
       Ref.ArgsFields<Ref_>
     >();
-    expectTypeOf<Ref.Returns<Ref_>>().toEqualTypeOf<readonly number[]>();
+    expectTypeOf<Ref.Returns<Ref_>>().toEqualTypeOf<ReadonlyArray<number>>();
     expectTypeOf<Ref.FunctionReference<Ref_>>().toEqualTypeOf<
       FunctionReference<"query", "public">
     >();
@@ -462,7 +466,7 @@ describe("Error type extraction", () => {
   });
 
   test("error schema extracts the error type", () => {
-    class NotFound extends Schema.TaggedError<NotFound, {}>()("NotFound", {
+    class NotFound extends Schema.TaggedError<NotFound, unknown>()("NotFound", {
       id: Schema.String,
     }) {}
 
@@ -477,12 +481,15 @@ describe("Error type extraction", () => {
   });
 
   test("union error schema extracts the union type", () => {
-    class NotFound extends Schema.TaggedError<NotFound, {}>()("NotFound", {
+    class NotFound extends Schema.TaggedError<NotFound, unknown>()("NotFound", {
       id: Schema.String,
     }) {}
-    class Forbidden extends Schema.TaggedError<Forbidden, {}>()("Forbidden", {
-      reason: Schema.String,
-    }) {}
+    class Forbidden extends Schema.TaggedError<Forbidden, unknown>()(
+      "Forbidden",
+      {
+        reason: Schema.String,
+      },
+    ) {}
 
     const _spec = FunctionSpec.publicMutation({
       name: "remove",
@@ -515,9 +522,12 @@ describe("isConvexError", () => {
 describe("decodeError", () => {
   it.effect("decodes error data using the error schema", () =>
     Effect.gen(function* () {
-      class NotFound extends Schema.TaggedError<NotFound, {}>()("NotFound", {
-        id: Schema.String,
-      }) {}
+      class NotFound extends Schema.TaggedError<NotFound, unknown>()(
+        "NotFound",
+        {
+          id: Schema.String,
+        },
+      ) {}
 
       const spec = FunctionSpec.publicMutation({
         name: "update",
@@ -552,7 +562,7 @@ describe("decodeError", () => {
 });
 
 describe("decodeErrorOption", () => {
-  class NotFound extends Schema.TaggedError<NotFound, {}>()("NotFound", {
+  class NotFound extends Schema.TaggedError<NotFound, unknown>()("NotFound", {
     id: Schema.String,
   }) {}
 
@@ -604,7 +614,7 @@ describe("decodeErrorOption", () => {
 });
 
 describe("decodeErrorOrElse", () => {
-  class NotFound extends Schema.TaggedError<NotFound, {}>()("NotFound", {
+  class NotFound extends Schema.TaggedError<NotFound, unknown>()("NotFound", {
     id: Schema.String,
   }) {}
 
@@ -629,7 +639,7 @@ describe("decodeErrorOrElse", () => {
     const handler = Ref.decodeErrorOrElse(refWithSchema, () => "FALLBACK");
     const decoded = handler(new ConvexError({ _tag: "NotFound", id: "abc" }));
     expect(decoded).toBeInstanceOf(NotFound);
-    expect((decoded as NotFound).id).toBe("abc");
+    expect(decoded).toHaveProperty("id", "abc");
   });
 
   test("calls the fallback for a non-ConvexError input", () => {
@@ -657,7 +667,7 @@ describe("decodeErrorOrElse", () => {
 
 describe("hasErrorSchema", () => {
   test("returns true for Confect ref with an error schema", () => {
-    class NotFound extends Schema.TaggedError<NotFound, {}>()("NotFound", {
+    class NotFound extends Schema.TaggedError<NotFound, unknown>()("NotFound", {
       id: Schema.String,
     }) {}
 
@@ -696,6 +706,9 @@ describe("hasErrorSchema", () => {
   });
 });
 
+const checkPaginatedQuery = <Query extends Ref.AnyPublicPaginatedQuery>(
+  ref: Query,
+) => ref;
 describe("paginated queries", () => {
   const paginatedDoc = Schema.Struct({ value: Schema.FiniteFromString });
 
@@ -876,20 +889,18 @@ describe("paginated queries", () => {
         >
       >().not.toExtend<Ref.AnyPublicPaginatedQuery>();
       expectTypeOf<
-        NativeQuery<ValidArgs, { page: number[]; continueCursor: string }>
+        NativeQuery<ValidArgs, { page: Array<number>; continueCursor: string }>
       >().not.toExtend<Ref.AnyPaginatedQuery>();
       expectTypeOf<
         NativeQuery<
           ValidArgs,
-          { page: number[]; isDone: boolean; continueCursor: number }
+          { page: Array<number>; isDone: boolean; continueCursor: number }
         >
       >().not.toExtend<Ref.AnyPaginatedQuery>();
     });
 
     test("preserves decoded generic arguments and items through the canonical constraint", () => {
-      const check = <Query extends Ref.AnyPublicPaginatedQuery>(ref: Query) =>
-        ref;
-      const inferred = check(paginatedRef);
+      const inferred = checkPaginatedQuery(paginatedRef);
       expectTypeOf(inferred).toEqualTypeOf<typeof paginatedRef>();
       expectTypeOf<
         Ref.Args<typeof inferred>["count"]
@@ -897,7 +908,7 @@ describe("paginated queries", () => {
       expectTypeOf<
         Ref.Returns<typeof inferred>["page"][number]
       >().toEqualTypeOf<{ readonly value: number }>();
-      expectTypeOf(check(convexPaginatedRef)).toEqualTypeOf<
+      expectTypeOf(checkPaginatedQuery(convexPaginatedRef)).toEqualTypeOf<
         typeof convexPaginatedRef
       >();
       expectTypeOf(
@@ -910,10 +921,10 @@ describe("paginated queries", () => {
     });
 
     test("is satisfied by a paginated query ref with an error schema", () => {
-      class PaginationFailed extends Schema.TaggedError<PaginationFailed, {}>()(
-        "PaginationFailed",
-        {},
-      ) {}
+      class PaginationFailed extends Schema.TaggedError<
+        PaginationFailed,
+        unknown
+      >()("PaginationFailed", {}) {}
 
       const refWithError = Ref.make(
         "notes",
@@ -966,10 +977,11 @@ describe("paginated queries", () => {
     });
 
     test("drops a stray paginationOpts key instead of sending it", () => {
-      const encoded = Ref.encodePaginatedQueryArgsSync(paginatedRef, {
+      const args = {
         count: 42,
         paginationOpts: { numItems: 50, cursor: null },
-      } as never);
+      };
+      const encoded = Ref.encodePaginatedQueryArgsSync(paginatedRef, args);
 
       expect(encoded).toEqual({ count: "42" });
     });
@@ -1006,8 +1018,14 @@ describe("error schema laziness at decode time", () => {
     const specErrorBuilt = MutableRef.make(false);
     const middlewareErrorBuilt = MutableRef.make(false);
 
-    class NotFound extends Schema.TaggedError<NotFound, {}>()("NotFound", {}) {}
-    class Blocked extends Schema.TaggedError<Blocked, {}>()("Blocked", {}) {}
+    class NotFound extends Schema.TaggedError<NotFound, unknown>()(
+      "NotFound",
+      {},
+    ) {}
+    class Blocked extends Schema.TaggedError<Blocked, unknown>()(
+      "Blocked",
+      {},
+    ) {}
 
     class Gate extends MiddlewareSpec.MiddlewareSpec<Gate>()("LazyDecodeGate", {
       functionTypes: { query: true, mutation: true, action: true },
@@ -1053,7 +1071,10 @@ describe("make with middleware options", () => {
   it("derives middleware specs from ordered attachments without forcing schemas", () => {
     const optionsBuilt = MutableRef.make(false);
     const errorBuilt = MutableRef.make(false);
-    class Blocked extends Schema.TaggedError<Blocked, {}>()("Blocked", {}) {}
+    class Blocked extends Schema.TaggedError<Blocked, unknown>()(
+      "Blocked",
+      {},
+    ) {}
     class Policy extends MiddlewareSpec.MiddlewareSpec<Policy>()("Policy", {
       options: () => {
         MutableRef.set(optionsBuilt, true);
@@ -1095,8 +1116,10 @@ describe("make with middleware options", () => {
         functionTypes: { query: true, mutation: false, action: false },
       },
     ) {}
-    const resolve = (_args: unknown) => "resource-id";
-    const options = { resolve, tolerateMissing: true };
+    const options = {
+      resolve: (_args: unknown) => "resource-id",
+      tolerateMissing: true,
+    };
     const ref = Ref.make("resources", query.middleware(Resource, options));
     expect(ref.middlewareAttachments[0]?.options).toBe(options);
     expectTypeOf<Ref.Error<typeof ref>>().toBeNever();

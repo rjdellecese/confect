@@ -144,11 +144,11 @@ export const make = <Spec_ extends Spec.AnyWithProps>(
 };
 
 const makeHelper = (
-  groups: Record.ReadonlyRecord<string, GroupSpec.Any>,
+  groups: Record.ReadonlyRecord<string, GroupSpec.AnyWithProps>,
   convexFunctionNamespace: Option.Option<string> = Option.none(),
 ): Any =>
   pipe(
-    groups as Record.ReadonlyRecord<string, GroupSpec.AnyWithProps>,
+    groups,
     Record.map((group, name) => {
       const currentConvexFunctionNamespace = Option.match(
         convexFunctionNamespace,

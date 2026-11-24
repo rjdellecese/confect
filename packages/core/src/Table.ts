@@ -11,7 +11,7 @@ import type {
   SearchIndexConfig,
   VectorIndexConfig,
 } from "convex/server";
-import type { GenericValidator, Validator } from "convex/values";
+import type { GenericValidator } from "convex/values";
 import * as Predicate from "effect/Predicate";
 import type * as Schema from "effect/Schema";
 
@@ -72,7 +72,7 @@ export const isUnnamedTable = (u: unknown): u is UnnamedAny =>
  */
 export interface Table<
   Name_ extends string,
-  TableSchema_ extends Schema.Codec<any, any>,
+  TableSchema_ extends Schema.Codec<unknown>,
   TableValidator_ extends GenericValidator =
     TableSchemaToTableValidator<TableSchema_>,
   Indexes_ extends GenericTableIndexes = {},
@@ -165,7 +165,7 @@ export type AnyWithProps = Table<
  * @category Models
  */
 export interface UnnamedTable<
-  TableSchema_ extends Schema.Codec<any, any>,
+  TableSchema_ extends Schema.Codec<unknown>,
   TableValidator_ extends GenericValidator =
     TableSchemaToTableValidator<TableSchema_>,
   Indexes_ extends GenericTableIndexes = {},
@@ -227,7 +227,7 @@ export interface UnnamedTable<
   index<
     IndexName extends string,
     FirstFieldPath extends ExtractFieldPaths<TableValidator_>,
-    RestFieldPaths extends ExtractFieldPaths<TableValidator_>[],
+    RestFieldPaths extends Array<ExtractFieldPaths<TableValidator_>>,
   >(
     name: IndexName,
     fields: [FirstFieldPath, ...RestFieldPaths],
@@ -414,7 +414,7 @@ export type TablesRecord<Tables extends AnyWithProps> = {
 // property and avoid all function-call overhead.
 
 interface UnnamedState<
-  TableSchema_ extends Schema.Codec<any, any>,
+  TableSchema_ extends Schema.Codec<unknown>,
   Indexes_ extends GenericTableIndexes,
   SearchIndexes_ extends GenericTableSearchIndexes,
   VectorIndexes_ extends GenericTableVectorIndexes,
@@ -427,8 +427,8 @@ interface UnnamedState<
 
 const makeBound = <
   Name_ extends string,
-  TableSchema_ extends Schema.Codec<any, any>,
-  TableValidator_ extends Validator<any, any, any>,
+  TableSchema_ extends Schema.Codec<unknown>,
+  TableValidator_ extends GenericValidator,
   Indexes_ extends GenericTableIndexes,
   SearchIndexes_ extends GenericTableSearchIndexes,
   VectorIndexes_ extends GenericTableVectorIndexes,
@@ -461,18 +461,15 @@ const makeBound = <
   Lazy.defineProperty(bound, "Fields", () => state.lazyFields());
 
   Lazy.defineProperty(bound, "Doc", () =>
-    SystemFields.extendWithSystemFields(
-      tableName,
-      (bound as { Fields: TableSchema_ }).Fields,
-    ),
+    SystemFields.extendWithSystemFields(tableName, bound.Fields),
   );
 
   return bound;
 };
 
 const makeUnnamed = <
-  TableSchema_ extends Schema.Codec<any, any>,
-  TableValidator_ extends Validator<any, any, any>,
+  TableSchema_ extends Schema.Codec<unknown>,
+  TableValidator_ extends GenericValidator,
   Indexes_ extends GenericTableIndexes,
   SearchIndexes_ extends GenericTableSearchIndexes,
   VectorIndexes_ extends GenericTableVectorIndexes,
@@ -555,7 +552,7 @@ const makeUnnamed = <
     });
 
   return Object.assign(bind, {
-    [TypeId]: TypeId as TypeId,
+    [TypeId]: TypeId,
     indexes: state.indexes,
     searchIndexes: state.searchIndexes,
     vectorIndexes: state.vectorIndexes,
@@ -591,18 +588,17 @@ const makeUnnamed = <
  * @returns An unnamed definition to default-export from
  *   `confect/tables/<name>.ts`. Codegen binds the filename as its table name.
  */
-export const make = <const TableSchema_ extends Schema.Codec<any, any>>(
+export const make = <const TableSchema_ extends Schema.Codec<unknown>>(
   lazyFields: () => TableSchema_,
 ): UnnamedTable<TableSchema_, TableSchemaToTableValidator<TableSchema_>> => {
   type TableValidator_ = TableSchemaToTableValidator<TableSchema_>;
-  type UnnamedTable_ = UnnamedTable<TableSchema_, TableValidator_>;
 
   return makeUnnamed<TableSchema_, TableValidator_, {}, {}, {}>({
     lazyFields,
     indexes: {},
     searchIndexes: {},
     vectorIndexes: {},
-  }) as UnnamedTable_;
+  });
 };
 
 // Vendored types from convex-js, partially modified. Ideally we could use these directly. See https://github.com/get-convex/convex-js/pull/14
@@ -614,7 +610,7 @@ export const make = <const TableSchema_ extends Schema.Codec<any, any>>(
  *
  * @public
  */
-type ExtractFieldPaths<T extends Validator<any, any, any>> =
+type ExtractFieldPaths<T extends GenericValidator> =
   // Add in the system fields available in index definitions.
   // This should be everything except for `_id` because thats added to indexes
   // automatically.

@@ -77,7 +77,7 @@ export interface Standard {
  */
 export interface Paginated<
   UserArgsFields_ extends ArgsFields = ArgsFields,
-  Item extends Schema.Codec<any, any> = Schema.Codec<any, any>,
+  Item extends Schema.Codec<unknown> = Schema.Codec<any, any>,
 > {
   readonly _tag: "Paginated";
   /**
@@ -99,8 +99,8 @@ export interface Paginated<
  */
 export interface Confect<
   ArgsFields_ extends ArgsFields,
-  Returns extends Schema.Codec<any, any>,
-  Error extends Schema.Codec<any, any> = never,
+  Returns extends Schema.Codec<unknown>,
+  Error extends Schema.Codec<unknown> = never,
   Kind extends ConfectKind = ConfectKind,
 > {
   readonly _tag: "Confect";
@@ -164,8 +164,8 @@ const Standard: Standard = { _tag: "Standard" };
  */
 export const Confect = <
   const ArgsFields_ extends ArgsFields,
-  Returns extends Schema.Codec<any, any>,
-  Error extends Schema.Codec<any, any> = never,
+  Returns extends Schema.Codec<unknown>,
+  Error extends Schema.Codec<unknown> = never,
 >(
   args: () => ArgsFields_,
   returns: () => Returns,
@@ -209,9 +209,9 @@ export type PaginatedArgs<UserArgsFields extends ArgsFields> = Schema.Struct<
  *
  * @internal
  */
-export type PaginatedReturns<Item extends Schema.Codec<any, any>> =
+export type PaginatedReturns<Item extends Schema.Codec<unknown>> =
   PaginationResult.PaginationResult<Item> extends infer ComposedReturns extends
-    Schema.Codec<any, any>
+    Schema.Codec<unknown>
     ? ComposedReturns
     : never;
 
@@ -220,8 +220,8 @@ export type PaginatedReturns<Item extends Schema.Codec<any, any>> =
  */
 export interface ConfectPaginated<
   UserArgsFields extends ArgsFields,
-  Item extends Schema.Codec<any, any>,
-  Error extends Schema.Codec<any, any> = never,
+  Item extends Schema.Codec<unknown>,
+  Error extends Schema.Codec<unknown> = never,
 > extends Confect<
   PaginatedArgsFields<UserArgsFields>,
   PaginatedReturns<Item>,
@@ -250,8 +250,8 @@ export interface AnyConfectPaginated extends AnyConfect {
  */
 export const ConfectPaginated = <
   const UserArgsFields_ extends ArgsFields,
-  Item extends Schema.Codec<any, any>,
-  Error extends Schema.Codec<any, any> = never,
+  Item extends Schema.Codec<unknown>,
+  Error extends Schema.Codec<unknown> = never,
 >(
   userArgs: () => UserArgsFields_,
   item: () => Item,

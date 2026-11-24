@@ -431,7 +431,10 @@ bench("small: Refs (public-filtered)", () =>
   ({}) as Refs.Refs<SmallSpec, Ref.AnyPublic>).types([320, "instantiations"]);
 
 bench("small: Refs (internal-filtered)", () =>
-  ({}) as Refs.Refs<SmallSpec, Ref.AnyInternal>).types([361, "instantiations"]);
+  ({}) satisfies Refs.Refs<SmallSpec, Ref.AnyInternal>).types([
+  361,
+  "instantiations",
+]);
 
 bench("small: Refs (resolve one leaf)", () =>
   ({}) as Refs.Refs<SmallSpec, Ref.AnyPublic>["auth"]["login"]).types([

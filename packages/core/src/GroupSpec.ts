@@ -284,17 +284,15 @@ const Proto = {
   },
 
   addFunction<Function extends FunctionSpec.AnyWithProps>(
-    this: Any,
+    this: AnyWithProps,
     function_: Function,
   ) {
-    const this_ = this as AnyWithProps;
-
     const overlapping = Array.findFirst(
       function_.middlewareAttachments,
       ({ spec: functionMiddlewareSpec }) =>
         !("options" in functionMiddlewareSpec) &&
         Array.some(
-          this_.middlewareAttachments,
+          this.middlewareAttachments,
           ({ spec: groupMiddlewareSpec }) =>
             groupMiddlewareSpec.key === functionMiddlewareSpec.key,
         ),
@@ -306,26 +304,24 @@ const Proto = {
     }
 
     return makeProto({
-      runtime: this_.runtime,
-      experimental_reuseContext: this_.experimental_reuseContext,
-      name: this_.name,
-      functions: Record.set(this_.functions, function_.name, function_),
-      groups: this_.groups,
-      middlewareAttachments: this_.middlewareAttachments,
+      runtime: this.runtime,
+      experimental_reuseContext: this.experimental_reuseContext,
+      name: this.name,
+      functions: Record.set(this.functions, function_.name, function_),
+      groups: this.groups,
+      middlewareAttachments: this.middlewareAttachments,
     });
   },
 
   middleware<MiddlewareSpec_ extends MiddlewareSpec.AnyMiddlewareSpec>(
-    this: Any,
+    this: AnyWithProps,
     middlewareSpec: MiddlewareSpec_,
     ...options: ReadonlyArray<unknown>
   ) {
-    const this_ = this as AnyWithProps;
-
     if (
       !("options" in middlewareSpec) &&
       Array.some(
-        this_.middlewareAttachments,
+        this.middlewareAttachments,
         ({ spec }) => spec.key === middlewareSpec.key,
       )
     ) {
@@ -334,7 +330,7 @@ const Proto = {
       );
     }
 
-    for (const function_ of Record.values(this_.functions)) {
+    for (const function_ of Record.values(this.functions)) {
       if (
         !("options" in middlewareSpec) &&
         Array.some(
@@ -349,13 +345,13 @@ const Proto = {
     }
 
     return makeProto({
-      runtime: this_.runtime,
-      experimental_reuseContext: this_.experimental_reuseContext,
-      name: this_.name,
-      functions: this_.functions,
-      groups: this_.groups,
+      runtime: this.runtime,
+      experimental_reuseContext: this.experimental_reuseContext,
+      name: this.name,
+      functions: this.functions,
+      groups: this.groups,
       middlewareAttachments: [
-        ...this_.middlewareAttachments,
+        ...this.middlewareAttachments,
         { spec: middlewareSpec, options: options[0] },
       ],
     });
@@ -554,6 +550,7 @@ export const validateMiddleware = (
         `function "${function_.name}"`,
       );
     }
-    for (const child of Record.values(group.groups))
+    for (const child of Record.values(group.groups)) {
       yield* validateMiddleware(child);
+    }
   });

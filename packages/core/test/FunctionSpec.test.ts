@@ -4,6 +4,7 @@ import type * as MiddlewareAttachment from "@confect/core/MiddlewareAttachment";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import * as MutableRef from "effect/MutableRef";
 import * as Schema from "effect/Schema";
+import type * as FunctionProvenance from "@confect/core/FunctionProvenance";
 import * as FunctionSpec from "@confect/core/FunctionSpec";
 import * as MiddlewareSpec from "@confect/core/MiddlewareSpec";
 import * as Ref from "@confect/core/Ref";
@@ -70,21 +71,25 @@ describe("make", () => {
   });
 
   it("only accepts context-free struct fields as args", () => {
-    const nonStruct = FunctionSpec.publicQuery({
+    FunctionSpec.publicQuery({
       name: "nonStruct",
       // @ts-expect-error—function args must be a struct field map
       args: () => Schema.String,
       returns: () => Schema.String,
     });
-    const serviceful = FunctionSpec.publicQuery({
+    FunctionSpec.publicQuery({
       name: "serviceful",
       // @ts-expect-error—function args must be synchronously encodable and decodable
       args: () => ({ value: ServicefulString }),
       returns: () => Schema.String,
     });
 
-    void nonStruct;
-    void serviceful;
+    expectTypeOf<
+      typeof Schema.String
+    >().not.toExtend<FunctionProvenance.ArgsFields>();
+    expectTypeOf<{
+      value: typeof ServicefulString;
+    }>().not.toExtend<FunctionProvenance.ArgsFields>();
   });
 
   it("disallows invalid JS identifiers as function names", () => {
@@ -137,28 +142,28 @@ describe("make", () => {
 // If you are changing `FunctionProvenance`, `FunctionSpec`, or `Ref` and these
 // tests fail, do not "fix" them by eagerly reading the schemas—preserve the
 // laziness instead.
-describe("laziness invariant", () => {
-  const makeSpec = (track: {
-    args?: () => void;
-    returns?: () => void;
-    error?: () => void;
-  }) =>
-    FunctionSpec.publicQuery({
-      name: "tracked",
-      args: () => {
-        track.args?.();
-        return { tracked: Schema.Boolean };
-      },
-      returns: () => {
-        track.returns?.();
-        return Schema.Null;
-      },
-      error: () => {
-        track.error?.();
-        return Schema.String;
-      },
-    });
+const makeSpec = (track: {
+  args?: () => void;
+  returns?: () => void;
+  error?: () => void;
+}) =>
+  FunctionSpec.publicQuery({
+    name: "tracked",
+    args: () => {
+      track.args?.();
+      return { tracked: Schema.Boolean };
+    },
+    returns: () => {
+      track.returns?.();
+      return Schema.Null;
+    },
+    error: () => {
+      track.error?.();
+      return Schema.String;
+    },
+  });
 
+describe("laziness invariant", () => {
   it("constructing a FunctionSpec does not evaluate any schema thunk", () => {
     const argsBuilt = MutableRef.make(false);
     const returnsBuilt = MutableRef.make(false);
@@ -242,28 +247,28 @@ describe("laziness invariant", () => {
 describe("paginated queries", () => {
   const item = Schema.Struct({ value: Schema.FiniteFromString });
 
-  describe("laziness invariant", () => {
-    const makePaginatedSpec = (track: {
-      args?: () => void;
-      item?: () => void;
-      error?: () => void;
-    }) =>
-      FunctionSpec.publicPaginatedQuery({
-        name: "tracked",
-        args: () => {
-          track.args?.();
-          return { tracked: Schema.Boolean };
-        },
-        item: () => {
-          track.item?.();
-          return item;
-        },
-        error: () => {
-          track.error?.();
-          return Schema.String;
-        },
-      });
+  const makePaginatedSpec = (track: {
+    args?: () => void;
+    item?: () => void;
+    error?: () => void;
+  }) =>
+    FunctionSpec.publicPaginatedQuery({
+      name: "tracked",
+      args: () => {
+        track.args?.();
+        return { tracked: Schema.Boolean };
+      },
+      item: () => {
+        track.item?.();
+        return item;
+      },
+      error: () => {
+        track.error?.();
+        return Schema.String;
+      },
+    });
 
+  describe("laziness invariant", () => {
     it("constructing a paginated FunctionSpec does not evaluate any schema thunk", () => {
       const argsBuilt = MutableRef.make(false);
       const itemBuilt = MutableRef.make(false);
@@ -412,7 +417,7 @@ describe("paginated queries", () => {
 });
 
 describe("middleware options", () => {
-  class AccessDenied extends Schema.TaggedError<AccessDenied, {}>()(
+  class AccessDenied extends Schema.TaggedError<AccessDenied, unknown>()(
     "AccessDenied",
     {},
   ) {}
@@ -439,15 +444,19 @@ describe("middleware options", () => {
   });
 
   it("requires exactly the declared attachment options", () => {
-    query.middleware(RequireRole, { roles: ["Internal"] });
-    query.middleware(Observe);
-    // @ts-expect-error
+    const attached = query
+      .middleware(RequireRole, { roles: ["Internal"] })
+      .middleware(Observe);
+    expectTypeOf<FunctionSpec.MiddlewareSpecs<typeof attached>>().toEqualTypeOf<
+      typeof RequireRole | typeof Observe
+    >();
+    // @ts-expect-error - RequireRole requires an options object
     query.middleware(RequireRole);
-    // @ts-expect-error
+    // @ts-expect-error - Unknown is not a declared role
     query.middleware(RequireRole, { roles: ["Unknown"] });
-    // @ts-expect-error
+    // @ts-expect-error - the roles field is required
     query.middleware(RequireRole, {});
-    // @ts-expect-error
+    // @ts-expect-error - Observe does not accept options
     query.middleware(Observe, {});
   });
 

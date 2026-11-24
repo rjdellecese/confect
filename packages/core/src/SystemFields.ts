@@ -62,8 +62,8 @@ const splitSystemFields = (input: { [key: PropertyKey]: unknown }) => {
  * fields would be dropped at every transformation step.
  */
 const wrapGetter = <R>(
-  getter: SchemaGetter.Getter<any, any, R>,
-): SchemaGetter.Getter<any, any, R> =>
+  getter: SchemaGetter.Getter<unknown, unknown, R>,
+): SchemaGetter.Getter<unknown, unknown, R> =>
   SchemaGetter.transformOptionalEffect((input, options) => {
     if (Option.isNone(input) || !Predicate.isObject(input.value)) {
       return SchemaGetter.run(getter, input, options);
@@ -80,7 +80,7 @@ const wrapGetter = <R>(
 
 const wrapTransformation = (
   transformation: SchemaAST.Link["transformation"],
-): SchemaTransformation.Transformation<any, any, any, any> => {
+) => {
   if (!SchemaTransformation.isTransformation(transformation)) {
     throw new Error(
       "Cannot extend a table schema that uses decoding/encoding middleware with system fields",
@@ -173,7 +173,7 @@ const makeExtendAst = (
  */
 export const extendWithSystemFields = <
   TableName extends string,
-  TableSchema extends Schema.Codec<any, any>,
+  TableSchema extends Schema.Codec<unknown>,
 >(
   tableName: TableName,
   schema: TableSchema,
@@ -194,7 +194,8 @@ export const extendWithSystemFields = <
     if (
       s.ast.encoding === undefined &&
       SchemaAST.isUnion(s.ast) &&
-      Array.isArray((s as { readonly members?: unknown }).members)
+      "members" in s &&
+      Array.isArray(s.members)
     ) {
       return (s as Schema.Union<ReadonlyArray<Schema.Top>>).mapMembers(
         Array.map(extend),
@@ -204,7 +205,8 @@ export const extendWithSystemFields = <
     if (
       s.ast.encoding === undefined &&
       SchemaAST.isObjects(s.ast) &&
-      typeof (s as { readonly mapFields?: unknown }).mapFields === "function"
+      "mapFields" in s &&
+      typeof s.mapFields === "function"
     ) {
       return (s as Schema.Struct<Schema.Struct.Fields>).mapFields(
         Struct.assign(system),

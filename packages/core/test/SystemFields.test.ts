@@ -5,7 +5,7 @@ import * as SchemaGetter from "effect/SchemaGetter";
 import * as String from "effect/String";
 import * as Tuple from "effect/Tuple";
 import { describe, expect, expectTypeOf, test } from "@effect/vitest";
-import type { GenericId } from "@confect/core/GenericId";
+import { GenericId } from "@confect/core/GenericId";
 import * as SystemFields from "@confect/core/SystemFields";
 
 describe("extendWithSystemFields", () => {
@@ -91,8 +91,8 @@ describe("extendWithSystemFields", () => {
     test("decodes a document carrying the system fields", () => {
       const extendedNote = {
         content: "Hello, world!",
-        _id: "abc123" as GenericId<"notes">,
-        _creationTime: 1234567890,
+        _id: GenericId("notes").make("abc123"),
+        _creationTime: 1_234_567_890,
       };
 
       expect(() =>
@@ -145,13 +145,13 @@ describe("extendWithSystemFields", () => {
     test("decodes a document for each union member", () => {
       const extendedNote = {
         content: "Hello, world!",
-        _id: "abc123" as GenericId<"items">,
-        _creationTime: 1234567890,
+        _id: GenericId("items").make("abc123"),
+        _creationTime: 1_234_567_890,
       };
       const extendedImage = {
         url: "https://example.com/image.jpg",
-        _id: "def456" as GenericId<"items">,
-        _creationTime: 1234567890,
+        _id: GenericId("items").make("def456"),
+        _creationTime: 1_234_567_890,
       };
 
       expect(() =>
@@ -220,8 +220,8 @@ describe("extendWithSystemFields", () => {
     );
 
     const systemFields = {
-      _id: "abc123" as GenericId<"notes">,
-      _creationTime: 1234567890,
+      _id: GenericId("notes").make("abc123"),
+      _creationTime: 1_234_567_890,
     };
 
     test("carries the system fields through the transformation when decoding", () => {
@@ -251,7 +251,7 @@ describe("extendWithSystemFields", () => {
         Result.getOrThrow(
           Schema.decodeUnknownResult(ExtendedNoteSchema)({ content: "Hello" }),
         ),
-      ).toThrow();
+      ).toThrow(Schema.SchemaError);
     });
 
     test("decodes and encodes to the transformation's shapes carrying the system fields", () => {
@@ -275,8 +275,8 @@ describe("extendWithSystemFields", () => {
     );
 
     const systemFields = {
-      _id: "abc123" as GenericId<"notes">,
-      _creationTime: 1234567890,
+      _id: GenericId("notes").make("abc123"),
+      _creationTime: 1_234_567_890,
     };
 
     test("decodes from the encoded key, keeping the system fields", () => {
@@ -325,8 +325,8 @@ describe("extendWithSystemFields", () => {
     );
 
     const systemFields = {
-      _id: "abc123" as GenericId<"items">,
-      _creationTime: 1234567890,
+      _id: GenericId("items").make("abc123"),
+      _creationTime: 1_234_567_890,
     };
 
     test("decodes a document for each union member", () => {
@@ -365,13 +365,13 @@ describe("extendWithSystemFields", () => {
           Schema.decodeUnknownResult(ExtendedNoteSchema)({
             content: "Hello",
             _id: "abc123",
-            _creationTime: 1234567890,
+            _creationTime: 1_234_567_890,
           }),
         ),
       ).toStrictEqual({
         content: "Hello",
         _id: "abc123",
-        _creationTime: 1234567890,
+        _creationTime: 1_234_567_890,
       });
     });
   });
@@ -392,20 +392,22 @@ describe("extendWithSystemFields", () => {
           Schema.decodeUnknownResult(ExtendedNoteSchema)({
             content: "Hello",
             _id: "abc123",
-            _creationTime: 1234567890,
+            _creationTime: 1_234_567_890,
           }),
         ),
       ).toStrictEqual({
         content: "Hello",
         _id: "abc123",
-        _creationTime: 1234567890,
+        _creationTime: 1_234_567_890,
       });
     });
   });
 
   describe("unsupported table schemas", () => {
     test("rejects a Schema.Class with a descriptive error", () => {
-      class Note extends Schema.Class<Note, {}>("Note")({
+      class Note extends Schema.Class<Note, { readonly brand: unique symbol }>(
+        "Note",
+      )({
         content: Schema.String,
       }) {}
 

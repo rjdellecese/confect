@@ -134,8 +134,8 @@ export type ConfectRef<
   RuntimeAndFunctionType_ extends RuntimeAndFunctionType.RuntimeAndFunctionType,
   FunctionVisibility_ extends FunctionVisibility,
   ArgsFields_ extends FunctionProvenance.ArgsFields,
-  ReturnsSchema_ extends Schema.Codec<any, any>,
-  ErrorSchema_ extends Schema.Codec<any, any> = never,
+  ReturnsSchema_ extends Schema.Codec<unknown>,
+  ErrorSchema_ extends Schema.Codec<unknown> = never,
   MiddlewareError_ = never,
 > = ConfectRefWithTypes<
   RuntimeAndFunctionType_,
@@ -799,7 +799,7 @@ const errorSchemaOf = (ref: Any): Option.Option<Schema.Codec<any, any>> =>
       return schemas.length === 0
         ? Option.none<Schema.Codec<any, any>>()
         : Option.some(
-            schemas.length === 1 ? schemas[0]! : Schema.Union(schemas),
+            schemas.length === 1 ? schemas[0] : Schema.Union(schemas),
           );
     }),
     Match.tag("Convex", () => Option.none<Schema.Codec<any, any>>()),

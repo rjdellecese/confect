@@ -2,27 +2,30 @@ import {
   compileSchema,
   compileAst,
   UnsupportedPropertySignatureKeyTypeError,
-  type UndefinedOrValueToValidator,
-  type ValueToValidator,
+} from "@confect/core/SchemaToValidator";
+import type {
+  UndefinedOrValueToValidator,
+  ValueToValidator,
 } from "@confect/core/SchemaToValidator";
 import { GenericId } from "@confect/core/GenericId";
 import type { TypeError } from "@confect/core/Types";
-import { describe, expect, expectTypeOf, it } from "@effect/vitest";
-import {
-  v,
-  type VAny,
-  type VArray,
-  type VObject,
-  type VOptional,
-} from "convex/values";
+import { assert, describe, expect, expectTypeOf, it } from "@effect/vitest";
+import { v } from "convex/values";
+import type { VAny, VArray, VObject, VOptional } from "convex/values";
 import type { Brand } from "effect";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
+import * as SchemaAST from "effect/SchemaAST";
 import * as Result from "effect/Result";
 
 describe("UnsupportedPropertySignatureKeyTypeError", () => {
   it("preserves raw numeric and symbol keys through construction and schema decoding", () => {
-    for (const propertyKey of [NaN, Infinity, -Infinity, Symbol("key")]) {
+    for (const propertyKey of [
+      Number.NaN,
+      Infinity,
+      -Infinity,
+      Symbol("key"),
+    ]) {
       const error = UnsupportedPropertySignatureKeyTypeError.make({
         propertyKey,
       });
@@ -64,7 +67,7 @@ describe("ValueToValidator", () => {
     type Converted = ValueToValidator<{
       code: Wide;
       optional?: Wide;
-      nested: { codes: readonly Wide[] };
+      nested: { codes: ReadonlyArray<Wide> };
     }>;
     type Required = Converted["fields"]["code"];
     type Optional = Converted["fields"]["optional"];
@@ -106,13 +109,13 @@ describe("ValueToValidator", () => {
 
   it("preserves never element validators", () => {
     expectTypeOf<ValueToValidator<[]>>().toEqualTypeOf<
-      VArray<never[], never>
+      VArray<Array<never>, never>
     >();
     expectTypeOf<ValueToValidator<readonly []>>().toEqualTypeOf<
-      VArray<never[], never>
+      VArray<Array<never>, never>
     >();
-    expectTypeOf<ValueToValidator<never[]>>().toEqualTypeOf<
-      VArray<never[], never>
+    expectTypeOf<ValueToValidator<Array<never>>>().toEqualTypeOf<
+      VArray<Array<never>, never>
     >();
   });
 
@@ -151,7 +154,7 @@ describe("ValueToValidator", () => {
   it("keeps collection children required when their containing fields are optional", () => {
     type Converted = ValueToValidator<{
       rows?: ReadonlyArray<Record<string, { label?: string }>>;
-      metadata?: Record<string, readonly number[]>;
+      metadata?: Record<string, ReadonlyArray<number>>;
       choice?:
         | { kind: "text"; text: string }
         | { kind: "number"; value: number };
@@ -185,7 +188,7 @@ describe("ValueToValidator", () => {
     >().toEqualTypeOf<never>();
     expectTypeOf<
       ValueToValidator<ReadonlyArray<Record<string, number | undefined>>>
-    >().toEqualTypeOf<VArray<Record<string, number>[], never>>();
+    >().toEqualTypeOf<VArray<Array<Record<string, number>>, never>>();
   });
 
   it("keeps optional fields in record values", () => {
@@ -201,7 +204,7 @@ describe("ValueToValidator", () => {
         Record<
           string,
           {
-            readonly labels: readonly "label"[];
+            readonly labels: ReadonlyArray<"label">;
             readonly metadata?: Record<string, any>;
           }
         >
@@ -262,7 +265,7 @@ describe("ValueToValidator", () => {
     expectTypeOf<ValueToValidator<Branded>>().toEqualTypeOf<
       TypeError<"Provided value is not a valid Convex value", Branded>
     >();
-    type BrandedArray = Recursive[] & Brand.Brand<"array">;
+    type BrandedArray = Array<Recursive> & Brand.Brand<"array">;
     expectTypeOf<
       ValueToValidator<BrandedArray>["kind"]
     >().toEqualTypeOf<"array">();
@@ -277,7 +280,7 @@ describe("ValueToValidator", () => {
       ValueToValidator<{ value: string & { child: Recursive } }>
     >().toEqualTypeOf<VAny>();
     expectTypeOf<
-      ValueToValidator<readonly string[] & { child: Recursive }>
+      ValueToValidator<ReadonlyArray<string> & { child: Recursive }>
     >().toEqualTypeOf<VAny>();
   });
 
@@ -315,7 +318,7 @@ describe("UndefinedOrValueToValidator", () => {
   });
 
   it("matches native optional wrapping for arrays, objects, records, and unions", () => {
-    type ArrayValue = readonly string[];
+    type ArrayValue = ReadonlyArray<string>;
     type ObjectValue = { readonly name: string };
     type RecordValue = Record<string, any>;
     type UnionValue = string | number | null;
@@ -362,6 +365,37 @@ describe("ID schemas", () => {
 });
 
 describe("compiler preprocessing", () => {
+  it.effect(
+    "preserves field order, own properties, and the first validator for a repeated field",
+    () =>
+      Effect.gen(function* () {
+        const validator = yield* compileAst(
+          new SchemaAST.Objects(
+            [
+              new SchemaAST.PropertySignature("repeated", Schema.String.ast),
+              new SchemaAST.PropertySignature("__proto__", Schema.Boolean.ast),
+              new SchemaAST.PropertySignature("repeated", Schema.Finite.ast),
+              new SchemaAST.PropertySignature("last", Schema.Null.ast),
+            ],
+            [],
+          ),
+        );
+
+        assert(validator.kind === "object");
+        const fields = validator.fields;
+        expect(Reflect.ownKeys(fields)).toEqual([
+          "last",
+          "repeated",
+          "__proto__",
+        ]);
+        expect(fields).toEqual({
+          last: v.null(),
+          repeated: v.string(),
+          ["__proto__"]: v.boolean(),
+        });
+      }),
+  );
+
   it.effect("captures union members before executing the compiler effect", () =>
     Effect.gen(function* () {
       const ast = Schema.Union([Schema.String, Schema.Boolean]).ast;
