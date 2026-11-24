@@ -48,7 +48,7 @@ export type Prefix = Data.TaggedEnum.Value<QueryStreamKey, "Prefix">;
  */
 export class KeyWidthMismatchError extends Schema.TaggedError<
   KeyWidthMismatchError,
-  unknown
+  { readonly brand: unique symbol }
 >()("KeyWidthMismatchError", {
   kind: Schema.Literals(["complete", "prefix"]),
   width: NumberValue,

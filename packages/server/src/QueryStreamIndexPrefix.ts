@@ -37,7 +37,7 @@ export interface QueryStreamIndexPrefix {
  */
 export class IndexPrefixWidthMismatchError extends Schema.TaggedError<
   IndexPrefixWidthMismatchError,
-  unknown
+  { readonly brand: unique symbol }
 >()("IndexPrefixWidthMismatchError", {
   width: NumberValue,
   actual: NumberValue,

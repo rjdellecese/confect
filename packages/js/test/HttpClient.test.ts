@@ -8,6 +8,32 @@ import * as Layer from "effect/Layer";
 import * as Queue from "effect/Queue";
 import * as Schema from "effect/Schema";
 
+it.effect(
+  "retains the HTTP error wire format without accepting structural substitutes",
+  () =>
+    Effect.gen(function* () {
+      class OtherError extends Schema.TaggedError<
+        OtherError,
+        { readonly brand: unique symbol }
+      >()("HttpClientError", { cause: Schema.Unknown }) {}
+      expectTypeOf<OtherError>().not.toExtend<HttpClient.HttpClientError>();
+
+      const wire = {
+        _tag: "HttpClientError",
+        cause: "connection closed",
+      } as const;
+      const error = HttpClient.HttpClientError.make({ cause: wire.cause });
+      const encoded = yield* Schema.encodeEffect(HttpClient.HttpClientError)(
+        error,
+      );
+      const decoded = yield* Schema.decodeEffect(HttpClient.HttpClientError)(
+        wire,
+      );
+      expect(encoded).toEqual(wire);
+      expect(decoded).toBeInstanceOf(HttpClient.HttpClientError);
+    }),
+);
+
 const noArgsQueryRef = Ref.make(
   "notes",
   FunctionSpec.publicQuery({

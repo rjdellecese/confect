@@ -151,7 +151,7 @@ type DropPrefix<
  */
 export class InvalidEqualityPrefixError extends Schema.TaggedError<
   InvalidEqualityPrefixError,
-  unknown
+  { readonly brand: unique symbol }
 >()("InvalidEqualityPrefixError", {
   fieldPaths: Schema.String.pipe(
     Schema.Array,
@@ -174,7 +174,7 @@ export class InvalidEqualityPrefixError extends Schema.TaggedError<
  */
 export class InvalidLabelPrefixError extends Schema.TaggedError<
   InvalidLabelPrefixError,
-  unknown
+  { readonly brand: unique symbol }
 >()("InvalidLabelPrefixError", {
   keyLabels: QueryStreamKeyLabels.QueryStreamKeyLabels,
   prefixKeyLabels: QueryStreamKeyLabels.QueryStreamKeyLabels,
@@ -193,7 +193,7 @@ export class InvalidLabelPrefixError extends Schema.TaggedError<
  */
 export class LabelCountMismatchError extends Schema.TaggedError<
   LabelCountMismatchError,
-  unknown
+  { readonly brand: unique symbol }
 >()("LabelCountMismatchError", {
   keyLabels: QueryStreamKeyLabels.QueryStreamKeyLabels,
   replacementKeyLabels: QueryStreamKeyLabels.QueryStreamKeyLabels,
@@ -372,7 +372,7 @@ export const Equivalence: Equivalence_.Equivalence<QueryStreamKeyLayout> =
  */
 export class KeyLayoutMismatchError extends Schema.TaggedError<
   KeyLayoutMismatchError,
-  unknown
+  { readonly brand: unique symbol }
 >()("KeyLayoutMismatchError", {
   expectedKeyLayout: QueryStreamKeyLayout,
   actualKeyLayout: QueryStreamKeyLayout,

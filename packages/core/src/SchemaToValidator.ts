@@ -575,7 +575,7 @@ const handlePropertySignatures = (objectsAst: SchemaAST.Objects) =>
  */
 export class TopLevelMustBeObjectError extends Schema.TaggedError<
   TopLevelMustBeObjectError,
-  unknown
+  { readonly brand: unique symbol }
 >()("TopLevelMustBeObjectError", {}) {
   /* v8 ignore start */
   override get message() {
@@ -589,7 +589,7 @@ export class TopLevelMustBeObjectError extends Schema.TaggedError<
  */
 export class TopLevelMustBeObjectOrUnionError extends Schema.TaggedError<
   TopLevelMustBeObjectOrUnionError,
-  unknown
+  { readonly brand: unique symbol }
 >()("TopLevelMustBeObjectOrUnionError", {}) {
   /* v8 ignore start */
   override get message() {
@@ -603,7 +603,7 @@ export class TopLevelMustBeObjectOrUnionError extends Schema.TaggedError<
  */
 export class UnsupportedPropertySignatureKeyTypeError extends Schema.TaggedError<
   UnsupportedPropertySignatureKeyTypeError,
-  unknown
+  { readonly brand: unique symbol }
 >()("UnsupportedPropertySignatureKeyTypeError", {
   propertyKey: Schema.declare<number | symbol>(
     (input): input is number | symbol =>
@@ -622,7 +622,7 @@ export class UnsupportedPropertySignatureKeyTypeError extends Schema.TaggedError
  */
 export class EmptyTupleIsNotSupportedError extends Schema.TaggedError<
   EmptyTupleIsNotSupportedError,
-  unknown
+  { readonly brand: unique symbol }
 >()("EmptyTupleIsNotSupportedError", {}) {
   /* v8 ignore start */
   override get message() {
@@ -636,7 +636,7 @@ export class EmptyTupleIsNotSupportedError extends Schema.TaggedError<
  */
 export class EmptyUnionIsNotSupportedError extends Schema.TaggedError<
   EmptyUnionIsNotSupportedError,
-  unknown
+  { readonly brand: unique symbol }
 >()("EmptyUnionIsNotSupportedError", {}) {
   /* v8 ignore start */
   override get message() {
@@ -650,7 +650,7 @@ export class EmptyUnionIsNotSupportedError extends Schema.TaggedError<
  */
 export class UnsupportedSchemaTypeError extends Schema.TaggedError<
   UnsupportedSchemaTypeError,
-  unknown
+  { readonly brand: unique symbol }
 >()("UnsupportedSchemaTypeError", {
   schemaType: Schema.Literals([
     "Declaration",
@@ -688,7 +688,7 @@ export class UnsupportedSchemaTypeError extends Schema.TaggedError<
  */
 export class IndexSignaturesAreNotSupportedError extends Schema.TaggedError<
   IndexSignaturesAreNotSupportedError,
-  unknown
+  { readonly brand: unique symbol }
 >()("IndexSignaturesAreNotSupportedError", {}) {
   /* v8 ignore start */
   override get message() {
@@ -702,7 +702,7 @@ export class IndexSignaturesAreNotSupportedError extends Schema.TaggedError<
  */
 export class MixedIndexAndPropertySignaturesAreNotSupportedError extends Schema.TaggedError<
   MixedIndexAndPropertySignaturesAreNotSupportedError,
-  unknown
+  { readonly brand: unique symbol }
 >()("MixedIndexAndPropertySignaturesAreNotSupportedError", {}) {
   /* v8 ignore start */
   override get message() {
@@ -716,7 +716,7 @@ export class MixedIndexAndPropertySignaturesAreNotSupportedError extends Schema.
  */
 export class OptionalTupleElementsAreNotSupportedError extends Schema.TaggedError<
   OptionalTupleElementsAreNotSupportedError,
-  unknown
+  { readonly brand: unique symbol }
 >()("OptionalTupleElementsAreNotSupportedError", {}) {
   /* v8 ignore start */
   override get message() {

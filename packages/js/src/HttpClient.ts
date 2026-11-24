@@ -21,7 +21,7 @@ import * as Schema from "effect/Schema";
  */
 export class HttpClientError extends Schema.TaggedError<
   HttpClientError,
-  unknown
+  { readonly brand: unique symbol }
 >()("HttpClientError", {
   /**
    * The original rejected value, including undeclared Convex errors.

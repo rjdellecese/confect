@@ -79,7 +79,7 @@ const OrderDirection = Schema.Literals(["asc", "desc"]);
  */
 export class ReadBudgetExceededError extends Schema.TaggedError<
   ReadBudgetExceededError,
-  unknown
+  { readonly brand: unique symbol }
 >()("ReadBudgetExceededError", {
   /**
    * Physical documents read, including filtered documents and repeated reads.
@@ -118,7 +118,7 @@ export class ReadBudgetExceededError extends Schema.TaggedError<
  */
 export class IncompatibleStreamsError extends Schema.TaggedError<
   IncompatibleStreamsError,
-  unknown
+  { readonly brand: unique symbol }
 >()("IncompatibleStreamsError", {
   /**
    * Direction of the first merge input, which defines the expected order.
@@ -166,7 +166,7 @@ export class IncompatibleStreamsError extends Schema.TaggedError<
  */
 export class InnerStreamOrderMismatchError extends Schema.TaggedError<
   InnerStreamOrderMismatchError,
-  unknown
+  { readonly brand: unique symbol }
 >()("InnerStreamOrderMismatchError", {
   /**
    * Direction required by the outer stream.
@@ -202,7 +202,7 @@ export class InnerStreamOrderMismatchError extends Schema.TaggedError<
  */
 export class InnerStreamLayoutMismatchError extends Schema.TaggedError<
   InnerStreamLayoutMismatchError,
-  unknown
+  { readonly brand: unique symbol }
 >()("InnerStreamLayoutMismatchError", {
   /**
    * Layout supplied as flatMap's innerKeyLayout template.
@@ -238,7 +238,7 @@ export class InnerStreamLayoutMismatchError extends Schema.TaggedError<
  */
 export class MissingReversalRecipeError extends Schema.TaggedError<
   MissingReversalRecipeError,
-  unknown
+  { readonly brand: unique symbol }
 >()("MissingReversalRecipeError", {}) {
   override get message(): string {
     return "QueryStream.reverse: this stream cannot be reversed without a reversal recipe";
@@ -2494,7 +2494,7 @@ const narrowInMemory = <
  */
 export class NotUniqueError extends Schema.TaggedError<
   NotUniqueError,
-  unknown
+  { readonly brand: unique symbol }
 >()("NotUniqueError", {}) {
   /**
    * Returns a message explaining the at-most-one expectation.

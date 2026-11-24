@@ -63,7 +63,7 @@ export type Limits = typeof Limits.Type;
  */
 export class InvalidReadLimitError extends Schema.TaggedError<
   InvalidReadLimitError,
-  unknown
+  { readonly brand: unique symbol }
 >()("InvalidReadLimitError", {
   /**
    * SchemaError describing the invalid limit options.

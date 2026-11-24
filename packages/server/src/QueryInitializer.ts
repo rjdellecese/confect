@@ -530,7 +530,7 @@ export const getById =
  */
 export class GetByIdFailure extends Schema.TaggedError<
   GetByIdFailure,
-  unknown
+  { readonly brand: unique symbol }
 >()("GetByIdFailure", {
   /**
    * The requested document ID.
@@ -568,7 +568,7 @@ export class GetByIdFailure extends Schema.TaggedError<
  */
 export class GetByIndexFailure extends Schema.TaggedError<
   GetByIndexFailure,
-  unknown
+  { readonly brand: unique symbol }
 >()("GetByIndexFailure", {
   /**
    * The selected table's name.

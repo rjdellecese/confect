@@ -26,7 +26,7 @@ type PageSize = typeof PageSize.Type;
  */
 export class InvalidPageSizeError extends Schema.TaggedError<
   InvalidPageSizeError,
-  unknown
+  { readonly brand: unique symbol }
 >()("InvalidPageSizeError", {
   /**
    * Page size rejected by `QueryStream.paginate`.
@@ -57,7 +57,7 @@ export class InvalidPageSizeError extends Schema.TaggedError<
  */
 export class EmptyInitialPageError extends Schema.TaggedError<
   EmptyInitialPageError,
-  unknown
+  { readonly brand: unique symbol }
 >()("EmptyInitialPageError", {}) {
   /**
    * Returns a message explaining why the first page cannot have size zero.
@@ -292,7 +292,7 @@ export type Outcome<Doc> = Data.TaggedEnum<{
  */
 export class UnsafePageBoundaryError extends Schema.TaggedError<
   UnsafePageBoundaryError,
-  unknown
+  { readonly brand: unique symbol }
 >()("UnsafePageBoundaryError", {
   reason: Schema.Literals(["NoProgress", "NoInteriorSplit"]),
 }) {
