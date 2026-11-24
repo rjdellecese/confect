@@ -15,7 +15,8 @@ import { ConfectDirectory } from "./ConfectDirectory";
 import { ConvexDirectory } from "./ConvexDirectory";
 import { CONVEX_CONFIG_FILENAME } from "./ConvexConfig";
 import { discoverLeafImplFiles, discoverLeafSpecFiles } from "./LeafModule";
-import { discoverTableFiles, type TableModule } from "./TableModule";
+import { discoverTableFiles } from "./TableModule";
+import type { TableModule } from "./TableModule";
 
 export type Kind = Data.TaggedEnum<{
   Spec: { readonly relativePath: SpecModulePath.SpecModulePath };
@@ -24,7 +25,7 @@ export type Kind = Data.TaggedEnum<{
   Http: { readonly relativePath: "http.ts" };
   Crons: { readonly relativePath: "crons.ts" };
   Auth: { readonly relativePath: "auth.ts" };
-  Config: {};
+  Config: object;
 }>;
 
 export const Kind = Data.taggedEnum<Kind>();
@@ -34,6 +35,11 @@ export const Declaration = Schema.TaggedUnion({
 });
 export type Declaration = typeof Declaration.Type;
 
+interface DeclarationPlan {
+  readonly tables: ReadonlyArray<TableModule>;
+  readonly paths: ReadonlyArray<ImplModulePath>;
+}
+
 /**
  * @internal
  */
@@ -41,10 +47,7 @@ export const planDeclarations = (
   declarations: Array.NonEmptyReadonlyArray<Declaration>,
   affectedImpls: ReadonlyArray<ImplModulePath>,
   path: Path.Path,
-): {
-  readonly tables: ReadonlyArray<TableModule>;
-  readonly paths: ReadonlyArray<ImplModulePath>;
-} => {
+): DeclarationPlan => {
   const plan = Array.reduce(
     declarations,
     {
@@ -86,20 +89,25 @@ export const isOptional = Predicate.or(
 export const parse = (
   relativePath: string,
 ): Option.Option<Exclude<Kind, { readonly _tag: "Config" }>> => {
-  if (relativePath === "http.ts")
+  if (relativePath === "http.ts") {
     return Option.some(Kind.Http({ relativePath }));
-  if (relativePath === "crons.ts")
+  }
+  if (relativePath === "crons.ts") {
     return Option.some(Kind.Crons({ relativePath }));
-  if (relativePath === "auth.ts")
+  }
+  if (relativePath === "auth.ts") {
     return Option.some(Kind.Auth({ relativePath }));
+  }
   const tablePath = Schema.decodeOption(TableModulePath)(relativePath);
-  if (Option.isSome(tablePath))
+  if (Option.isSome(tablePath)) {
     return Option.some(Kind.Table({ relativePath: tablePath.value }));
+  }
   const specPath = Schema.decodeOption(SpecModulePath.SpecModulePath)(
     relativePath,
   );
-  if (Option.isSome(specPath))
+  if (Option.isSome(specPath)) {
     return Option.some(Kind.Spec({ relativePath: specPath.value }));
+  }
   return Schema.decodeOption(ImplModulePath)(relativePath).pipe(
     Option.map((implPath) => Kind.Impl({ relativePath: implPath })),
   );

@@ -13,7 +13,7 @@ export class ProjectRoot extends Context.Service<
   ProjectRoot,
   { readonly get: Effect.Effect<string> }
 >()("@confect/cli/ProjectRoot") {
-  static readonly get = ProjectRoot.use((service) => service.get);
+  static readonly get = Effect.flatMap(ProjectRoot, (service) => service.get);
 }
 
 /**

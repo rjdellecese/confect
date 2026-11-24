@@ -1,4 +1,5 @@
-import { type GroupSpec, Spec } from "@confect/core";
+import { Spec } from "@confect/core";
+import type { GroupSpec } from "@confect/core";
 import { pipe } from "effect/Function";
 import * as HashSet from "effect/HashSet";
 import * as Option from "effect/Option";
@@ -61,13 +62,7 @@ export const groupPaths = (
 export const diff = (
   previousFunctions: FunctionPaths,
   currentFunctions: FunctionPaths,
-): {
-  functionsAdded: FunctionPaths;
-  functionsRemoved: FunctionPaths;
-  groupsRemoved: GroupPaths.GroupPaths;
-  groupsAdded: GroupPaths.GroupPaths;
-  groupsChanged: GroupPaths.GroupPaths;
-} => {
+) => {
   const currentGroups = groupPaths(currentFunctions);
   const previousGroups = groupPaths(previousFunctions);
 

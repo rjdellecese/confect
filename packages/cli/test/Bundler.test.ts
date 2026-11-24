@@ -1,3 +1,4 @@
+import * as Predicate from "effect/Predicate";
 import * as Option from "effect/Option";
 import { pipe } from "effect/Function";
 import * as Str from "effect/String";
@@ -11,7 +12,7 @@ import * as Cause from "effect/Cause";
 import * as Path from "effect/Path";
 import * as NodeFileSystem from "@effect/platform-node/NodeFileSystem";
 import * as NodePath from "@effect/platform-node/NodePath";
-import { expect, layer } from "@effect/vitest";
+import { assert, expect, layer } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
@@ -20,6 +21,35 @@ import * as References from "effect/References";
 import * as Result from "effect/Result";
 import * as Match from "effect/Match";
 import * as Bundler from "@confect/cli/Bundler";
+import { callFixtureExport } from "./fixtureExport";
+
+const bundleFixture = Effect.fnUntraced(function* (
+  ...args: Parameters<typeof Bundler.bundle>
+) {
+  const { module, metafile } = yield* Bundler.bundle(...args);
+  assert(Predicate.isObject(module));
+  return { module, metafile };
+});
+
+const importFixture = Effect.fnUntraced(function* (
+  module: unknown,
+  name: string,
+) {
+  assert(Predicate.hasProperty(module, name));
+  const loaded = yield* Effect.promise(() =>
+    Promise.resolve(callFixtureExport(module[name], module)),
+  );
+  assert(Predicate.isObject(loaded));
+  return loaded;
+});
+
+const settle = (load: unknown) =>
+  Effect.promise(() =>
+    Promise.resolve(callFixtureExport(load, undefined)).then(
+      () => "loaded",
+      () => "failed",
+    ),
+  );
 
 const BundlerLayer = Layer.mergeAll(NodePath.layer, NodeFileSystem.layer);
 
@@ -57,7 +87,7 @@ layer(BundlerLayer)("bundle", (it) => {
           `import { value } from "~/sibling";\nexport default value;\n`,
         );
 
-        const bundled = yield* Bundler.bundle(entry);
+        const bundled = yield* bundleFixture(entry);
         expect(bundled.module.default).toBe("bundled");
       }).pipe(Effect.scoped),
   );
@@ -103,7 +133,7 @@ layer(BundlerLayer)("bundle", (it) => {
           `import { value } from "@scope/lib/Scenario";\nexport default value;\n`,
         );
 
-        const bundled = yield* Bundler.bundle(entry);
+        const bundled = yield* bundleFixture(entry);
         expect(bundled.module.default).toBe("bundled");
       }).pipe(Effect.scoped),
   );
@@ -151,7 +181,7 @@ layer(BundlerLayer)("bundle", (it) => {
           `import { value } from "@scope/esm-lib/Widget";\nexport default value;\n`,
         );
 
-        const bundled = yield* Bundler.bundle(entry);
+        const bundled = yield* bundleFixture(entry);
         expect(bundled.module.default).toBe("bundled");
       }).pipe(Effect.scoped),
   );
@@ -172,7 +202,7 @@ layer(BundlerLayer)("bundle", (it) => {
         `import { pipe } from "effect/Function";\nexport default pipe(1, (n) => n + 1);\n`,
       );
 
-      const bundled = yield* Bundler.bundle(entry);
+      const bundled = yield* bundleFixture(entry);
       expect(bundled.module.default).toBe(2);
     }).pipe(Effect.scoped),
   );
@@ -190,7 +220,7 @@ layer(BundlerLayer)("bundle", (it) => {
         const entry = path.join(tempDir, "entry.ts");
         yield* fs.writeFileString(entry, `export default import.meta.url;\n`);
 
-        const bundled = yield* Bundler.bundle(entry);
+        const bundled = yield* bundleFixture(entry);
         // esbuild canonicalizes `import.meta.url` to the entry's real path, so
         // resolve symlinks before comparing—otherwise this fails when the
         // temp dir lives under a symlinked root (e.g. macOS `/tmp` ->
@@ -222,7 +252,7 @@ layer(BundlerLayer)("importersOfPackage", (it) => {
         `import { pipe } from "effect/Function";\nexport default pipe(1, (n) => n + 1);\n`,
       );
 
-      const bundled = yield* Bundler.bundle(entry);
+      const bundled = yield* bundleFixture(entry);
 
       expect(
         Bundler.importersOfPackage(bundled, "effect", () => true),
@@ -261,7 +291,7 @@ layer(BundlerLayer)("importersOfPackage", (it) => {
         `import { value } from "@scope/lib";\nexport default value;\n`,
       );
 
-      const bundled = yield* Bundler.bundle(entry);
+      const bundled = yield* bundleFixture(entry);
 
       // The import resolved to an absolute path inside `pkg/dist`, yet the
       // package is still found by name. Canonicalize the returned path because
@@ -301,7 +331,7 @@ layer(BundlerLayer)("importersOfPackage", (it) => {
         `export { default } from "./sibling";\n`,
       );
 
-      const bundled = yield* Bundler.bundle(entry);
+      const bundled = yield* bundleFixture(entry);
       const realSibling = yield* fs.realPath(sibling);
 
       expect(
@@ -401,9 +431,9 @@ layer(BundlerLayer)("withBatch", (it) => {
         "node_modules/fixture/value.ts": 'export const value = "native-node";',
       });
       const entry = file("entry.ts");
-      expect((yield* Bundler.bundle(entry)).module.value).toBe("native-node");
+      expect((yield* bundleFixture(entry)).module.value).toBe("native-node");
       expect(
-        (yield* Bundler.withBatch([entry], Bundler.bundle(entry))).module.value,
+        (yield* Bundler.withBatch([entry], bundleFixture(entry))).module.value,
       ).toBe("native-node");
     }).pipe(Effect.scoped),
   );
@@ -419,9 +449,9 @@ layer(BundlerLayer)("withBatch", (it) => {
           "entry.ts": 'export { value } from "alias";',
         });
         const entry = file("entry.ts");
-        expect((yield* Bundler.bundle(entry)).module.value).toBe("local");
+        expect((yield* bundleFixture(entry)).module.value).toBe("local");
         expect(
-          (yield* Bundler.withBatch([entry], Bundler.bundle(entry))).module
+          (yield* Bundler.withBatch([entry], bundleFixture(entry))).module
             .value,
         ).toBe("local");
       }).pipe(Effect.scoped),
@@ -445,7 +475,7 @@ layer(BundlerLayer)("withBatch", (it) => {
         const second = file("nested/second.ts");
         const bundled = yield* Bundler.withBatch(
           [first, second],
-          Effect.all([Bundler.bundle(first), Bundler.bundle(second)], {
+          Effect.all([bundleFixture(first), bundleFixture(second)], {
             concurrency: 1,
           }),
         );
@@ -465,11 +495,11 @@ layer(BundlerLayer)("withBatch", (it) => {
           "nested/tsconfig.json": '{"extends":',
           "nested/shared.ts": "export const value = 1;",
         });
-        expect((yield* Bundler.bundle(file("entry.ts"))).module.value).toBe(1);
+        expect((yield* bundleFixture(file("entry.ts"))).module.value).toBe(1);
         expect(
           (yield* Bundler.withBatch(
             [file("entry.ts")],
-            Bundler.bundle(file("entry.ts")),
+            bundleFixture(file("entry.ts")),
           )).module.value,
         ).toBe(1);
       }).pipe(Effect.scoped),
@@ -498,9 +528,9 @@ layer(BundlerLayer)("withBatch", (it) => {
             'import { value } from "alias"; class Base { set field(value) { this.received = value; } } class Derived extends Base { field = value; } export default new Derived().received;',
         });
         const entry = file("entry.ts");
-        expect((yield* Bundler.bundle(entry)).module.default).toBe("inherited");
+        expect((yield* bundleFixture(entry)).module.default).toBe("inherited");
         expect(
-          (yield* Bundler.withBatch([entry], Bundler.bundle(entry))).module
+          (yield* Bundler.withBatch([entry], bundleFixture(entry))).module
             .default,
         ).toBe("inherited");
       }).pipe(Effect.scoped),
@@ -526,13 +556,13 @@ layer(BundlerLayer)("withBatch", (it) => {
           "node_modules/@fixture/backend.v1-extra/index.js":
             'export default "external";',
         });
-        const individual = yield* Bundler.bundle(file("first.ts"));
+        const individual = yield* bundleFixture(file("first.ts"));
         const [first, second] = yield* Bundler.withBatch(
           [file("first.ts"), file("nested/second.ts")],
           Effect.all(
             [
-              Bundler.bundle(file("first.ts")),
-              Bundler.bundle(file("nested/second.ts")),
+              bundleFixture(file("first.ts")),
+              bundleFixture(file("nested/second.ts")),
             ],
             { concurrency: 1 },
           ),
@@ -542,7 +572,7 @@ layer(BundlerLayer)("withBatch", (it) => {
         }).pipe(ConfigProvider.layer, Layer.build);
         const fallback = yield* Bundler.withBatch(
           [file("first.ts"), file("nested/second.ts")],
-          Bundler.bundle(file("nested/second.ts")),
+          bundleFixture(file("nested/second.ts")),
         ).pipe(Effect.provideContext(services));
         for (const bundled of [individual, first, second, fallback]) {
           expect(bundled.module.values).toEqual([
@@ -609,7 +639,7 @@ layer(BundlerLayer)("withBatch", (it) => {
           "nested/second.ts": 'export { shared } from "../shared";',
           ...files,
         });
-        const events: Logger.Options<unknown>[] = [];
+        const events: Array<Logger.Options<unknown>> = [];
         const entries = [
           file("first.ts"),
           file(
@@ -620,7 +650,7 @@ layer(BundlerLayer)("withBatch", (it) => {
         ];
         const run = Bundler.withBatch(
           entries,
-          Effect.forEach(entries, (entry) => Bundler.bundle(entry), {
+          Effect.forEach(entries, (entry) => bundleFixture(entry), {
             concurrency: "unbounded",
           }),
         );
@@ -662,7 +692,7 @@ layer(BundlerLayer)("withBatch", (it) => {
   it.effect("does not diagnose unused or successful batches", () =>
     Effect.gen(function* () {
       const { file } = yield* fixture({ "first.ts": "export default 1;" });
-      const events: Logger.Options<unknown>[] = [];
+      const events: Array<Logger.Options<unknown>> = [];
       const services4 = yield* Layer.build(
         Logger.layer([
           Logger.make((event) => {
@@ -674,7 +704,7 @@ layer(BundlerLayer)("withBatch", (it) => {
         yield* Bundler.withBatch(["/missing/entry.ts"], Effect.void);
         yield* Bundler.withBatch(
           [file("first.ts")],
-          Bundler.bundle(file("first.ts")),
+          bundleFixture(file("first.ts")),
         );
       }).pipe(
         Effect.provideContext(services4),
@@ -706,14 +736,14 @@ layer(BundlerLayer)("withBatch", (it) => {
           file("linked-source/first.ts"),
           file("linked-source/second.ts"),
         ] as const;
-        const messages: unknown[] = [];
+        const messages: Array<unknown> = [];
         const console = yield* Console.Console;
         const outputs = yield* Bundler.withBatch(
           entries,
           Effect.gen(function* () {
-            const first = yield* Bundler.bundle(entries[0]);
+            const first = yield* bundleFixture(entries[0]);
             expect(messages).toEqual([]);
-            const second = yield* Bundler.bundle(entries[1]);
+            const second = yield* bundleFixture(entries[1]);
             expect(first.module.shared).toBe(second.module.shared);
             expect(Rec.keys(first.metafile.inputs).sort()).toEqual(
               [
@@ -777,10 +807,10 @@ layer(BundlerLayer)("withBatch", (it) => {
       yield* Bundler.withBatch(
         [file("first.ts"), file("second.ts")],
         Effect.gen(function* () {
-          const first = yield* Bundler.bundle(file("first.ts"));
+          const first = yield* bundleFixture(file("first.ts"));
           const second = yield* Bundler.withBatch(
             [file("second.ts")],
-            Bundler.bundle(file("second.ts")),
+            bundleFixture(file("second.ts")),
           );
           expect(first.module.shared).toBe(second.module.shared);
         }),
@@ -819,11 +849,13 @@ layer(BundlerLayer)("withBatch", (it) => {
         const entries = [file("first.ts"), file("nested/second.ts")] as const;
         const [first, second] = yield* Bundler.withBatch(
           entries,
-          Effect.all([Bundler.bundle(entries[0]), Bundler.bundle(entries[1])], {
+          Effect.all([bundleFixture(entries[0]), bundleFixture(entries[1])], {
             concurrency: 4,
           }),
         );
         expect(first.module.state).toBe(second.module.state);
+        assert(typeof first.module.count === "number");
+        assert(typeof second.module.count === "number");
         expect(
           [first.module.count, second.module.count].sort((a, b) => a - b),
         ).toEqual([1, 2]);
@@ -873,10 +905,10 @@ layer(BundlerLayer)("withBatch", (it) => {
         yield* Bundler.withBatch(
           entries,
           Effect.gen(function* () {
-            const first = yield* Bundler.bundle(entries[0]);
+            const first = yield* bundleFixture(entries[0]);
             const snapshot = structuredClone(first.metafile);
-            const unrelated = yield* Bundler.bundle(entries[1]);
-            const repeated = yield* Bundler.bundle(entries[0]);
+            const unrelated = yield* bundleFixture(entries[1]);
+            const repeated = yield* bundleFixture(entries[0]);
 
             const actual8 = yield* Effect.forEach(
               ["first.ts", "left.ts", "right.ts", "shared.ts"],
@@ -903,10 +935,11 @@ layer(BundlerLayer)("withBatch", (it) => {
             ).toBe(false);
             for (const output of Rec.values(first.metafile.outputs)) {
               for (const imported of output.imports) {
-                if (imported.external !== true)
+                if (imported.external !== true) {
                   expect(first.metafile.outputs).toHaveProperty([
                     path.resolve(path.dirname(entries[0]), imported.path),
                   ]);
+                }
               }
             }
             expect(
@@ -932,16 +965,10 @@ layer(BundlerLayer)("withBatch", (it) => {
             expect(
               Bundler.importersOfPackage(first, "node:os", () => true),
             ).toEqual([]);
-            const left = yield* Effect.promise(() =>
-              Promise.resolve(first.module.left()),
-            );
-            const right = yield* Effect.promise(() =>
-              Promise.resolve(first.module.right()),
-            );
+            const left = yield* importFixture(first.module, "left");
+            const right = yield* importFixture(first.module, "right");
             expect(left.shared).toBe(right.shared);
-            const cycle = yield* Effect.promise(() =>
-              Promise.resolve(left.cycle()),
-            );
+            const cycle = yield* importFixture(left, "cycle");
             expect(cycle.root).toBe(first.module.root);
             expect(first.metafile).toEqual(snapshot);
             expect(repeated.metafile).toEqual(snapshot);
@@ -964,7 +991,7 @@ layer(BundlerLayer)("withBatch", (it) => {
         const artifacts = yield* Bundler.withBatch(
           [file("first.ts"), file("second.ts")],
           Effect.gen(function* () {
-            const first = yield* Bundler.bundle(file("first.ts"));
+            const first = yield* bundleFixture(file("first.ts"));
             const outputs = Rec.keys(first.metafile.outputs);
             expect(
               Array.some(outputs, (output) =>
@@ -975,14 +1002,15 @@ layer(BundlerLayer)("withBatch", (it) => {
               const exists = yield* fs.exists(output);
               expect(exists).toBe(true);
             }
-            const second = yield* Bundler.bundle(file("second.ts")).pipe(
+            const second = yield* bundleFixture(file("second.ts")).pipe(
               Effect.result,
             );
             expect(Result.isFailure(second)).toBe(true);
-            if (Result.isFailure(second))
+            if (Result.isFailure(second)) {
               expect(second.failure.cause).toMatchObject({
                 message: "second evaluated",
               });
+            }
             return outputs;
           }),
         );
@@ -1015,13 +1043,13 @@ layer(BundlerLayer)("withBatch", (it) => {
           recursive: true,
         });
         yield* fs.symlink(file("pkg"), file("node_modules/@fixture/lib"));
-        const original = yield* Bundler.bundle(file("first.ts"));
+        const original = yield* bundleFixture(file("first.ts"));
         const [first, second] = yield* Bundler.withBatch(
           [file("first.ts"), file("nested/second.ts")],
           Effect.all(
             [
-              Bundler.bundle(file("first.ts")),
-              Bundler.bundle(file("nested/second.ts")),
+              bundleFixture(file("first.ts")),
+              bundleFixture(file("nested/second.ts")),
             ],
             { concurrency: 1 },
           ),
@@ -1061,8 +1089,8 @@ layer(BundlerLayer)("withBatch", (it) => {
         });
         const originals = yield* Effect.all(
           [
-            Bundler.bundle(file("first.ts")),
-            Bundler.bundle(file("nested/second.ts")),
+            bundleFixture(file("first.ts")),
+            bundleFixture(file("nested/second.ts")),
           ],
           { concurrency: 1 },
         );
@@ -1070,8 +1098,8 @@ layer(BundlerLayer)("withBatch", (it) => {
           [file("first.ts"), file("nested/second.ts")],
           Effect.all(
             [
-              Bundler.bundle(file("first.ts")),
-              Bundler.bundle(file("nested/second.ts")),
+              bundleFixture(file("first.ts")),
+              bundleFixture(file("nested/second.ts")),
             ],
             { concurrency: 1 },
           ),
@@ -1104,21 +1132,11 @@ layer(BundlerLayer)("withBatch", (it) => {
           "node_modules/legacy/index.js": 'module.exports = "main";',
           "node_modules/legacy/sub.js": 'module.exports = "sub";',
         });
-        const settle = (load: () => Promise<unknown>) =>
-          Effect.promise(() =>
-            load().then(
-              () => "loaded",
-              () => "failed",
-            ),
-          );
-        const original = yield* Bundler.bundle(file("first.ts"));
+        const original = yield* bundleFixture(file("first.ts"));
         const [first, second] = yield* Bundler.withBatch(
           [file("first.ts"), file("second.ts")],
           Effect.all(
-            [
-              Bundler.bundle(file("first.ts")),
-              Bundler.bundle(file("second.ts")),
-            ],
+            [bundleFixture(file("first.ts")), bundleFixture(file("second.ts"))],
             { concurrency: 1 },
           ),
         );
@@ -1143,14 +1161,11 @@ layer(BundlerLayer)("withBatch", (it) => {
           "node_modules/conditional/conditional.js": `export default "${condition}";`,
           "node_modules/conditional/default.js": 'export default "default";',
         });
-        const original = yield* Bundler.bundle(file("first.ts"));
+        const original = yield* bundleFixture(file("first.ts"));
         const [first, second] = yield* Bundler.withBatch(
           [file("first.ts"), file("second.ts")],
           Effect.all(
-            [
-              Bundler.bundle(file("first.ts")),
-              Bundler.bundle(file("second.ts")),
-            ],
+            [bundleFixture(file("first.ts")), bundleFixture(file("second.ts"))],
             { concurrency: 1 },
           ),
         );
@@ -1176,7 +1191,7 @@ layer(BundlerLayer)("withBatch", (it) => {
       const [first, second] = yield* Bundler.withBatch(
         [file("first.ts"), file("second.ts")],
         Effect.all(
-          [Bundler.bundle(file("first.ts")), Bundler.bundle(file("second.ts"))],
+          [bundleFixture(file("first.ts")), bundleFixture(file("second.ts"))],
           { concurrency: 1 },
         ),
       ).pipe(Effect.provideContext(services5));
@@ -1200,8 +1215,8 @@ layer(BundlerLayer)("withBatch", (it) => {
           [file("first.ts"), file("nested/second.ts")],
           Effect.all(
             [
-              Bundler.bundle(file("first.ts")),
-              Bundler.bundle(file("nested/second.ts")),
+              bundleFixture(file("first.ts")),
+              bundleFixture(file("nested/second.ts")),
             ],
             { concurrency: 1 },
           ),
@@ -1217,7 +1232,7 @@ layer(BundlerLayer)("withBatch", (it) => {
     "falls back after a failed build and reports only the requested entry's error",
     () =>
       Effect.gen(function* () {
-        const events: Logger.Options<unknown>[] = [];
+        const events: Array<Logger.Options<unknown>> = [];
         const { file, fs } = yield* fixture({
           "first.ts": 'export const value = "valid";',
           "broken.ts": "export const value = ;",
@@ -1232,14 +1247,14 @@ layer(BundlerLayer)("withBatch", (it) => {
         yield* Bundler.withBatch(
           [file("first.ts"), file("broken.ts")],
           Effect.gen(function* () {
-            expect((yield* Bundler.bundle(file("first.ts"))).module.value).toBe(
+            expect((yield* bundleFixture(file("first.ts"))).module.value).toBe(
               "valid",
             );
-            const broken = yield* Bundler.bundle(file("broken.ts")).pipe(
+            const broken = yield* bundleFixture(file("broken.ts")).pipe(
               Effect.result,
             );
             expect(Result.isFailure(broken)).toBe(true);
-            if (Result.isFailure(broken))
+            if (Result.isFailure(broken)) {
               expect(broken.failure.cause).toMatchObject({
                 errors: [
                   expect.objectContaining({
@@ -1247,13 +1262,14 @@ layer(BundlerLayer)("withBatch", (it) => {
                   }),
                 ],
               });
+            }
             yield* fs.writeFileString(
               file("broken.ts"),
               'export const value = "fixed";',
             );
-            expect(
-              (yield* Bundler.bundle(file("broken.ts"))).module.value,
-            ).toBe("fixed");
+            expect((yield* bundleFixture(file("broken.ts"))).module.value).toBe(
+              "fixed",
+            );
           }),
         ).pipe(
           Effect.provideContext(services6),
@@ -1307,7 +1323,7 @@ layer(BundlerLayer)("withBatch", (it) => {
         yield* Bundler.withBatch(
           [file("first.ts"), file("second.ts")],
           Effect.gen(function* () {
-            const custom = yield* Bundler.bundle(file("first.ts"), {
+            const custom = yield* bundleFixture(file("first.ts"), {
               plugins: [
                 {
                   name: "replace-entry",
@@ -1321,11 +1337,11 @@ layer(BundlerLayer)("withBatch", (it) => {
               ],
             });
             expect(custom.module.value).toBe("custom");
-            expect((yield* Bundler.bundle(file("first.ts"))).module.value).toBe(
+            expect((yield* bundleFixture(file("first.ts"))).module.value).toBe(
               "first",
             );
             expect(
-              (yield* Bundler.bundle(file("outside.ts"))).module.value,
+              (yield* bundleFixture(file("outside.ts"))).module.value,
             ).toBe("outside");
           }),
         );
@@ -1342,7 +1358,7 @@ layer(BundlerLayer)("withBatch", (it) => {
       const load = () =>
         Bundler.withBatch(
           [file("first.ts"), file("second.ts")],
-          Bundler.bundle(file("first.ts")),
+          bundleFixture(file("first.ts")),
         );
       expect((yield* load()).module.value).toBe("before");
       yield* fs.writeFileString(
@@ -1364,11 +1380,11 @@ layer(BundlerLayer)("withBatch", (it) => {
             "export const value = { duplicate: 1, duplicate: 2 };",
         });
         yield* fs.copy(file("short"), file("canonical"));
-        const messages: unknown[] = [];
+        const messages: Array<unknown> = [];
         const console = yield* Console.Console;
         const bundled = yield* Bundler.withBatch(
           [file("short/first.ts"), file("short/second.ts")],
-          Bundler.bundle(file("short/first.ts")),
+          bundleFixture(file("short/first.ts")),
         ).pipe(
           Effect.provideService(FileSystem.FileSystem, {
             ...fs,
@@ -1418,14 +1434,14 @@ layer(BundlerLayer)("withBatch", (it) => {
           "second.ts": 'export { default } from "./warning";',
           "warning.ts": "export default { duplicate: 1, duplicate: 2 };",
         });
-        const messages: unknown[] = [];
+        const messages: Array<unknown> = [];
         const console = yield* Console.Console;
         yield* Bundler.withBatch(
           [file("first.ts"), file("second.ts")],
           Effect.gen(function* () {
-            yield* Bundler.bundle(file("first.ts"));
+            yield* bundleFixture(file("first.ts"));
             expect(messages).toEqual([]);
-            yield* Bundler.bundle(file("second.ts"));
+            yield* bundleFixture(file("second.ts"));
             expect(messages).toHaveLength(1);
             expect(Array.join(Array.map(messages, String), "\n")).toContain(
               "Duplicate key",
@@ -1456,11 +1472,11 @@ layer(BundlerLayer)("withBatch", (it) => {
           "second.ts": 'export { value } from "./shared";',
           "shared.ts": "export const value = {};",
         });
-        const directories: string[] = [];
+        const directories: Array<string> = [];
         const exit = yield* Bundler.withBatch(
           [file("first.ts"), file("second.ts")],
           Effect.gen(function* () {
-            yield* Bundler.bundle(file("first.ts"));
+            yield* bundleFixture(file("first.ts"));
             return yield* mode === "failure"
               ? Effect.fail("failed")
               : Effect.interrupt;
@@ -1500,17 +1516,23 @@ layer(BundlerLayer)("withBatch", (it) => {
           "first.ts": 'export { load, lazy } from "./shared";',
           "nested/second.ts": 'export { load, lazy } from "../shared";',
         });
-        const original = yield* Bundler.bundle(file("first.ts"));
+        const original = yield* bundleFixture(file("first.ts"));
         yield* Bundler.withBatch(
           [file("first.ts"), file("nested/second.ts")],
           Effect.gen(function* () {
-            const first = yield* Bundler.bundle(file("first.ts"));
-            const second = yield* Bundler.bundle(file("nested/second.ts"));
-            expect(first.module.load("./value.cjs")).toBe(
-              original.module.load("./value.cjs"),
+            const first = yield* bundleFixture(file("first.ts"));
+            const second = yield* bundleFixture(file("nested/second.ts"));
+            expect(
+              callFixtureExport(first.module.load, first.module, "./value.cjs"),
+            ).toBe(
+              callFixtureExport(
+                original.module.load,
+                original.module,
+                "./value.cjs",
+              ),
             );
             expect(first.module.load).toBe(second.module.load);
-            const lazy = yield* Effect.promise(() => first.module.lazy());
+            const lazy = yield* importFixture(first.module, "lazy");
             expect(lazy).toMatchObject({ default: "lazy" });
           }),
         );

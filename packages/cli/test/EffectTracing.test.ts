@@ -1,3 +1,4 @@
+import * as Predicate from "effect/Predicate";
 import * as Array from "effect/Array";
 import * as Project from "./integration/Project";
 import * as Bundler from "@confect/cli/Bundler";
@@ -230,7 +231,9 @@ layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
 
         expect(spans).toEqual([]);
         yield* fs.writeFileString(entry, "export default 42;\n");
-        expect((yield* bundle).module.default).toBe(42);
+        const { module } = yield* bundle;
+        assert(Predicate.hasProperty(module, "default"));
+        expect(module.default).toBe(42);
         yield* fs.remove(entry);
         const actual = yield* Effect.exit(bundle);
         expect(Exit.isFailure(actual)).toBe(true);

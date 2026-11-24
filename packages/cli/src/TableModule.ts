@@ -1,3 +1,4 @@
+import * as Predicate from "effect/Predicate";
 import * as String from "effect/String";
 import * as Record from "effect/Record";
 import { Identifier } from "@confect/core";
@@ -161,7 +162,10 @@ export const validate = Effect.fnUntraced(function* (
       Effect.mapError((error) => fromBundlerError(relativePath, error)),
     );
 
-    if (!Table.isUnnamedTable(module.default)) {
+    if (
+      !Predicate.hasProperty(module, "default") ||
+      !Table.isUnnamedTable(module.default)
+    ) {
       return yield* InvalidTableDefaultExportError.make({
         tablePath: relativePath,
       });

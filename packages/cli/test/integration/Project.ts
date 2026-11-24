@@ -146,12 +146,8 @@ export const make = Effect.gen(function* () {
       Queue.take(lines).pipe(
         Effect.repeat({ while: (line) => !pipe(line, Str.includes(text)) }),
         Effect.timeoutOption("15 seconds"),
-        Effect.flatMap((result) =>
-          Ref.get(output).pipe(
-            Effect.map((log) => {
-              expect(result._tag, `Waiting for ${text}:\n${log}`).toBe("Some");
-            }),
-          ),
+        Effect.zipWith(Ref.get(output), (result, log) =>
+          expect(result._tag, `Waiting for ${text}:\n${log}`).toBe("Some"),
         ),
       );
     return { handle, output, waitFor };

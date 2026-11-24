@@ -8,9 +8,9 @@ import type { ImplModulePath } from "./ImplModulePath";
 import type { GenerationSnapshot } from "./GenerationSnapshot";
 
 export type Work = Data.TaggedEnum<{
-  None: {};
-  Reconcile: {};
-  Full: {};
+  None: object;
+  Reconcile: object;
+  Full: object;
   Impls: { readonly paths: Array.NonEmptyReadonlyArray<ImplModulePath> };
   Declarations: {
     readonly entries: Array.NonEmptyReadonlyArray<Declaration>;
@@ -114,8 +114,8 @@ export const add = (
 };
 
 export type Phase = Data.TaggedEnum<{
-  Bootstrapping: {};
-  NeedsFullSync: {};
+  Bootstrapping: object;
+  NeedsFullSync: object;
   Incremental: {
     readonly failedImpls: HashSet.HashSet<ImplModulePath>;
     readonly snapshot: GenerationSnapshot;
@@ -125,8 +125,8 @@ export const Phase = Data.taggedEnum<Phase>();
 
 export type Outcome = Data.TaggedEnum<{
   Succeeded: { readonly snapshot: GenerationSnapshot };
-  GenerationFailed: {};
-  ReconciliationFailed: {};
+  GenerationFailed: object;
+  ReconciliationFailed: object;
   ValidationFailed: {
     readonly snapshot: GenerationSnapshot;
     readonly paths: Array.NonEmptyReadonlyArray<ImplModulePath>;
@@ -182,7 +182,7 @@ export const implsToValidate = (
   );
 
 export type Operation = Data.TaggedEnum<{
-  Generate: {};
+  Generate: object;
   Validate: {
     readonly snapshot: GenerationSnapshot;
     readonly paths: ReadonlyArray<ImplModulePath>;

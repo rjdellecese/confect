@@ -1,3 +1,4 @@
+import * as Predicate from "effect/Predicate";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, expect, layer } from "@effect/vitest";
 import * as Array from "effect/Array";
@@ -36,9 +37,10 @@ const buildEntry = Effect.fnUntraced(function* (root: string, entry: string) {
     Array.filter(([, input]) => input.bytesInOutput > 0),
     Array.map(([name]) => name),
   ).sort();
-  const runtime = yield* Effect.promise(
+  const runtime: unknown = yield* Effect.promise(
     () => import(pathToFileURL(path.join(root, outfile)).href),
   );
+  assert(Predicate.isObject(runtime));
   return { inputs, runtime };
 });
 
@@ -172,7 +174,7 @@ export default GroupImpl.make(auditedSpec).pipe(
           const generation = yield* project.start("codegen");
           const exitCode = yield* generation.handle.exitCode;
           const log = yield* Ref.get(generation.output);
-          expect(Number(exitCode), log).toBe(0);
+          assert.strictEqual(Number(exitCode), 0, log);
 
           for (const [entry, names, functions] of [
             ["plain", [], ["ping"]],
@@ -184,35 +186,45 @@ export default GroupImpl.make(auditedSpec).pipe(
               project.root,
               `convex/${entry}.ts`,
             );
-            expect(inputs, entry).toContain(
+            assert.include(
+              inputs,
               `confect/_generated/registeredFunctions/${entry}.ts`,
-            );
-            expect(inputs, entry).toContain(`confect/${entry}.impl.ts`);
-            expect(
-              Array.filter(inputs, Str.startsWith("confect/tables/")),
               entry,
-            ).toEqual(Array.map(names, (name) => `confect/tables/${name}.ts`));
-            expect(inputs, entry).not.toContain("confect/_generated/schema.ts");
-            expect(inputs, entry).not.toContain(
-              "confect/_generated/convexSchema.ts",
             );
-            expect(runtime.reads, entry).toEqual([]);
-            for (const name of functions)
-              expect(runtime[name].isQuery).toBe(true);
+            assert.include(inputs, `confect/${entry}.impl.ts`, entry);
+            assert.deepEqual(
+              Array.filter(inputs, Str.startsWith("confect/tables/")),
+              Array.map(names, (name) => `confect/tables/${name}.ts`),
+              entry,
+            );
+            assert.notInclude(inputs, "confect/_generated/schema.ts", entry);
+            assert.notInclude(
+              inputs,
+              "confect/_generated/convexSchema.ts",
+              entry,
+            );
+            assert.deepEqual(runtime.reads, [], entry);
+            for (const name of functions) {
+              expect(runtime[name]).toHaveProperty("isQuery", true);
+            }
           }
           const deploy = yield* buildEntry(project.root, "convex/schema.ts");
+          assert(Predicate.isObject(deploy.runtime.default));
+          assert(Predicate.isObject(deploy.runtime.default.tables));
           expect(Record.keys(deploy.runtime.default.tables).sort()).toEqual([
             "notes",
             "unused",
             "users",
           ]);
-          expect(deploy.runtime.reads.toSorted()).toEqual([
+          assert(Array.isArray(deploy.runtime.reads));
+          assert(Array.every(deploy.runtime.reads, Predicate.isString));
+          expect(Array.sort(deploy.runtime.reads, Str.Order)).toEqual([
             "notes",
             "unused",
             "users",
           ]);
         }).pipe(Effect.scoped),
-      { timeout: 60000 },
+      { timeout: 60_000 },
     );
   },
 );

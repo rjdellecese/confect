@@ -26,10 +26,8 @@ import * as String from "effect/String";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 import * as Log from "@confect/cli/log";
-import {
-  ParentChildNameCollisionError,
-  type CodegenError,
-} from "@confect/cli/CodegenError";
+import { ParentChildNameCollisionError } from "@confect/cli/CodegenError";
+import type { CodegenError } from "@confect/cli/CodegenError";
 import { ConfectDirectory } from "@confect/cli/ConfectDirectory";
 import * as Bundler from "@confect/cli/Bundler";
 import { ImplModulePath } from "@confect/cli/ImplModulePath";
@@ -45,9 +43,8 @@ import {
   validateImpl,
   validateImplFiles,
   loadSpec,
-  type LeafModule,
-  type LoadedLeafModule,
 } from "@confect/cli/LeafModule";
+import type { LeafModule, LoadedLeafModule } from "@confect/cli/LeafModule";
 
 const fixtureConfect = `${import.meta.dirname}/../../server/test/mock-backend/fixtures/confect`;
 
@@ -219,6 +216,8 @@ for (const { name, pathLayer, sep } of PLATFORMS) {
   });
 }
 
+const emptyArgs = () => ({});
+
 layer(LeafModuleLayer)("loadSpec", (it) => {
   it.effect.each([
     { option: "yes", runtime: "Convex", name: "list", reason: "InvalidOption" },
@@ -270,7 +269,7 @@ layer(LeafModuleLayer)("loadSpec", (it) => {
     "warns only for opted-in action-only groups without evaluating schemas",
     () =>
       Effect.gen(function* () {
-        const returns = vi.fn(() => Schema.Null);
+        const returns = vi.fn<() => typeof Schema.Null>(() => Schema.Null);
         const action = FunctionSpec.publicAction({ name: "run", returns });
         const query = FunctionSpec.publicQuery({ name: "list", returns });
         const actions = GroupSpec.make({
@@ -312,8 +311,8 @@ layer(LeafModuleLayer)("loadSpec", (it) => {
     "pairs the validated spec with its leaf without forcing schemas or mutating inputs",
     () =>
       Effect.gen(function* () {
-        const schema = vi.fn(() => Schema.Null);
-        const args = vi.fn(() => ({}));
+        const schema = vi.fn<() => typeof Schema.Null>(() => Schema.Null);
+        const args = vi.fn<typeof emptyArgs>(emptyArgs);
         const spec = GroupSpec.makeNode().addFunction(
           FunctionSpec.publicNodeAction({
             name: "get",
@@ -620,7 +619,7 @@ layer(LeafModuleLayer)("discovery", (it) => {
           "notes.impl.ts",
           path.join("groups", "nested.impl.ts"),
         ]);
-        expectTypeOf(implFiles).toEqualTypeOf<ImplModulePath[]>();
+        expectTypeOf(implFiles).toEqualTypeOf<Array<ImplModulePath>>();
         expect(files).toHaveLength(5);
       }),
   );
@@ -938,8 +937,9 @@ const emptyLeafBundle = (
   entry: string,
   spec = GroupSpec.make(),
 ): Bundler.Bundled => {
-  if (pipe(entry, String.endsWith(".spec.ts")))
+  if (pipe(entry, String.endsWith(".spec.ts"))) {
     return { module: { default: spec }, metafile: { inputs: {}, outputs: {} } };
+  }
   const specPath =
     pipe(entry, String.slice(0, -".impl.ts".length)) + ".spec.ts";
   return {
@@ -1027,7 +1027,9 @@ layer(
             Effect.gen(function* () {
               active++;
               maximum = Math.max(maximum, active);
-              if (active === 4) yield* Deferred.succeed(started, undefined);
+              if (active === 4) {
+                yield* Deferred.succeed(started, undefined);
+              }
               yield* Deferred.await(release);
               yield* Effect.yieldNow;
               active--;
@@ -1095,12 +1097,12 @@ layer(
 
 const collisionLeaf = (
   relativePath: string,
-  pathSegments: [string, ...string[]],
+  pathSegments: [string, ...Array<string>],
 ): LeafModule => ({
   relativePath,
   pathSegments,
   groupPathDot: Array.join(pathSegments, "."),
-  exportName: pathSegments[pathSegments.length - 1]!,
+  exportName: pathSegments.at(-1)!,
   specImportPath: `../${pipe(relativePath, String.slice(0, -".ts".length))}`,
 });
 
@@ -1294,14 +1296,14 @@ layer(LeafModuleLayer)("validateNoParentChildNameCollisions", (it) => {
 
 const leafFor = Effect.fnUntraced(function* (
   relativePath: string,
-  pathSegments: [string, ...string[]],
+  pathSegments: [string, ...Array<string>],
 ) {
   const specImportPath = yield* specImportPathFromGenerated(relativePath);
   return {
     relativePath,
     pathSegments,
     groupPathDot: Array.join(pathSegments, "."),
-    exportName: pathSegments[pathSegments.length - 1]!,
+    exportName: pathSegments.at(-1)!,
     specImportPath,
   } satisfies LeafModule;
 });

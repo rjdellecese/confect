@@ -92,7 +92,9 @@ export const discover = Effect.fnUntraced(function* (directory: string) {
     Array.filter(parents(path, directory), (candidate) => candidate !== root),
     (candidate) => fs.exists(path.join(candidate, "tsconfig.json")),
   ).pipe(Effect.mapError((cause) => BuildError.BundlerError.make({ cause })));
-  if (Option.isNone(selected)) return Option.none<TypeScriptConfig>();
+  if (Option.isNone(selected)) {
+    return Option.none<TypeScriptConfig>();
+  }
 
   const read = Effect.fnUntraced(
     function* (file: string) {
@@ -104,11 +106,12 @@ export const discover = Effect.fnUntraced(function* (directory: string) {
             if (
               path.basename(file) === ".env.local" ||
               path.basename(real) === ".env.local"
-            )
+            ) {
               return yield* DiscoveryRejected.make({
                 path: file,
                 reason: "ForbiddenFile",
               });
+            }
             const contents = yield* fs.readFileString(real);
             return Option.some({
               path: real,
@@ -121,9 +124,10 @@ export const discover = Effect.fnUntraced(function* (directory: string) {
         Match.orElse(() => Effect.succeed(Option.none<ConfigSource>())),
       );
     },
-    Effect.catch((cause: PlatformError.PlatformError | DiscoveryRejected) => {
-      const fail = () => Effect.fail(BuildError.BundlerError.make({ cause }));
-      return Match.value(cause).pipe(
+    Effect.catch((error: PlatformError.PlatformError | DiscoveryRejected) => {
+      const fail = () =>
+        Effect.fail(BuildError.BundlerError.make({ cause: error }));
+      return Match.value(error).pipe(
         Match.tag("PlatformError", ({ reason }) =>
           Match.value(reason).pipe(
             Match.when({ _tag: "NotFound" }, () => Effect.succeedNone),
@@ -150,9 +154,12 @@ export const discover = Effect.fnUntraced(function* (directory: string) {
   ): Effect.Effect<Option.Option<InheritedConfig>, BuildError.BundlerError> =>
     Effect.gen(function* () {
       const source = yield* read(file);
-      if (Option.isNone(source)) return Option.none();
-      if (HashSet.has(ancestors, source.value.path))
+      if (Option.isNone(source)) {
+        return Option.none();
+      }
+      if (HashSet.has(ancestors, source.value.path)) {
         return Option.some({ aliases: Option.none() });
+      }
       const lineage = HashSet.add(ancestors, source.value.path);
       const extension = property(source.value.tree, "extends");
       const inherited = yield* Effect.forEach(
@@ -203,7 +210,9 @@ export const discover = Effect.fnUntraced(function* (directory: string) {
     ancestors: HashSet.HashSet<string>,
   ): Effect.Effect<Option.Option<InheritedConfig>, BuildError.BundlerError> =>
     Effect.gen(function* () {
-      if (String.isEmpty(value)) return Option.none();
+      if (String.isEmpty(value)) {
+        return Option.none();
+      }
       if (path.isAbsolute(value) || /^(?:\.{1,2}(?:[\\/]|$))/.test(value)) {
         const file = path.resolve(
           from,
@@ -220,7 +229,9 @@ export const discover = Effect.fnUntraced(function* (directory: string) {
         "/",
       );
       for (const current of parents(path, from)) {
-        if (path.basename(current) === "node_modules") continue;
+        if (path.basename(current) === "node_modules") {
+          continue;
+        }
         const packageDirectory = path.join(
           current,
           "node_modules",
@@ -248,7 +259,9 @@ export const discover = Effect.fnUntraced(function* (directory: string) {
           );
           if (Option.isSome(target)) {
             const found = yield* visit(target.value, ancestors);
-            if (Option.isSome(found)) return found;
+            if (Option.isSome(found)) {
+              return found;
+            }
           }
         }
         const base = Option.flatMap(manifest, ({ tree }) =>
@@ -266,7 +279,9 @@ export const discover = Effect.fnUntraced(function* (directory: string) {
           `${base}.json`,
         ]) {
           const found = yield* visit(file, ancestors);
-          if (Option.isSome(found)) return found;
+          if (Option.isSome(found)) {
+            return found;
+          }
         }
       }
       const legacy = Option.liftThrowable(() =>
@@ -281,10 +296,11 @@ export const discover = Effect.fnUntraced(function* (directory: string) {
 
   const file = path.join(selected.value, "tsconfig.json");
   const config = yield* visit(file, HashSet.empty());
-  if (Option.isNone(config))
+  if (Option.isNone(config)) {
     return yield* BuildError.BundlerError.make({
       cause: DiscoveryRejected.make({ path: file, reason: "NotRegularFile" }),
     });
+  }
   return Option.some({
     path: file,
     aliases: Option.getOrElse(config.value.aliases, () => []),

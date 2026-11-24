@@ -5,15 +5,12 @@ import * as Option from "effect/Option";
 import * as GroupPath from "@confect/cli/GroupPath";
 
 describe("GroupPath.getGroupSpec", () => {
-  const makeGroupPathObj = (pathSegments: readonly [string, ...string[]]) =>
-    GroupPath.make(pathSegments);
-
   test("returns none for empty spec", () => {
     const spec = Spec.fromGroups({});
 
     const result = GroupPath.getGroupSpec(
       spec,
-      makeGroupPathObj(["nonexistent"]),
+      GroupPath.make(["nonexistent"]),
     );
 
     expect(Option.isNone(result)).toBe(true);
@@ -24,7 +21,7 @@ describe("GroupPath.getGroupSpec", () => {
 
     const result = GroupPath.getGroupSpec(
       spec,
-      makeGroupPathObj(["nonexistent"]),
+      GroupPath.make(["nonexistent"]),
     );
 
     expect(Option.isNone(result)).toBe(true);
@@ -34,7 +31,7 @@ describe("GroupPath.getGroupSpec", () => {
     const myGroup = GroupSpec.make();
     const spec = Spec.fromGroups({ myGroup });
 
-    const result = GroupPath.getGroupSpec(spec, makeGroupPathObj(["myGroup"]));
+    const result = GroupPath.getGroupSpec(spec, GroupPath.make(["myGroup"]));
 
     expect(Option.isSome(result)).toBe(true);
     expect(Option.getOrThrow(result).name).toBe("myGroup");
@@ -46,7 +43,7 @@ describe("GroupPath.getGroupSpec", () => {
 
     const result = GroupPath.getGroupSpec(
       spec,
-      makeGroupPathObj(["outer", "nonexistent"]),
+      GroupPath.make(["outer", "nonexistent"]),
     );
 
     expect(Option.isNone(result)).toBe(true);
@@ -59,7 +56,7 @@ describe("GroupPath.getGroupSpec", () => {
 
     const result = GroupPath.getGroupSpec(
       spec,
-      makeGroupPathObj(["outer", "inner"]),
+      GroupPath.make(["outer", "inner"]),
     );
 
     expect(Option.isSome(result)).toBe(true);
@@ -74,7 +71,7 @@ describe("GroupPath.getGroupSpec", () => {
 
     const result = GroupPath.getGroupSpec(
       spec,
-      makeGroupPathObj(["level1", "level2", "level3"]),
+      GroupPath.make(["level1", "level2", "level3"]),
     );
 
     expect(Option.isSome(result)).toBe(true);
@@ -88,7 +85,7 @@ describe("GroupPath.getGroupSpec", () => {
 
     const result = GroupPath.getGroupSpec(
       spec,
-      makeGroupPathObj(["level1", "level2", "nonexistent"]),
+      GroupPath.make(["level1", "level2", "nonexistent"]),
     );
 
     expect(Option.isNone(result)).toBe(true);
@@ -101,7 +98,7 @@ describe("GroupPath.getGroupSpec", () => {
 
     const result = GroupPath.getGroupSpec(
       spec,
-      makeGroupPathObj(["level1", "nonexistent", "level2"]),
+      GroupPath.make(["level1", "nonexistent", "level2"]),
     );
 
     expect(Option.isNone(result)).toBe(true);
@@ -118,11 +115,11 @@ describe("GroupPath.getGroupSpec", () => {
 
     const notesResult = GroupPath.getGroupSpec(
       spec,
-      makeGroupPathObj(["notesAndRandom", "notes"]),
+      GroupPath.make(["notesAndRandom", "notes"]),
     );
     const randomResult = GroupPath.getGroupSpec(
       spec,
-      makeGroupPathObj(["notesAndRandom", "random"]),
+      GroupPath.make(["notesAndRandom", "random"]),
     );
 
     expect(Option.isSome(notesResult)).toBe(true);
@@ -136,14 +133,8 @@ describe("GroupPath.getGroupSpec", () => {
     const posts = GroupSpec.make();
     const spec = Spec.fromGroups({ users, posts });
 
-    const usersResult = GroupPath.getGroupSpec(
-      spec,
-      makeGroupPathObj(["users"]),
-    );
-    const postsResult = GroupPath.getGroupSpec(
-      spec,
-      makeGroupPathObj(["posts"]),
-    );
+    const usersResult = GroupPath.getGroupSpec(spec, GroupPath.make(["users"]));
+    const postsResult = GroupPath.getGroupSpec(spec, GroupPath.make(["posts"]));
 
     expect(Option.isSome(usersResult)).toBe(true);
     expect(Option.getOrThrow(usersResult).name).toBe("users");

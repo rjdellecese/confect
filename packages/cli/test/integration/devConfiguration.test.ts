@@ -2,7 +2,7 @@ import { pipe } from "effect/Function";
 import * as Option from "effect/Option";
 import * as Str from "effect/String";
 import * as NodeServices from "@effect/platform-node/NodeServices";
-import { expect, layer } from "@effect/vitest";
+import { assert, expect, layer } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
@@ -54,10 +54,14 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           const watching = yield* project.start("dev");
           yield* watching.waitFor(success);
           const startup = yield* Ref.get(watching.output);
-          expect(
-            Option.getOrNull(pipe(startup, Str.match(/^FULL_GENERATION$/gm))),
+          assert.lengthOf(
+            Option.getOrElse(
+              pipe(startup, Str.match(/^FULL_GENERATION$/gm)),
+              () => [],
+            ),
+            1,
             startup,
-          ).toHaveLength(1);
+          );
           const generated = yield* project.generatedFiles;
           yield* Ref.set(watching.output, "");
           yield* project.write(
@@ -70,7 +74,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           const actual = yield* project.generatedFiles;
           expect(actual).toEqual(generated);
         }).pipe(Effect.scoped),
-      { timeout: 30000 },
+      { timeout: 30_000 },
     );
 
     it.effect(
@@ -105,7 +109,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           const current3 = yield* Ref.get(restarted.output);
           expect(Str.split(current3, success)).toHaveLength(2);
         }).pipe(Effect.scoped),
-      { timeout: 30000 },
+      { timeout: 30_000 },
     );
   },
 );

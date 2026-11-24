@@ -1,6 +1,8 @@
+import * as Predicate from "effect/Predicate";
 import * as Record from "effect/Record";
 import { GroupSpec, MiddlewareAttachment } from "@confect/core";
-import { Registry, type RegistryItems } from "@confect/server";
+import { Registry } from "@confect/server";
+import type { RegistryItems } from "@confect/server";
 import * as GroupImpl from "@confect/server/GroupImpl";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
@@ -39,7 +41,7 @@ import { removePathExtension, toPosixPath } from "./utils";
 
 export interface LeafModule {
   readonly relativePath: string;
-  readonly pathSegments: readonly [string, ...string[]];
+  readonly pathSegments: readonly [string, ...Array<string>];
   readonly groupPathDot: string;
   readonly exportName: string;
   readonly specImportPath: string;
@@ -115,7 +117,7 @@ export const groupPathFromRelativeModulePath = Effect.fnUntraced(function* (
     String.split(dir, path.sep),
     String.isNonEmpty,
   );
-  const pathSegments = Array.append(dirSegments, stem) as [string, ...string[]];
+  const pathSegments = Array.append(dirSegments, stem);
   return {
     pathSegments,
     groupPathDot: Array.join(pathSegments, "."),
@@ -300,7 +302,9 @@ export const loadSpec = Effect.fn("LeafModule.loadSpec")(function* (
     Effect.mapError((error) => fromBundlerError(leaf.relativePath, error)),
   );
 
-  const groupSpec = bundled.module.default;
+  const groupSpec = Predicate.hasProperty(bundled.module, "default")
+    ? bundled.module.default
+    : undefined;
 
   if (!GroupSpec.isGroupSpec(groupSpec)) {
     return yield* SpecMissingDefaultGroupSpecError.make({
@@ -413,9 +417,9 @@ const buildImplLayer = Effect.fnUntraced(function* (
   implLayer: Layer.Layer<unknown>,
 ) {
   const registry = Ref.makeUnsafe<RegistryItems.RegistryItems>({});
-  return yield* Layer.build(
-    implLayer as Layer.Layer<unknown, never, never>,
-  ).pipe(Effect.provideService(Registry.Registry, registry));
+  return yield* Layer.build(implLayer).pipe(
+    Effect.provideService(Registry.Registry, registry),
+  );
 }, Effect.scoped);
 
 /**
@@ -449,7 +453,10 @@ export const validateImpl = Effect.fn("LeafModule.validateImpl")(function* (
     });
   }
 
-  if (!Layer.isLayer(bundled.module.default)) {
+  const impl = Predicate.hasProperty(bundled.module, "default")
+    ? bundled.module.default
+    : undefined;
+  if (!Layer.isLayer(impl)) {
     return yield* ImplMissingDefaultLayerError.make({
       implPath: implRelativePath,
     });
@@ -458,9 +465,7 @@ export const validateImpl = Effect.fn("LeafModule.validateImpl")(function* (
   const groupSpec = leaf.spec;
   const expectedFunctionNames = Record.keys(groupSpec.functions);
 
-  const context = yield* buildImplLayer(
-    bundled.module.default as Layer.Layer<unknown>,
-  );
+  const context = yield* buildImplLayer(impl as Layer.Layer<unknown>);
   const finalizedGroupImpl = yield* Option.match(
     findFinalizedGroupImpl(context),
     {

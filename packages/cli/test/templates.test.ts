@@ -16,19 +16,20 @@ import * as FileSystem from "effect/FileSystem";
 import * as Order from "effect/Order";
 import * as Path from "effect/Path";
 import * as Predicate from "effect/Predicate";
+import { callFixtureExport } from "./fixtureExport";
 import * as Record from "effect/Record";
 import * as Stream from "effect/Stream";
 import * as ChildProcess from "effect/process/ChildProcess";
 import { ChildProcessSpawner } from "effect/process/ChildProcessSpawner";
 import { queryGeneric } from "convex/server";
 
-const leafAt = (pathSegments: [string, ...string[]]): LeafModule => {
+const leafAt = (pathSegments: [string, ...Array<string>]): LeafModule => {
   const relativePath = `${Array.join(pathSegments, "/")}.spec.ts`;
   return {
     relativePath,
     pathSegments,
     groupPathDot: Array.join(pathSegments, "."),
-    exportName: pathSegments[pathSegments.length - 1]!,
+    exportName: pathSegments.at(-1)!,
     specImportPath: `../${pipe(relativePath, Str.slice(0, -".ts".length))}`,
   };
 };
@@ -151,6 +152,24 @@ it.effect.each([
     }),
 );
 
+const lookupRef = (
+  refs: unknown,
+  path: ReadonlyArray<string>,
+): Record.ReadonlyRecord<string, unknown> => {
+  const ref = Array.reduce(path, refs, (parent, segment) => {
+    assert(Predicate.isObject(parent));
+    return parent[segment];
+  });
+  assert(Predicate.isObject(ref));
+  return ref;
+};
+
+const names = (prefix: string, count: number) =>
+  Array.makeBy(
+    count,
+    (index) => `${prefix}${pipe(String(index + 1), Str.padStart(3, "0"))}`,
+  );
+
 layer(NodeServices.layer)("registeredFunctionsForGroup", (test) => {
   test.effect.each([
     {
@@ -272,9 +291,9 @@ export default implementation;`,
           Stream.mkString,
         );
         const actual = yield* compiler.exitCode;
-        expect(actual, output).toBe(0);
+        assert.strictEqual(actual, 0, output);
       }).pipe(Effect.scoped),
-    { timeout: 30000 },
+    { timeout: 30_000 },
   );
 });
 
@@ -339,18 +358,21 @@ export { reads } from "./reads";
         const runtime = yield* Bundler.bundle(
           path.join(directory, "runtime.ts"),
         );
+        assert(Predicate.isObject(runtime.module));
         expect(runtime.module.reads).toEqual({ fields: 0 });
         expect(Record.keys(runtime.metafile.inputs)).not.toContain(
           path.join(directory, "convexSchema.ts"),
         );
-        assert(Predicate.isFunction(runtime.module.fields));
-        expect(runtime.module.fields()).toBe(runtime.module.fields());
+        expect(callFixtureExport(runtime.module.fields, runtime.module)).toBe(
+          callFixtureExport(runtime.module.fields, runtime.module),
+        );
         expect(runtime.module.reads).toEqual({ fields: 1 });
 
         const deploy = yield* Bundler.bundle(path.join(directory, "deploy.ts"));
         expect(deploySource).toContain(
           'import { Table as Table_ } from "@confect/server";',
         );
+        assert(Predicate.isObject(deploy.module));
         expect(deploy.module.reads).toEqual({ fields: 1 });
         expect(Record.keys(deploy.metafile.inputs)).toContain(
           path.join(directory, "convexSchema.ts"),
@@ -466,9 +488,9 @@ export const plainString: Id<"_storage"> = "not-an-id";
           Stream.mkString,
         );
         const actual2 = yield* compiler.exitCode;
-        expect(actual2, output).toBe(0);
+        assert.strictEqual(actual2, 0, output);
       }).pipe(Effect.scoped),
-    { timeout: 30000 },
+    { timeout: 30_000 },
   );
 });
 
@@ -509,18 +531,6 @@ layer(NodeServices.layer)("assembledSpec", (test) => {
     ),
   );
 
-  const lookupRef = (
-    refs: unknown,
-    path: ReadonlyArray<string>,
-  ): Record.ReadonlyRecord<string, unknown> => {
-    const ref = Array.reduce(path, refs, (parent, segment) => {
-      assert(Predicate.isObject(parent));
-      return parent[segment];
-    });
-    assert(Predicate.isObject(ref));
-    return ref;
-  };
-
   test.effect.each([true, false])(
     "typechecks and emits precise declarations at scale with exactOptionalPropertyTypes=%s",
     (exactOptionalPropertyTypes) =>
@@ -532,19 +542,14 @@ layer(NodeServices.layer)("assembledSpec", (test) => {
           directory: import.meta.dirname,
           prefix: "spec-",
         });
-        const names = (prefix: string, count: number) =>
-          Array.makeBy(
-            count,
-            (index) =>
-              `${prefix}${pipe(String(index + 1), Str.padStart(3, "0"))}`,
-          );
+
         const rootNames = ["Group", ...names("g", 600)];
         const childNames = names("c", 300);
         const deepNames = names("d", 100);
-        const lastRoot = rootNames[rootNames.length - 1]!;
-        const lastChild = childNames[childNames.length - 1]!;
-        const lastDeep = deepNames[deepNames.length - 1]!;
-        const leaves: LeafModule[] = [
+        const lastRoot = rootNames.at(-1)!;
+        const lastChild = childNames.at(-1)!;
+        const lastDeep = deepNames.at(-1)!;
+        const leaves: Array<LeafModule> = [
           ...Array.map(rootNames, (name) => leafAt([name])),
           leafAt(["nested"]),
           ...Array.map(childNames, (name) => leafAt(["nested", name])),
@@ -686,7 +691,7 @@ const wrongArgs: typeof deep["~Args"] = { id: 1 };
           Stream.mkString,
         );
         const actual4 = yield* compiler.exitCode;
-        expect(actual4, output).toBe(0);
+        assert.strictEqual(actual4, 0, output);
         const declaration = yield* fs.readFileString(
           path.join(directory, "declarations", "_generated", "spec.d.ts"),
         );
@@ -736,7 +741,7 @@ const wrongArgs: typeof deep["~Args"] = { id: 1 };
           Stream.mkString,
         );
         const actual5 = yield* declarationConsumer.exitCode;
-        expect(actual5, declarationOutput).toBe(0);
+        assert.strictEqual(actual5, 0, declarationOutput);
         const runtimeEntry = path.join(directory, "runtime.ts");
         yield* fs.writeFileString(
           runtimeEntry,
@@ -745,7 +750,8 @@ export { schemaReads } from "./schemaReads";
 `,
         );
         const bundled = yield* Bundler.bundle(runtimeEntry);
-        const assembled: unknown = bundled.module.default;
+        assert(Predicate.isObject(bundled.module));
+        const assembled = bundled.module.default;
         assert(Spec.isSpec(assembled));
         const groups = Spec.groups(assembled);
         expect(Record.has(groups, "__proto__")).toBe(true);
@@ -815,6 +821,6 @@ export { schemaReads } from "./schemaReads";
           error: 1,
         });
       }).pipe(Effect.scoped),
-    { timeout: 60000 },
+    { timeout: 60_000 },
   );
 });

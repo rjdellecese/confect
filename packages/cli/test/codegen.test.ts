@@ -40,7 +40,7 @@ import * as Project from "./integration/Project";
 vi.mock("esbuild", (importOriginal) =>
   importOriginal<typeof esbuild>().then((original) => ({
     ...original,
-    build: vi.fn(original.build),
+    build: vi.fn<typeof original.build>(original.build),
   })),
 );
 
@@ -105,7 +105,7 @@ layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
             Rec.keys(workspaceBundle.metafile.inputs).length,
           );
         }).pipe(Effect.scoped),
-      { timeout: 30000 },
+      { timeout: 30_000 },
     );
 
     it.effect.each([
@@ -162,7 +162,7 @@ layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
           );
           expect(contents2).toBe(previousSchema);
         }).pipe(Effect.scoped),
-      { timeout: 30000 },
+      { timeout: 30_000 },
     );
 
     it.effect.each(["http.ts", "crons.ts", "auth.ts"])(
@@ -190,7 +190,7 @@ layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
           );
           yield* project.provide(codegenHandler);
         }).pipe(Effect.scoped),
-      { timeout: 30000 },
+      { timeout: 30_000 },
     );
 
     it.effect.each(["http.ts", "crons.ts", "auth.ts"])(
@@ -204,7 +204,7 @@ layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
           );
           yield* project.provide(codegenHandler);
         }).pipe(Effect.scoped),
-      { timeout: 30000 },
+      { timeout: 30_000 },
     );
 
     it.effect(
@@ -230,7 +230,7 @@ layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
             Option.getOrThrow((yield* fs.stat(schema)).mtime).getTime(),
           ).toBe(2000);
         }).pipe(Effect.scoped),
-      { timeout: 30000 },
+      { timeout: 30_000 },
     );
 
     it.effect(
@@ -300,7 +300,7 @@ layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
           const actual5 = yield* project.generatedFiles;
           expect(actual5).toEqual(incremental);
         }).pipe(Effect.scoped),
-      { timeout: 30000 },
+      { timeout: 30_000 },
     );
 
     it.effect(
@@ -358,7 +358,7 @@ layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
           const actual6 = yield* project.generatedFiles;
           expect(actual6).toEqual(before);
         }).pipe(Effect.scoped),
-      { timeout: 30000 },
+      { timeout: 30_000 },
     );
 
     it.effect(
@@ -409,10 +409,12 @@ layer(Layer.mergeAll(NodePath.layer, NodeFileSystem.layer))(
             expect(writes).toEqual([]);
             const fresh = yield* project.generatedFiles;
             expect(fresh).toEqual(generated);
-            if (!enabled) expect(generated).toEqual(baseline);
+            if (!enabled) {
+              expect(generated).toEqual(baseline);
+            }
           }
         }).pipe(Effect.scoped),
-      { timeout: 30000 },
+      { timeout: 30_000 },
     );
 
     it.effect(
@@ -493,7 +495,7 @@ export default GroupImpl.make(notesSpec).pipe(Layer.provide(FunctionImpl.make(no
           const actual10 = yield* project.generatedFiles;
           expect(actual10).toEqual(removedOutputs);
         }).pipe(Effect.scoped),
-      { timeout: 30000 },
+      { timeout: 30_000 },
     );
 
     it.effect(
@@ -554,7 +556,7 @@ export default GroupImpl.make(notesSpec).pipe(Layer.provide(FunctionImpl.make(no
           const actual13 = yield* project.generatedFiles;
           expect(actual13).toEqual(before);
         }).pipe(Effect.scoped),
-      { timeout: 30000 },
+      { timeout: 30_000 },
     );
 
     it.effect(
@@ -615,7 +617,7 @@ export default GroupImpl.make(notesSpec).pipe(Layer.provide(FunctionImpl.make(no
           const actual16 = yield* project.generatedFiles;
           expect(actual16).toEqual(batchedOutputs);
         }).pipe(Effect.scoped),
-      { timeout: 30000 },
+      { timeout: 30_000 },
     );
 
     it.effect(
@@ -649,8 +651,12 @@ export default GroupImpl.make(group${index}Spec).pipe(GroupImpl.finalize);`,
                     : pipe(entry, String.endsWith(".impl.ts"))
                       ? "impl"
                       : undefined;
-                  if (phase === undefined) return yield* original(entry);
-                  if (phase === "impl") expect(completedSpecs).toBe(9);
+                  if (phase === undefined) {
+                    return yield* original(entry);
+                  }
+                  if (phase === "impl") {
+                    expect(completedSpecs).toBe(9);
+                  }
                   active[phase]++;
                   maximum[phase] = Math.max(maximum[phase], active[phase]);
                   yield* Effect.yieldNow;
@@ -658,7 +664,9 @@ export default GroupImpl.make(group${index}Spec).pipe(GroupImpl.finalize);`,
                     Effect.ensuring(
                       Effect.sync(() => {
                         active[phase]--;
-                        if (phase === "spec") completedSpecs++;
+                        if (phase === "spec") {
+                          completedSpecs++;
+                        }
                       }),
                     ),
                   );
@@ -681,7 +689,7 @@ export default GroupImpl.make(group${index}Spec).pipe(GroupImpl.finalize);`,
           expect(maximum).toEqual({ spec: 4, impl: 4 });
           expect(completedSpecs).toBe(9);
         }).pipe(Effect.scoped),
-      { timeout: 30000 },
+      { timeout: 30_000 },
     );
 
     it.effect(
@@ -750,7 +758,7 @@ export default GroupImpl.make(group${index}Spec).pipe(GroupImpl.finalize);`,
           const actual20 = yield* Project.writtenFiles(run);
           expect(actual20).toEqual([]);
         }).pipe(Effect.scoped),
-      { timeout: 30000 },
+      { timeout: 30_000 },
     );
   },
 );
@@ -774,11 +782,12 @@ const CodegenLayer = Layer.effect(
       "tables/tags.ts",
       "tables/users.ts",
       "_generated/id.ts",
-    ])
+    ]) {
       yield* fs.copyFile(
         path.join(fixtureConfect, file),
         path.join(directory, file),
       );
+    }
     return ConfectDirectory.of({ get: Effect.succeed(directory) });
   }),
 ).pipe(
@@ -798,7 +807,9 @@ layer(CodegenLayer)("TableModule.validate", (it) => {
             Effect.gen(function* () {
               active++;
               maximum = Math.max(maximum, active);
-              if (active === 4) yield* Deferred.succeed(started, undefined);
+              if (active === 4) {
+                yield* Deferred.succeed(started, undefined);
+              }
               yield* Deferred.await(release);
               active--;
               return {

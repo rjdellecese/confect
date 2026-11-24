@@ -5,10 +5,8 @@ import * as Schema from "effect/Schema";
 import type * as GroupSpec from "@confect/core/GroupSpec";
 import type * as FunctionSpec from "@confect/core/FunctionSpec";
 import { CodeBlockWriter } from "./CodeBlockWriter";
-import {
-  render as renderSpecAssembly,
-  type SpecAssemblyNode,
-} from "./SpecAssemblyNode";
+import { render as renderSpecAssembly } from "./SpecAssemblyNode";
+import type { SpecAssemblyNode } from "./SpecAssemblyNode";
 
 /**
  * Emit `convex/schema.ts` as a one-line re-export of the codegen-emitted deploy

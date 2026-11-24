@@ -15,10 +15,9 @@ import { existsSync } from "node:fs";
 const entry = new URL("../dist/index.mjs", import.meta.url);
 
 if (!existsSync(entry)) {
-  // oxlint-disable-next-line effecttsgo/global-console -- The pre-build shim cannot use the CLI's Effect logger before dist exists.
-  console.error(
+  process.stderr.write(
     "@confect/cli's build output is missing. Run `pnpm build` from the repo root " +
-      "(or `vp run --filter @confect/cli dev` for a watcher) first.",
+      "(or `vp run --filter @confect/cli dev` for a watcher) first.\n",
   );
   process.exit(1);
 }

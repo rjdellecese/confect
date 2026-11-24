@@ -1,3 +1,4 @@
+import * as Predicate from "effect/Predicate";
 import { pipe } from "effect/Function";
 import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
@@ -9,7 +10,8 @@ import * as Record from "effect/Record";
 import * as Schema from "effect/Schema";
 import * as String from "effect/String";
 import type * as esbuild from "esbuild";
-import { fromBundlerError, type BuildError } from "./BuildError";
+import { fromBundlerError } from "./BuildError";
+import type { BuildError } from "./BuildError";
 import * as Bundler from "./Bundler";
 import { InvalidConvexConfigError } from "./CodegenError";
 import { toPosixPath } from "./utils";
@@ -65,7 +67,9 @@ export const componentConfigPlugin = (path: Path.Path): esbuild.Plugin => ({
     build.onResolve({ filter: /convex\.config/ }, (args) => {
       // The app's own `convex.config.ts` is the entry point; only imports of
       // *component* definitions get wrapped.
-      if (args.kind === "entry-point") return undefined;
+      if (args.kind === "entry-point") {
+        return undefined;
+      }
 
       // Claim a wrapper's import of the real definition into the file
       // namespace: bundled, the definition's own nested `convex.config`
@@ -75,7 +79,9 @@ export const componentConfigPlugin = (path: Path.Path): esbuild.Plugin => ({
       if (args.namespace === COMPONENT_CONFIG_NAMESPACE) {
         return { path: args.path };
       }
-      if (args.namespace !== "file" && args.namespace !== "") return undefined;
+      if (args.namespace !== "file" && args.namespace !== "") {
+        return undefined;
+      }
 
       const importer =
         args.importer !== "" ? args.importer : path.join(args.resolveDir, "_");
@@ -113,8 +119,9 @@ export const componentConfigPlugin = (path: Path.Path): esbuild.Plugin => ({
       { filter: /.*/, namespace: COMPONENT_CONFIG_NAMESPACE },
       (args) =>
         Effect.gen(function* () {
-          const specifier = (args.pluginData as { specifier: string })
-            .specifier;
+          const { specifier } = yield* Schema.decodeUnknownEffect(
+            ComponentConfigPluginData,
+          )(args.pluginData);
           // The injected path is the definition's *directory*, matching the
           // Convex runtime's convention—so even if a future convex version
           // stops reading `defaultName`, `app.use`'s last-resort fallback
@@ -171,6 +178,21 @@ const AppDefinitionAnalysis = Schema.Struct({
   ),
 });
 
+const ComponentConfigPluginData = Schema.Struct({ specifier: Schema.String });
+
+interface RootAppDefinition {
+  readonly _isRoot: true;
+  export(): unknown;
+}
+
+const isRootAppDefinition = (app: unknown): app is RootAppDefinition =>
+  typeof app === "object" &&
+  app !== null &&
+  "_isRoot" in app &&
+  app._isRoot === true &&
+  "export" in app &&
+  typeof app.export === "function";
+
 const byName = Order.mapInput(
   Order.String,
   (component: InstalledComponent) => component.name,
@@ -207,17 +229,11 @@ export const discoverInstalledComponents = Effect.fn(
     plugins: [componentConfigPlugin(path)],
   }).pipe(Effect.mapError((error) => fromBundlerError(displayPath, error)));
 
-  const app = module.default as
-    | { _isRoot?: unknown; export?: unknown }
-    | null
-    | undefined;
+  const app = Predicate.hasProperty(module, "default")
+    ? module.default
+    : undefined;
 
-  if (
-    app === null ||
-    typeof app !== "object" ||
-    app._isRoot !== true ||
-    typeof app.export !== "function"
-  ) {
+  if (!isRootAppDefinition(app)) {
     return yield* InvalidConvexConfigError.make({
       configPath: displayPath,
       reason:
@@ -225,8 +241,8 @@ export const discoverInstalledComponents = Effect.fn(
     });
   }
 
-  const analysis = yield* Effect.try({
-    try: () => (app.export as () => unknown)(),
+  const decodeAnalysis = yield* Effect.try({
+    try: () => Schema.decodeUnknownEffect(AppDefinitionAnalysis)(app.export()),
     catch: (cause) =>
       InvalidConvexConfigError.make({
         configPath: displayPath,
@@ -234,9 +250,7 @@ export const discoverInstalledComponents = Effect.fn(
       }),
   });
 
-  const decoded = yield* Schema.decodeUnknownEffect(AppDefinitionAnalysis)(
-    analysis,
-  ).pipe(
+  const decoded = yield* decodeAnalysis.pipe(
     Effect.mapError((cause) =>
       InvalidConvexConfigError.make({
         configPath: displayPath,

@@ -28,7 +28,7 @@ import * as PackageSelfReference from "./PackageSelfReference";
 import * as TypeScriptConfig from "./TypeScriptConfig";
 
 export interface Bundled {
-  readonly module: any;
+  readonly module: unknown;
   readonly metafile: esbuild.Metafile;
 }
 
@@ -67,21 +67,21 @@ const absolutizeMetafile = (
       })),
     },
   ]);
-  const outputs = Record.mapEntries(metafile.outputs, (value, key) => [
-    absolutize(key),
-    {
+  const outputs = Record.mapEntries(metafile.outputs, (value, key) => {
+    const output = {
       ...value,
-      ...(value.entryPoint !== undefined && value.entryPoint !== ""
-        ? { entryPoint: inputPath(value.entryPoint) }
-        : {}),
       inputs: Record.mapKeys(value.inputs, inputPath),
       imports: Array.map(value.imports, (imported) =>
         imported.external === true
           ? imported
           : { ...imported, path: absolutize(imported.path) },
       ),
-    },
-  ]);
+    };
+    if (value.entryPoint !== undefined && value.entryPoint !== "") {
+      output.entryPoint = inputPath(value.entryPoint);
+    }
+    return [absolutize(key), output];
+  });
   return { inputs, outputs };
 };
 
@@ -117,7 +117,7 @@ const resolveCjs = Option.liftThrowable((specifier: string, importer: string) =>
 );
 
 const resolveExternalEsm = Option.liftThrowable(
-  (specifier: string, importer: string, conditions: string[]) =>
+  (specifier: string, importer: string, conditions: Array<string>) =>
     resolveModulePath(specifier, { from: importer, conditions }),
 );
 
@@ -150,8 +150,12 @@ export const bundleWorkspacePlugin = (
   setup(build) {
     const patterns = [...skipPatterns];
     build.onResolve({ filter: /^[^./]/ }, (args) => {
-      if (args.namespace !== "file" && args.namespace !== "") return undefined;
-      if (isBuiltin(args.path) || path.isAbsolute(args.path)) return undefined;
+      if (args.namespace !== "file" && args.namespace !== "") {
+        return undefined;
+      }
+      if (isBuiltin(args.path) || path.isAbsolute(args.path)) {
+        return undefined;
+      }
       if (BundleRequire.match(args.path, patterns)) {
         return undefined;
       }
@@ -248,78 +252,95 @@ const batchResolutionPlugin = (
   path: Path.Path,
   fs: FileSystem.FileSystem,
   skipPatterns: ReadonlyArray<string | RegExp>,
-  conditions: string[],
+  conditions: Array<string>,
   externalImports: Ref.Ref<
     HashMap.HashMap<string, ReadonlyArray<ExternalImport>>
   >,
-): esbuild.Plugin => ({
-  name: "confect:batch-resolution",
-  setup(build) {
-    const patterns = [...skipPatterns];
-    const external = (args: esbuild.OnResolveArgs, resolved: string) => {
-      const importer = path.resolve(args.importer);
-      Effect.runSync(
-        Ref.update(
-          externalImports,
-          HashMap.modifyAt(importer, (imports) =>
-            Option.some(
-              Array.append(
-                Option.getOrElse(imports, () => []),
-                { path: resolved, original: args.path },
-              ),
+): esbuild.Plugin => {
+  const external = (args: esbuild.OnResolveArgs, resolved: string) => {
+    const importer = path.resolve(args.importer);
+    Effect.runSync(
+      Ref.update(
+        externalImports,
+        HashMap.modifyAt(importer, (imports) =>
+          Option.some(
+            Array.append(
+              Option.getOrElse(imports, () => []),
+              { path: resolved, original: args.path },
             ),
           ),
         ),
-      );
-      return { path: resolved, external: true };
-    };
-    build.onResolve({ filter: /.*/ }, (args) => {
-      if (args.kind === "entry-point") return undefined;
-      if (isBuiltin(args.path)) return { path: args.path, external: true };
-      if (BundleRequire.match(args.path, patterns)) return undefined;
-      if (/[\\/]node_modules[\\/]/.test(args.path)) {
-        return external(
-          args,
-          pathToFileURL(path.resolve(args.resolveDir, args.path)).href,
-        );
-      }
-      if (String.startsWith(".")(args.path) || path.isAbsolute(args.path))
-        return undefined;
-
-      const resolved = resolveModule(args.path, args.importer);
-      if (Option.isNone(resolved)) {
-        return {
-          errors: [
-            { text: `Could not resolve "${args.path}" from ${args.importer}` },
-          ],
-        };
-      }
-      return Effect.runPromise(
-        fs
-          .realPath(resolved.value)
-          .pipe(Effect.orElseSucceed(() => resolved.value)),
-      ).then((real) => {
-        if (!/[\\/]node_modules[\\/]/.test(real)) return { path: real };
-        if (args.kind === "require-call" || args.kind === "require-resolve") {
+      ),
+    );
+    return { path: resolved, external: true };
+  };
+  return {
+    name: "confect:batch-resolution",
+    setup(build) {
+      const patterns = [...skipPatterns];
+      build.onResolve({ filter: /.*/ }, (args) => {
+        if (args.kind === "entry-point") {
+          return undefined;
+        }
+        if (isBuiltin(args.path)) {
+          return { path: args.path, external: true };
+        }
+        if (BundleRequire.match(args.path, patterns)) {
+          return undefined;
+        }
+        if (/[\\/]node_modules[\\/]/.test(args.path)) {
           return external(
             args,
-            createRequire(args.importer).resolve(args.path),
+            pathToFileURL(path.resolve(args.resolveDir, args.path)).href,
           );
         }
-        return external(
-          args,
-          Option.match(
-            resolveExternalEsm(args.path, args.importer, conditions),
-            {
-              onNone: () => args.path,
-              onSome: (resolvedPath) => pathToFileURL(resolvedPath).href,
-            },
-          ),
-        );
+        if (String.startsWith(".")(args.path) || path.isAbsolute(args.path)) {
+          return undefined;
+        }
+
+        const resolved = resolveModule(args.path, args.importer);
+        if (Option.isNone(resolved)) {
+          return {
+            errors: [
+              {
+                text: `Could not resolve "${args.path}" from ${args.importer}`,
+              },
+            ],
+          };
+        }
+        return Effect.runPromise(
+          fs
+            .realPath(resolved.value)
+            .pipe(Effect.orElseSucceed(() => resolved.value)),
+        ).then((real) => {
+          if (!/[\\/]node_modules[\\/]/.test(real)) {
+            return { path: real };
+          }
+          if (args.kind === "require-call" || args.kind === "require-resolve") {
+            return external(
+              args,
+              createRequire(args.importer).resolve(args.path),
+            );
+          }
+          return external(
+            args,
+            Option.match(
+              resolveExternalEsm(args.path, args.importer, conditions),
+              {
+                onNone: () => args.path,
+                onSome: (resolvedPath) => pathToFileURL(resolvedPath).href,
+              },
+            ),
+          );
+        });
       });
-    });
-  },
-});
+    },
+  };
+};
+
+const configPath = (
+  selected: Option.Option<TypeScriptConfig.TypeScriptConfig>,
+) => Option.getOrUndefined(Option.map(selected, (value) => value.path));
 
 const compileBatch = Effect.fn("Bundler.compileBatch")(function* (
   entryPoints: ReadonlyArray<string>,
@@ -329,12 +350,13 @@ const compileBatch = Effect.fn("Bundler.compileBatch")(function* (
   const nodeOptions = yield* Config.String("NODE_OPTIONS").pipe(
     Config.withDefault(""),
   );
-  if (/--conditions|-C|--(?:no-)?addons/.test(nodeOptions))
+  if (/--conditions|-C|--(?:no-)?addons/.test(nodeOptions)) {
     return yield* BatchIncompatible.make({
       reason: "RuntimeConditions",
       message:
         "NODE_OPTIONS changes Node export conditions; individual builds preserve native resolution.",
     });
+  }
   const runtimeOptions = yield* Effect.try({
     try: () =>
       parseArgs({
@@ -387,16 +409,15 @@ const compileBatch = Effect.fn("Bundler.compileBatch")(function* (
     { concurrency: 1 },
   );
   const config = Array.headNonEmpty(configs);
-  const configPath = (
-    selected: Option.Option<TypeScriptConfig.TypeScriptConfig>,
-  ) => Option.getOrUndefined(Option.map(selected, (value) => value.path));
+
   if (
     !Array.every(configs, (other) => configPath(other) === configPath(config))
-  )
+  ) {
     return yield* BatchIncompatible.make({
       reason: "MixedTsconfigs",
       message: `Entries use different tsconfigs: ${Array.join(Array.dedupe(Array.map(configs, (item) => configPath(item) ?? "(no tsconfig)")), ", ")}`,
     });
+  }
 
   const cwd = yield* fs.realPath(path.dirname(first));
   const directory = yield* fs
@@ -468,7 +489,7 @@ const compileBatch = Effect.fn("Bundler.compileBatch")(function* (
       warning.location === null ||
       !HashSet.has(inputPaths, path.resolve(cwd, warning.location.file)),
   );
-  if (unattributedWarnings.length > 0)
+  if (unattributedWarnings.length > 0) {
     return yield* BatchIncompatible.make({
       reason: "UnattributedWarnings",
       message: `Cannot attribute build warnings to entries: ${Array.join(
@@ -476,6 +497,7 @@ const compileBatch = Effect.fn("Bundler.compileBatch")(function* (
         "; ",
       )}`,
     });
+  }
   yield* Effect.forEach(
     result.outputFiles,
     (output) => fs.writeFile(output.path, output.contents),
@@ -552,8 +574,9 @@ export const withBatch = <A, E, R>(
         Array.every(entryPoints, (entry) =>
           current.value.entryPoints.includes(entry),
         )
-      )
+      ) {
         return yield* effect;
+      }
       const compilation = yield* Effect.cached(
         compileBatch(entryPoints).pipe(
           Effect.provideService(Scope.Scope, scope),
@@ -612,15 +635,18 @@ const reachableMetafileEntries = <
       >(
         { pending: Chunk.of(root), visited: HashSet.empty() },
         ({ pending, visited }) => {
-          if (!Chunk.isNonEmpty(pending)) return Option.none();
+          if (!Chunk.isNonEmpty(pending)) {
+            return Option.none();
+          }
           const key = Chunk.headNonEmpty(pending);
           const remaining = Chunk.tailNonEmpty(pending);
           const metadata = entries[key];
-          if (HashSet.has(visited, key) || metadata === undefined)
+          if (HashSet.has(visited, key) || metadata === undefined) {
             return Option.some([
               Option.none(),
               { pending: remaining, visited },
             ]);
+          }
           return Option.some([
             Option.some([key, metadata] as const),
             {
@@ -691,7 +717,9 @@ export const check = Effect.fn("Bundler.check")((entryPoint: string) =>
 
 const bundleWith = Effect.fnUntraced(function* (
   entryPoint: string,
-  load?: typeof BundleRequire.dynamicImport,
+  load?: (
+    ...args: Parameters<typeof BundleRequire.dynamicImport>
+  ) => Promise<unknown>,
   options?: { readonly plugins?: ReadonlyArray<esbuild.Plugin> },
 ): Effect.fn.Return<Bundled, BundlerError, Path.Path | FileSystem.FileSystem> {
   const path = yield* Path.Path;
@@ -769,7 +797,7 @@ const bundleWith = Effect.fnUntraced(function* (
   ];
   const result = yield* Effect.tryPromise({
     try: () =>
-      BundleRequire.bundleRequire({
+      BundleRequire.bundleRequire<unknown>({
         filepath: entryPoint,
         require: load ?? constUndefined,
         cwd,
@@ -822,7 +850,9 @@ const findMetafileInputKey = Effect.fnUntraced(function* (
 ) {
   const path = yield* Path.Path;
   const resolved = path.resolve(absolutePath);
-  if (metafile.inputs[resolved] !== undefined) return Option.some(resolved);
+  if (metafile.inputs[resolved] !== undefined) {
+    return Option.some(resolved);
+  }
   const fs = yield* FileSystem.FileSystem;
   const real = yield* fs
     .realPath(resolved)

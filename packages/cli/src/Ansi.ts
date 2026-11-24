@@ -4,7 +4,7 @@
  * with a trailing reset.
  */
 
-const ESC = "\x1B[";
+const ESC = "\u001B[";
 
 const RESET = `${ESC}0m`;
 

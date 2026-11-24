@@ -68,6 +68,40 @@ const logFileChangeIndented = Effect.fnUntraced(function* (
   );
 });
 
+const logForGroups = (
+  groupPaths: GroupPaths.GroupPaths,
+  fnPaths: FunctionPaths.FunctionPaths,
+  logFn: typeof logFunctionAdded,
+) =>
+  Effect.forEach(
+    groupPaths,
+    (gp) =>
+      Effect.forEach(
+        Array.fromIterable(
+          HashSet.filter(fnPaths, (fp) => Equal.equals(fp.groupPath, gp)),
+        ),
+        logFn,
+        { concurrency: 1 },
+      ),
+    { concurrency: 1 },
+  );
+
+const validate = (
+  paths: ReadonlyArray<ImplModulePath>,
+  snapshot: GenerationSnapshot.GenerationSnapshot,
+) =>
+  Effect.gen(function* () {
+    if (Array.isReadonlyArrayNonEmpty(paths)) {
+      const validated = yield* Evaluation.validate(paths).pipe(
+        Evaluation.catchAndLog,
+      );
+      if (Option.isNone(validated)) {
+        return SyncState.Outcome.ValidationFailed({ paths, snapshot });
+      }
+    }
+    return SyncState.Outcome.Succeeded({ snapshot });
+  });
+
 const logFunctionPathDiff = Effect.fnUntraced(function* (
   previous: FunctionPaths.FunctionPaths,
   current: FunctionPaths.FunctionPaths,
@@ -79,24 +113,6 @@ const logFunctionPathDiff = Effect.fnUntraced(function* (
     groupsAdded,
     groupsChanged,
   } = FunctionPaths.diff(previous, current);
-
-  const logForGroups = (
-    groupPaths: GroupPaths.GroupPaths,
-    fnPaths: FunctionPaths.FunctionPaths,
-    logFn: typeof logFunctionAdded,
-  ) =>
-    Effect.forEach(
-      groupPaths,
-      (gp) =>
-        Effect.forEach(
-          Array.fromIterable(
-            HashSet.filter(fnPaths, (fp) => Equal.equals(fp.groupPath, gp)),
-          ),
-          logFn,
-          { concurrency: 1 },
-        ),
-      { concurrency: 1 },
-    );
 
   yield* logForGroups(groupsRemoved, functionsRemoved, logFunctionRemoved);
   yield* logForGroups(groupsAdded, functionsAdded, logFunctionAdded);
@@ -180,9 +196,13 @@ const logChangedWatcherMessages = Effect.fnUntraced(function* (
 ) {
   const signature = watcherMessagesSignature(messages);
   const previous = yield* Ref.get(lastLoggedSignatureRef);
-  if (signature === previous) return;
+  if (signature === previous) {
+    return;
+  }
   yield* Ref.set(lastLoggedSignatureRef, signature);
-  if (messages.length === 0) return;
+  if (messages.length === 0) {
+    return;
+  }
   yield* log(dedupeWatcherMessages(messages));
 });
 
@@ -218,9 +238,13 @@ const syncLoop = Effect.fnUntraced(function* (
 
       const phase = yield* Ref.get(phaseRef);
       const firstSync = SyncState.Phase.$is("Bootstrapping")(phase);
-      if (!firstSync) yield* logMessages;
+      if (!firstSync) {
+        yield* logMessages;
+      }
 
-      if (!SyncState.isDirty(pending)) return;
+      if (!SyncState.isDirty(pending)) {
+        return;
+      }
 
       const optional = yield* Ref.updateAndGet(
         optionalPendingRef,
@@ -240,8 +264,9 @@ const syncLoop = Effect.fnUntraced(function* (
           SyncState.Operation.$is("Validate")(operation) &&
           operation.paths.length === 0
         )
-      )
+      ) {
         yield* logPending("Dependencies may have changed, reloading…");
+      }
 
       const regenerate = (generation: typeof Evaluation.generateSnapshot) =>
         Effect.gen(function* () {
@@ -273,21 +298,7 @@ const syncLoop = Effect.fnUntraced(function* (
           }
           return SyncState.Outcome.Succeeded({ snapshot: current.value });
         });
-      const validate = (
-        paths: ReadonlyArray<ImplModulePath>,
-        snapshot: GenerationSnapshot.GenerationSnapshot,
-      ) =>
-        Effect.gen(function* () {
-          if (Array.isReadonlyArrayNonEmpty(paths)) {
-            const validated = yield* Evaluation.validate(paths).pipe(
-              Evaluation.catchAndLog,
-            );
-            if (Option.isNone(validated)) {
-              return SyncState.Outcome.ValidationFailed({ paths, snapshot });
-            }
-          }
-          return SyncState.Outcome.Succeeded({ snapshot });
-        });
+
       const outcome = yield* SyncState.Operation.$match(operation, {
         Generate: () => regenerate(Evaluation.generateSnapshot),
         Validate: ({ paths, snapshot }) => validate(paths, snapshot),
@@ -300,7 +311,9 @@ const syncLoop = Effect.fnUntraced(function* (
       if (SyncState.shouldRetry(phase, outcome)) {
         yield* watcher.requestRetry;
       }
-      if (!SyncState.Outcome.$is("Succeeded")(outcome)) return;
+      if (!SyncState.Outcome.$is("Succeeded")(outcome)) {
+        return;
+      }
 
       const dirtyOptionalFiles = [
         ...(HashSet.has(optional, "Http")
@@ -319,8 +332,9 @@ const syncLoop = Effect.fnUntraced(function* (
         : Effect.void;
       yield* Ref.set(optionalPendingRef, HashSet.empty());
 
-      if (SyncState.needsDeploymentNotification(phase))
+      if (SyncState.needsDeploymentNotification(phase)) {
         yield* touchConvexSchema;
+      }
 
       const remaining = yield* watcher.pending;
       if (!SyncState.isDirty(remaining)) {

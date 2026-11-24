@@ -75,8 +75,8 @@ it("preserves actual workflow inputs and inferred result, error, and service typ
   expectTypeOf(dev).toEqualTypeOf<
     Command.Command<
       "dev",
-      {},
-      {},
+      Record<never, never>,
+      Record<never, never>,
       OperationError | EvaluationError | PlatformError,
       GenerationServices | ProjectRoot
     >

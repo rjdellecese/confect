@@ -48,7 +48,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           const actual2 = yield* project.generatedFiles;
           expect(actual2).toEqual(incremental);
         }).pipe(Effect.scoped),
-      { timeout: 30000 },
+      { timeout: 30_000 },
     );
 
     it.effect(
@@ -84,7 +84,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
             expect(actual3).toEqual(generated);
           }
         }).pipe(Effect.scoped),
-      { timeout: 30000 },
+      { timeout: 30_000 },
     );
 
     it.effect(
@@ -153,7 +153,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           const actual6 = yield* project.generatedFiles;
           expect(actual6).toEqual(incremental);
         }).pipe(Effect.scoped),
-      { timeout: 30000 },
+      { timeout: 30_000 },
     );
 
     it.effect(
@@ -208,7 +208,7 @@ if (existsSync(block)) {
           const actual8 = yield* project.generatedFiles;
           expect(actual8).toEqual(incremental);
         }).pipe(Effect.scoped),
-      { timeout: 30000 },
+      { timeout: 30_000 },
     );
 
     it.effect(
@@ -256,7 +256,7 @@ if (existsSync(block)) {
           yield* watching.waitFor("SECOND:2");
           yield* watching.waitFor(success);
         }).pipe(Effect.scoped),
-      { timeout: 30000 },
+      { timeout: 30_000 },
     );
 
     it.effect(
@@ -307,7 +307,7 @@ if (existsSync(block)) {
           yield* watching.waitFor("EVALUATED:notes:3");
           yield* watching.waitFor(success);
         }).pipe(Effect.scoped),
-      { timeout: 45000 },
+      { timeout: 45_000 },
     );
 
     it.effect.each([1, 8])(
@@ -361,7 +361,7 @@ if (existsSync(block)) {
           expect(reload).toContain(changedMarker);
           expect(Str.split(reload, unrelatedMarker)).toHaveLength(1);
         }).pipe(Effect.scoped),
-      { timeout: 30000 },
+      { timeout: 30_000 },
     );
   },
 );
