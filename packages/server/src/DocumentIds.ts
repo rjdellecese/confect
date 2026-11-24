@@ -43,6 +43,11 @@ type IdentifiedId<Name extends string> = Name extends unknown
  *   });
  * ```
  *
+ * @remarks
+ *   Codegen support: this interface names the generated service shape; do not
+ *   import it directly. Yield `DocumentIds` from `confect/_generated/services`
+ *   and call `ids.parse` or `ids.identify`.
+ *
  * @category Services
  */
 export interface DocumentIdsService<AppTableName extends string> {
@@ -60,7 +65,7 @@ export interface DocumentIdsService<AppTableName extends string> {
    * @returns An effect yielding `Some(id)` if Convex normalizes the input for
    *   this table to exactly the same string, or `None` otherwise.
    *
-   * @see {@link DocumentIdsService.identify} when the table name is unknown.
+   * @see `ids.identify` when the table name is unknown.
    */
   readonly parse: <
     const Name extends AppTableName | DatabaseSchema.SystemTableNames,
@@ -84,7 +89,7 @@ export interface DocumentIdsService<AppTableName extends string> {
    *   runtime ID lookups, not document scans, and cannot discover other
    *   components' tables.
    *
-   * @see {@link DocumentIdsService.parse} when the table name is known.
+   * @see `ids.parse` when the table name is known.
    */
   readonly identify: (
     input: string,
@@ -95,8 +100,9 @@ export interface DocumentIdsService<AppTableName extends string> {
 
 /**
  * Service requirement for validating IDs against the tables of a particular
- * database schema. Yield the generated `DocumentIds` tag to acquire the
- * {@link DocumentIdsService}.
+ * database schema. Import the `DocumentIds` type from
+ * `confect/_generated/services` to describe that requirement for your
+ * application.
  *
  * @category Services
  */
@@ -104,6 +110,10 @@ export type DocumentIds<DatabaseSchema_ extends DatabaseSchema.AnyWithProps> =
   DocumentIdsService<DatabaseSchema.TableNames<DatabaseSchema_>>;
 
 /**
+ * Annotates the generated `DocumentIds` tag. For an Effect requirement, import
+ * the type `DocumentIds` from `confect/_generated/services` instead of naming
+ * this tag type.
+ *
  * @internal
  */
 export type DocumentIdsTag<
@@ -116,6 +126,10 @@ const tag = <AppTableName extends string>() =>
   );
 
 /**
+ * Constructs the schema-specific tag for generated services. Import
+ * `DocumentIds` from `confect/_generated/services` and yield it rather than
+ * calling this factory.
+ *
  * @internal
  */
 export const DocumentIds = <

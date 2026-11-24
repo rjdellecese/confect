@@ -175,6 +175,12 @@ const layerFromImpls = <
  * `_generated/server`. They type each wrapper's database services against the
  * application's schema.
  *
+ * @remarks
+ *   Codegen support: this interface names the generated builder shape; do not
+ *   import it directly. Import `MiddlewareImpl` from
+ *   `confect/_generated/server` for `make`, `makeByFunctionType`, and
+ *   `provides`. For the builder's type, use `typeof MiddlewareImpl`.
+ *
  * @category Models
  */
 export interface Builders<DatabaseSchema_ extends DatabaseSchema.AnyWithProps> {
@@ -196,7 +202,7 @@ export interface Builders<DatabaseSchema_ extends DatabaseSchema.AnyWithProps> {
    *
    * @returns A layer to provide to each group that uses the middleware.
    *
-   * @see {@link Builders.makeByFunctionType} for wrappers that need services specific to one function type.
+   * @see `MiddlewareImpl.makeByFunctionType` for wrappers that need services specific to one function type.
    */
   readonly make: <MiddlewareSpec_ extends MiddlewareSpec.AnyMiddlewareSpec>(
     middlewareSpec: MiddlewareSpec_,
@@ -262,7 +268,7 @@ export interface Builders<DatabaseSchema_ extends DatabaseSchema.AnyWithProps> {
    * @returns An implementation layer to provide to each group that uses the
    *   middleware.
    *
-   * @see {@link Builders.make | make} when computing the service requires attachment options or invocation metadata.
+   * @see `MiddlewareImpl.make` when computing the service requires attachment options or invocation metadata.
    */
   readonly provides: <
     MiddlewareSpec_ extends MiddlewareSpec.AnyMiddlewareSpec,
@@ -283,7 +289,10 @@ export interface Builders<DatabaseSchema_ extends DatabaseSchema.AnyWithProps> {
 }
 
 /**
- * Bind middleware strategies to the application's data model at the type level.
+ * Binds the application's database type without loading its tables. Use
+ * `MiddlewareImpl.make`, `MiddlewareImpl.makeByFunctionType`, or
+ * `MiddlewareImpl.provides` from `confect/_generated/server` instead of binding
+ * the builder directly.
  *
  * @internal
  */
@@ -322,8 +331,8 @@ export const {
   /**
    * Creates a middleware layer with one wrapper shared across the spec's
    * function types, without specializing its database services. Import
-   * `MiddlewareImpl` from `_generated/server` for the application-typed
-   * {@link Builders.make} method.
+   * `MiddlewareImpl` from `_generated/server` for the application-typed `make`
+   * method.
    *
    * @category Layers
    */
@@ -331,7 +340,8 @@ export const {
   /**
    * Creates a middleware layer with one wrapper per declared function type,
    * without specializing its database services. The generated `MiddlewareImpl`
-   * exposes {@link Builders.makeByFunctionType} with application-typed services.
+   * exposes `MiddlewareImpl.makeByFunctionType` with application-typed
+   * services.
    *
    * @category Layers
    */
@@ -339,8 +349,7 @@ export const {
   /**
    * Creates a middleware layer that supplies a service to the downstream
    * handler without specializing database services. The generated
-   * `MiddlewareImpl` exposes {@link Builders.provides} with application-typed
-   * services.
+   * `MiddlewareImpl` exposes `provides` with application-typed services.
    *
    * @category Layers
    */

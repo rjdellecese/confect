@@ -40,6 +40,10 @@ export interface CronJobs {
    */
   readonly cronJobs: Record<string, CronJob.CronJob>;
   /**
+   * Supplies the generated Convex deployment entry point. Default-export
+   * `CronJobs.make().add(job)` from `confect/crons.ts` instead of accessing
+   * this property directly.
+   *
    * @internal
    */
   readonly convexCronJobs: Crons;

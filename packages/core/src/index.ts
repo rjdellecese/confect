@@ -10,9 +10,10 @@ export * as FunctionProvenance from "./FunctionProvenance";
  */
 export * as FunctionSpec from "./FunctionSpec";
 /**
- * The table-branded identifier type underlying the generated `Id` helper.
+ * Backs the generated ID schema and type. Import `Id` from
+ * `confect/_generated/id` rather than using this namespace directly.
  *
- * @category Models
+ * @internal
  */
 export * as GenericId from "./GenericId";
 /**
@@ -69,9 +70,11 @@ export * as PaginationResult from "./PaginationResult";
  */
 export * as Ref from "./Ref";
 /**
- * The generated project's public and internal trees of function refs.
+ * Backs the generated function-ref tree. Use `refs.public` or `refs.internal`
+ * on the default import from `confect/_generated/refs` rather than importing
+ * this namespace.
  *
- * @category References
+ * @internal
  */
 export * as Refs from "./Refs";
 /**

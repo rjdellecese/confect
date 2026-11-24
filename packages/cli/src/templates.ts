@@ -498,12 +498,13 @@ const refsEffect = Effect.fnUntraced(function* ({
  * **Details**
  *
  * The \`public\` view exposes client-callable references and \`internal\` exposes
- * server-only references. Each carries its argument, result, and declared error
- * types; Confect evaluates codecs lazily.
+ * server-only references. Each view omits groups with no matching functions.
+ * Each Confect reference carries its argument, result, and declared error types,
+ * including errors from attached middleware. Codecs are evaluated lazily.
  *
  * **Gotchas**
  *
- * The views filter references at the type level. Convex enforces visibility on the
+ * Both views share one tree at runtime. Convex enforces visibility on the
  * deployed functions.
  *
  * @category references
@@ -669,13 +670,21 @@ const registeredFunctionsForGroupEffect = Effect.fnUntraced(function* ({
   // per-function bundle. Typing from the leaf spec (not the project-wide assembled spec)
   // keeps the registry's type dependent solely on its own group.
   const specType = `typeof import("${specImportPath}")["default"]`;
+  const registrationDoc = `/**
+ * Registration tree consumed by the generated Convex entry point. Implement
+ * handlers with \`FunctionImpl.make\` from \`confect/_generated/server\`. To invoke
+ * a function, pass a leaf from \`confect/_generated/refs\` to a client or runner
+ * rather than importing this tree.
+ *
+ * @internal
+ */`;
   if (useNode) {
     yield* cbw.writeLine(
-      `export default RegisteredNodeFunction.buildForGroup<${specType}>(groupLayer);`,
+      `${registrationDoc}\nexport default RegisteredNodeFunction.buildForGroup<${specType}>(groupLayer);`,
     );
   } else if (!forwarding) {
     yield* cbw.writeLine(
-      `export default RegisteredFunctions.buildForGroup<${specType}>([], groupLayer);`,
+      `${registrationDoc}\nexport default RegisteredFunctions.buildForGroup<${specType}>([], groupLayer);`,
     );
   } else {
     const JsonString = Schema.fromJsonString(Schema.String);
@@ -723,6 +732,7 @@ const registeredFunctionsForGroupEffect = Effect.fnUntraced(function* ({
 
 const definitions = ConvexFunctionDefinitions.buildForGroup<${specType}>(${usesTableNames ? "tableNames" : "[]"}, groupLayer);
 
+${registrationDoc}
 export default ${registered} as RegisteredFunctions.RegisteredFunctionsForGroupSpec<${specType}>;`);
   }
 
@@ -1116,15 +1126,16 @@ const servicesEffect = Effect.fnUntraced(function* ({
   yield* cbw.blankLine();
 
   yield* cbw.writeLine(`/**
- * Transaction controls tag, provided in queries and mutations.
- * Prefer QueryRunner.runQuery with transactionLimits; it requests this service when options are supplied.
+ * Capability used by generated runners. Instead of yielding this tag, pass
+ * transactionLimits to runQuery on the yielded QueryRunner in a query or mutation.
  * @internal
  */`);
   yield* cbw.writeLine(
     "export const QueryTransactionContext = QueryTransactionContext_.QueryTransactionContext;",
   );
   yield* cbw.writeLine(`/**
- * Effect environment requirement for {@link QueryTransactionContext}.
+ * Internal requirement of runQuery with transactionLimits. Use the QueryRunner
+ * from this module rather than importing the capability type.
  * @internal
  */`);
   yield* cbw.writeLine(
@@ -1132,15 +1143,17 @@ const servicesEffect = Effect.fnUntraced(function* ({
   );
   yield* cbw.blankLine();
   yield* cbw.writeLine(`/**
- * Mutation transaction controls tag, provided only in mutations.
- * QueryRunner requests this service for useStaleSnapshot; MutationRunner requests it for transactionLimits.
+ * Capability used by generated runners in mutations. Instead of yielding this
+ * tag, use runQuery with useStaleSnapshot or runMutation with transactionLimits
+ * on the yielded QueryRunner or MutationRunner.
  * @internal
  */`);
   yield* cbw.writeLine(
     "export const MutationTransactionContext = MutationTransactionContext_.MutationTransactionContext;",
   );
   yield* cbw.writeLine(`/**
- * Effect environment requirement for {@link MutationTransactionContext}.
+ * Internal requirement of runner options in mutations. Use runQuery or runMutation
+ * on the yielded QueryRunner or MutationRunner rather than importing this type.
  * @internal
  */`);
   yield* cbw.writeLine(

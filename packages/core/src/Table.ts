@@ -173,6 +173,10 @@ export interface UnnamedTable<
   VectorIndexes_ extends GenericTableVectorIndexes = {},
 > {
   /**
+   * Binds the filename-derived table name in a generated wrapper.
+   * Default-import the handle from `confect/_generated/tables/<name>` rather
+   * than calling the unnamed table directly.
+   *
    * @internal
    */
   <const Name_ extends string>(

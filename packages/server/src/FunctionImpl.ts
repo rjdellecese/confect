@@ -37,6 +37,12 @@ export const FunctionImpl = <Name_ extends string>({ name }: { name: Name_ }) =>
  * `_generated/server`. Its handlers see the database services for the
  * application's schema.
  *
+ * @remarks
+ *   Codegen support: this interface names the generated builder shape; do not
+ *   import it directly. Use `FunctionImpl.make` from
+ *   `confect/_generated/server`; to name the builder's type, use `typeof
+ *   FunctionImpl`.
+ *
  * @category Models
  */
 export interface Builder<DatabaseSchema_ extends DatabaseSchema.AnyWithProps> {
@@ -80,7 +86,9 @@ export interface Builder<DatabaseSchema_ extends DatabaseSchema.AnyWithProps> {
 }
 
 /**
- * Bind the application's data model without loading any of its table modules.
+ * Binds the application's database type without loading its tables. Use
+ * `FunctionImpl.make` from `confect/_generated/server` instead of binding the
+ * builder directly.
  *
  * @internal
  */
@@ -117,8 +125,8 @@ export const {
   /**
    * Creates a function implementation layer without specializing its database
    * services to an application schema. Import `FunctionImpl` from
-   * `_generated/server` to use the {@link Builder.make | schema-typed builder}
-   * with the same arguments.
+   * `_generated/server` to use its schema-typed `FunctionImpl.make` method with
+   * the same arguments.
    *
    * @category Layers
    */

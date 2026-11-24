@@ -279,25 +279,28 @@ export const DatabaseWriter: DatabaseWriter_.DatabaseWriterTag<
 export type DatabaseWriter = typeof DatabaseWriter.Identifier;
 
 /**
- * Transaction controls tag, provided in queries and mutations.
- * Prefer QueryRunner.runQuery with transactionLimits; it requests this service when options are supplied.
+ * Capability used by generated runners. Instead of yielding this tag, pass
+ * transactionLimits to runQuery on the yielded QueryRunner in a query or mutation.
  * @internal
  */
 export const QueryTransactionContext = QueryTransactionContext_.QueryTransactionContext;
 /**
- * Effect environment requirement for {@link QueryTransactionContext}.
+ * Internal requirement of runQuery with transactionLimits. Use the QueryRunner
+ * from this module rather than importing the capability type.
  * @internal
  */
 export type QueryTransactionContext = typeof QueryTransactionContext.Identifier;
 
 /**
- * Mutation transaction controls tag, provided only in mutations.
- * QueryRunner requests this service for useStaleSnapshot; MutationRunner requests it for transactionLimits.
+ * Capability used by generated runners in mutations. Instead of yielding this
+ * tag, use runQuery with useStaleSnapshot or runMutation with transactionLimits
+ * on the yielded QueryRunner or MutationRunner.
  * @internal
  */
 export const MutationTransactionContext = MutationTransactionContext_.MutationTransactionContext;
 /**
- * Effect environment requirement for {@link MutationTransactionContext}.
+ * Internal requirement of runner options in mutations. Use runQuery or runMutation
+ * on the yielded QueryRunner or MutationRunner rather than importing this type.
  * @internal
  */
 export type MutationTransactionContext = typeof MutationTransactionContext.Identifier;

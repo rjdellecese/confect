@@ -46,6 +46,10 @@ const make = (ctx: Pick<GenericQueryCtx<GenericDataModel>, "runQuery">) => ({
 });
 
 /**
+ * Backs transaction options on the generated runners. Pass `transactionLimits`
+ * to `runQuery` on the yielded `QueryRunner` from `confect/_generated/services`
+ * instead of requesting this capability directly.
+ *
  * @internal
  */
 export class QueryTransactionContext extends Context.Service<

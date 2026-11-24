@@ -21,6 +21,24 @@ description: Public API JSDoc. Use when authoring or reviewing Confect API docum
 `@internal` declarations and default exports are outside public JSDoc
 authoring, except for public generated default exports.
 
+Distinguish the API an application uses from exports that codegen needs to
+construct, type, or document it. Check the generator, emitted files, handwritten
+call sites, and migration guides before classifying an export. For a support-only
+declaration, use `@internal` and add a short hover note explaining its role and
+which generated import or member to use instead. Keep the TypeScript export and
+signature. If the declaration owns public operations, keep those operations
+visible: use a `@remarks` note starting with `Codegen support:` on the owner
+rather than hiding it and its members.
+
+Check public JSDoc for references to the support declaration, including prose,
+links, examples, and parameter and return descriptions. Check package barrels,
+subpaths, and comments emitted by the CLI as well as the declaration's module.
+Describe the public receiver or import instead. Verify the extracted package and
+generated references: the support-only entry should be absent, but generated
+tags, types, and callable members must remain usable. A required TypeScript type
+reference or a link to a public method is not a recommendation to import its
+owner.
+
 Public declarations use a multiline block with one self-contained practical
 description paragraph. Start functions and methods with a present-tense action;
 match nearby noun-family phrasing for values. Optional non-empty sections appear

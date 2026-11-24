@@ -65,6 +65,10 @@ const tableDefinitionCache = new WeakMap<
 >();
 
 /**
+ * Constructs a native table definition for the generated deployment schema. For
+ * deployment or test setup, default-import `confect/_generated/convexSchema`
+ * rather than calling the converter directly.
+ *
  * @internal
  */
 export const tableDefinition = <Table extends Table_.AnyWithProps>(

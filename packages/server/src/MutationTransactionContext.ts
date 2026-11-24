@@ -62,6 +62,11 @@ const make = (
 });
 
 /**
+ * Backs transaction options on the generated runners. In a mutation, pass
+ * `useStaleSnapshot` to the yielded `QueryRunner`'s `runQuery`, or
+ * `transactionLimits` to the yielded `MutationRunner`'s `runMutation`, using
+ * the tags from `confect/_generated/services` instead.
+ *
  * @internal
  */
 export class MutationTransactionContext extends Context.Service<

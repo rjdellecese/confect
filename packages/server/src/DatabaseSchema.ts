@@ -29,6 +29,10 @@ export const isDatabaseSchema = (u: unknown): u is Any =>
  * `_generated/schema`. Assembling it does not evaluate table codecs or
  * construct Convex deployment validators.
  *
+ * For an application-wide annotation, use `typeof schema` with a type-only
+ * default import from `confect/_generated/schema`. Use an explicit table record
+ * when describing a subset.
+ *
  * **Gotchas**
  *
  * A value import loads every application table module. Use a type-only import
@@ -118,9 +122,9 @@ export type TableWithName<
 > = Extract<Tables<DatabaseSchema_>, { readonly tableName: TableName }>;
 
 /**
- * Construct a database schema from its bound table record. The record's keys
- * must match their tables' names. Table schemas remain lazy; construction only
- * stores the record. The empty case is `make({})`.
+ * Builds the registry exported by codegen without evaluating table codecs. For
+ * the application registry, default-import `confect/_generated/schema` rather
+ * than constructing it directly.
  *
  * @internal
  */

@@ -11,12 +11,13 @@ import spec from "./spec";
  * **Details**
  *
  * The \`public\` view exposes client-callable references and \`internal\` exposes
- * server-only references. Each carries its argument, result, and declared error
- * types; Confect evaluates codecs lazily.
+ * server-only references. Each view omits groups with no matching functions.
+ * Each Confect reference carries its argument, result, and declared error types,
+ * including errors from attached middleware. Codecs are evaluated lazily.
  *
  * **Gotchas**
  *
- * The views filter references at the type level. Convex enforces visibility on the
+ * Both views share one tree at runtime. Convex enforces visibility on the
  * deployed functions.
  *
  * @category references
@@ -296,24 +297,27 @@ export declare const DatabaseWriter: DatabaseWriter_.DatabaseWriterTag<typeof sc
  */
 export type DatabaseWriter = typeof DatabaseWriter.Identifier;
 /**
- * Transaction controls tag, provided in queries and mutations.
- * Prefer QueryRunner.runQuery with transactionLimits; it requests this service when options are supplied.
+ * Capability used by generated runners. Instead of yielding this tag, pass
+ * transactionLimits to runQuery on the yielded QueryRunner in a query or mutation.
  * @internal
  */
 export declare const QueryTransactionContext: typeof QueryTransactionContext_.QueryTransactionContext;
 /**
- * Effect environment requirement for {@link QueryTransactionContext}.
+ * Internal requirement of runQuery with transactionLimits. Use the QueryRunner
+ * from this module rather than importing the capability type.
  * @internal
  */
 export type QueryTransactionContext = typeof QueryTransactionContext.Identifier;
 /**
- * Mutation transaction controls tag, provided only in mutations.
- * QueryRunner requests this service for useStaleSnapshot; MutationRunner requests it for transactionLimits.
+ * Capability used by generated runners in mutations. Instead of yielding this
+ * tag, use runQuery with useStaleSnapshot or runMutation with transactionLimits
+ * on the yielded QueryRunner or MutationRunner.
  * @internal
  */
 export declare const MutationTransactionContext: typeof MutationTransactionContext_.MutationTransactionContext;
 /**
- * Effect environment requirement for {@link MutationTransactionContext}.
+ * Internal requirement of runner options in mutations. Use runQuery or runMutation
+ * on the yielded QueryRunner or MutationRunner rather than importing this type.
  * @internal
  */
 export type MutationTransactionContext = typeof MutationTransactionContext.Identifier;

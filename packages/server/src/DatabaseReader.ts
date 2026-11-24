@@ -81,6 +81,11 @@ type TableReader<Table_ extends Table.AnyWithProps, Docs> =
  * });
  * ```
  *
+ * @remarks
+ *   Codegen support: this interface names the generated service shape; do not
+ *   import it directly. Yield `DatabaseReader` from
+ *   `confect/_generated/services` and call `reader.table(handle)`.
+ *
  * @category Services
  */
 export interface DatabaseReaderService<
@@ -165,6 +170,10 @@ export const make = <Model extends GenericDataModel>(
  * `Handler`/runtime provisioning provide. The tag's _Service_ (what `yield*`
  * produces) carries `Docs`, so queries resolve to the named doc interfaces.
  *
+ * Annotates the generated `DatabaseReader` tag. For an Effect requirement,
+ * import the type `DatabaseReader` from `confect/_generated/services` instead
+ * of naming this tag type.
+ *
  * @internal
  */
 export type DatabaseReaderTag<
@@ -176,6 +185,10 @@ export type DatabaseReaderTag<
 >;
 
 /**
+ * Constructs the schema-specific tag for generated services. Import
+ * `DatabaseReader` from `confect/_generated/services` and yield it rather than
+ * calling this factory.
+ *
  * @internal
  */
 export const DatabaseReader = <
@@ -189,8 +202,8 @@ export const DatabaseReader = <
 
 /**
  * Service requirement for effects that read from this database schema. Yield
- * the generated `DatabaseReader` tag to acquire a {@link DatabaseReaderService}
- * with the application's named document types.
+ * `DatabaseReader` from `confect/_generated/services` and call
+ * `reader.table(handle)` to read the application's named document types.
  *
  * @category Services
  */

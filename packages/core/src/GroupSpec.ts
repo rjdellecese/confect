@@ -236,8 +236,9 @@ export type WithName<
 > = Extract<Group, { readonly name: Name_ }>;
 
 /**
- * Assigns a segment name to a leaf group created with {@link make} for typing
- * and refs.
+ * Codegen assigns this group's name from its file path. Default-export a group
+ * built with `GroupSpec.make()` or `GroupSpec.makeNode()` from a `.spec.ts`
+ * file rather than naming it directly.
  *
  * @internal
  */
@@ -249,6 +250,10 @@ export type NamedAt<Group extends Any, Name_ extends string> = Omit<
 };
 
 /**
+ * Types the nested groups assembled by codegen. Place group specs in the
+ * corresponding directories and use the default import from
+ * `confect/_generated/spec` for the complete contract.
+ *
  * @internal
  */
 export type AddGroups<
@@ -473,6 +478,10 @@ export const makeNode = (): GroupSpec<"Node", ""> =>
   });
 
 /**
+ * Codegen assigns this group's name from its file path. Default-export a group
+ * built with `GroupSpec.make()` or `GroupSpec.makeNode()` from a `.spec.ts`
+ * file rather than naming it directly.
+ *
  * @internal
  */
 export function withName<const Name_ extends string, Group extends Any>(
@@ -480,6 +489,10 @@ export function withName<const Name_ extends string, Group extends Any>(
   group: Group,
 ): NamedAt<Group, Name_>;
 /**
+ * Codegen assigns this group's name from its file path. Default-export a group
+ * built with `GroupSpec.make()` or `GroupSpec.makeNode()` from a `.spec.ts`
+ * file rather than naming it directly.
+ *
  * @internal
  */
 export function withName(name: string, group: Any): AnyWithProps {
@@ -501,6 +514,10 @@ export function withName(name: string, group: Any): AnyWithProps {
 }
 
 /**
+ * Nests child groups during spec assembly. Define their paths with `.spec.ts`
+ * files and import the assembled contract from `confect/_generated/spec`
+ * instead of attaching them directly.
+ *
  * @internal
  */
 export const addGroupsAt = (

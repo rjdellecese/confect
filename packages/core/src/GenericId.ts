@@ -1,3 +1,12 @@
+/**
+ * Implementation of the generated ID helper. Use `Id` from
+ * `confect/_generated/id` rather than this package subpath.
+ *
+ * @module
+ *
+ * @internal
+ */
+
 import type { GenericId as ConvexGenericId } from "convex/values";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
@@ -6,6 +15,9 @@ import * as SchemaAST from "effect/SchemaAST";
 const ConvexId = "~@confect/core/ConvexId";
 
 /**
+ * Builds the schema behind the generated ID helper. Use `Id(tableName)` from
+ * `confect/_generated/id` rather than calling this constructor directly.
+ *
  * @internal
  */
 export const GenericId = <TableName extends string>(
@@ -17,11 +29,10 @@ export const GenericId = <TableName extends string>(
   );
 
 /**
- * A Convex document ID branded with its table name. The generated
- * `Id<TableName>` helper uses this type to keep IDs from different tables
- * distinct at compile time. The brand does not prove that a document exists.
+ * Codegen uses this to type document IDs. In application code, import `Id` from
+ * `confect/_generated/id` and use `Id<TableName>`.
  *
- * @category Models
+ * @internal
  */
 export type GenericId<TableName extends string> = ConvexGenericId<TableName>;
 

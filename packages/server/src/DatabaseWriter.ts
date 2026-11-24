@@ -35,9 +35,8 @@ export type PatchValue<Doc> = {
 
 /**
  * Write operations for the application table selected by
- * `DatabaseWriterService.table`. They accept decoded user fields and use the
- * table's codec to produce the stored values. Native database failures are
- * defects.
+ * `writer.table(handle)`. They accept decoded user fields and use the table's
+ * codec to produce the stored values. Native database failures are defects.
  *
  * @category Models
  */
@@ -149,6 +148,11 @@ export interface DatabaseWriterTableAccessor<
  * });
  * ```
  *
+ * @remarks
+ *   Codegen support: this interface names the generated service shape; do not
+ *   import it directly. Yield `DatabaseWriter` from
+ *   `confect/_generated/services` and call `writer.table(handle)`.
+ *
  * @category Services
  */
 export interface DatabaseWriterService<
@@ -191,6 +195,10 @@ export interface DatabaseWriterService<
  * The tag's _Identifier_ is `Docs`-independent (see `DatabaseReaderTag`); only
  * the _Service_ carries `Docs` so writer inputs print the named doc
  * interfaces.
+ *
+ * Annotates the generated `DatabaseWriter` tag. For an Effect requirement,
+ * import the type `DatabaseWriter` from `confect/_generated/services` instead
+ * of naming this tag type.
  *
  * @internal
  */
@@ -291,6 +299,10 @@ export const make = <Model extends GenericDataModel>(
 };
 
 /**
+ * Constructs the schema-specific tag for generated services. Import
+ * `DatabaseWriter` from `confect/_generated/services` and yield it rather than
+ * calling this factory.
+ *
  * @internal
  */
 export const DatabaseWriter = <
@@ -304,8 +316,8 @@ export const DatabaseWriter = <
 
 /**
  * Service requirement for effects that write to this database schema. Yield the
- * generated `DatabaseWriter` tag to acquire a {@link DatabaseWriterService} with
- * the application's named document types.
+ * `DatabaseWriter` tag from `confect/_generated/services` and call
+ * `writer.table(handle)` to write the application's named document types.
  *
  * @category Services
  */

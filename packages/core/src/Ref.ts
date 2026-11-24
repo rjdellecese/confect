@@ -498,6 +498,10 @@ export type FunctionReference<Ref_ extends Any> = ConvexFunctionReference<
 >;
 
 /**
+ * Computes the type of a leaf in the generated ref tree. Use `typeof
+ * refs.public.group.fn` or `typeof refs.internal.group.fn` from the default
+ * `confect/_generated/refs` import for a concrete function.
+ *
  * @internal
  */
 export type FromFunctionSpec<
@@ -554,6 +558,10 @@ type FromFunctionSpecHelper<
         >;
 
 /**
+ * Builds a leaf in the generated ref tree. Pass the corresponding `refs.public`
+ * or `refs.internal` leaf from `confect/_generated/refs` to a client, runner,
+ * or scheduler instead of constructing it.
+ *
  * @internal
  */
 export const make = <FunctionSpec_ extends FunctionSpec.AnyWithProps>(

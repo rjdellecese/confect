@@ -2,6 +2,10 @@ import type { GenericDataModel, GenericQueryCtx } from "convex/server";
 import * as Context from "effect/Context";
 
 /**
+ * Annotates the generated `QueryCtx` tag. For an Effect requirement, import the
+ * type `QueryCtx` from `confect/_generated/services` instead of naming this tag
+ * type.
+ *
  * @internal
  */
 export type QueryCtxTag<DataModel extends GenericDataModel> = Context.Service<
@@ -10,6 +14,10 @@ export type QueryCtxTag<DataModel extends GenericDataModel> = Context.Service<
 >;
 
 /**
+ * Constructs the schema-specific tag for generated services. Import `QueryCtx`
+ * from `confect/_generated/services` and yield it rather than calling this
+ * factory.
+ *
  * @internal
  */
 export const QueryCtx = <

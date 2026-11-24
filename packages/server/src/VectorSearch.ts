@@ -19,6 +19,11 @@ type ConvexVectorSearch<DataModel_ extends DataModel.AnyWithProps> =
  * the generated `VectorSearch` tag in an action or a schema-typed HTTP router
  * to obtain the search function.
  *
+ * @remarks
+ *   Codegen support: this interface names the generated service shape; do not
+ *   import it directly. Yield `VectorSearch` from `confect/_generated/services`
+ *   and call the resulting search function.
+ *
  * @category Services
  */
 export interface VectorSearchService<
@@ -61,6 +66,10 @@ export interface VectorSearchService<
 }
 
 /**
+ * Annotates the generated `VectorSearch` tag. For an Effect requirement, import
+ * the type `VectorSearch` from `confect/_generated/services` instead of naming
+ * this tag type.
+ *
  * @internal
  */
 export type VectorSearchTag<DataModel_ extends DataModel.AnyWithProps> =
@@ -80,6 +89,10 @@ export const make =
     Effect.promise(() => vectorSearch(tableName, indexName, query));
 
 /**
+ * Constructs the schema-specific tag for generated services. Import
+ * `VectorSearch` from `confect/_generated/services` and yield it rather than
+ * calling this factory.
+ *
  * @internal
  */
 export const VectorSearch = <
@@ -93,9 +106,10 @@ export const VectorSearch = <
  * Callable vector search service specialized to the application's data model.
  * Its table names, index names, and filter fields come from that model.
  *
- * @category Services
+ * Yield `VectorSearch` from `confect/_generated/services` and call the returned
+ * function to get ranked document IDs and scores.
  *
- * @see {@link VectorSearchService} for the search signature and ranked result shape.
+ * @category Services
  */
 export type VectorSearch<DataModel_ extends DataModel.AnyWithProps> =
   VectorSearchService<DataModel_>;

@@ -1,3 +1,12 @@
+/**
+ * Builds the application's generated function refs. Default-import `refs` from
+ * `confect/_generated/refs` rather than importing this package subpath.
+ *
+ * @module
+ *
+ * @internal
+ */
+
 import type { Types } from "effect";
 import { pipe } from "effect/Function";
 import * as Option from "effect/Option";
@@ -9,12 +18,11 @@ import * as Ref from "./Ref";
 import * as Spec from "./Spec";
 
 /**
- * A generated tree of function refs nested by group and function name.
- * `Predicate` limits the type to matching refs, such as public functions, and
- * omits groups with no matches. Each Confect ref's failure type includes the
- * function's own errors and those of its middleware.
+ * Computes the filtered tree used by generated function refs. For an
+ * application type, use `typeof refs.public` or `typeof refs.internal` on the
+ * default import from `confect/_generated/refs`.
  *
- * @category Utility types
+ * @internal
  */
 export type Refs<
   Spec_ extends Spec.AnyWithProps,
@@ -22,15 +30,11 @@ export type Refs<
 > = Types.Simplify<OmitEmpty<Helper<Spec.Groups<Spec_>, Predicate>>>;
 
 /**
- * The generated project's public and internal views of its function refs.
+ * Names the two views of a generated ref tree. Use the default `refs` from
+ * `confect/_generated/refs` and its `public` and `internal` members instead of
+ * naming this interface.
  *
- * **Gotchas**
- *
- * The two views have different TypeScript types but share one tree at runtime.
- * Filtering by visibility is not an authorization check; Convex enforces the
- * deployed function's visibility.
- *
- * @category Models
+ * @internal
  */
 export interface FromSpec<Spec_ extends Spec.AnyWithProps> {
   /**
@@ -124,6 +128,9 @@ type Any =
   | Ref.Any;
 
 /**
+ * Builds the generated ref tree from the project spec. Default-import `refs`
+ * from `confect/_generated/refs` instead of constructing the tree directly.
+ *
  * @internal
  */
 export const make = <Spec_ extends Spec.AnyWithProps>(

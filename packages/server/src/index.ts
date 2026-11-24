@@ -60,6 +60,10 @@ export * as BlobNotFoundError from "./BlobNotFoundError";
  */
 export * as ConvexConfigProvider from "./ConvexConfigProvider";
 /**
+ * Generated deployment modules register each group's handlers. In `.impl.ts`
+ * use `FunctionImpl.make` and `GroupImpl.finalize` from
+ * `confect/_generated/server` rather than registering functions directly.
+ *
  * @internal
  */
 export * as ConvexFunctionDefinitions from "./ConvexFunctionDefinitions";
@@ -195,6 +199,11 @@ export * as MutationCtx from "./MutationCtx";
  */
 export * as MutationRunner from "./MutationRunner";
 /**
+ * Backs transaction options on the generated runners. In a mutation, pass
+ * `useStaleSnapshot` to the yielded `QueryRunner`'s `runQuery`, or
+ * `transactionLimits` to the yielded `MutationRunner`'s `runMutation`, using
+ * the tags from `confect/_generated/services` instead.
+ *
  * @internal
  */
 export * as MutationTransactionContext from "./MutationTransactionContext";
@@ -226,6 +235,10 @@ export * as QueryInitializer from "./QueryInitializer";
  */
 export * as QueryRunner from "./QueryRunner";
 /**
+ * Backs transaction options on the generated runners. Pass `transactionLimits`
+ * to `runQuery` on the yielded `QueryRunner` from `confect/_generated/services`
+ * instead of requesting this capability directly.
+ *
  * @internal
  */
 export * as QueryTransactionContext from "./QueryTransactionContext";
@@ -287,6 +300,10 @@ export * as QueryStreamIndexRange from "./QueryStreamIndexRange";
  */
 export * as QueryStreamReadBudget from "./QueryStreamReadBudget";
 /**
+ * Generated deployment modules register each group's handlers. In `.impl.ts`
+ * use `FunctionImpl.make` and `GroupImpl.finalize` from
+ * `confect/_generated/server` rather than registering functions directly.
+ *
  * @internal
  */
 export * as RegisteredConvexFunction from "./RegisteredConvexFunction";
@@ -295,6 +312,10 @@ export * as RegisteredConvexFunction from "./RegisteredConvexFunction";
  */
 export * as RegisteredFunction from "./RegisteredFunction";
 /**
+ * Generated deployment modules register each group's handlers. In `.impl.ts`
+ * use `FunctionImpl.make` and `GroupImpl.finalize` from
+ * `confect/_generated/server` rather than registering functions directly.
+ *
  * @internal
  */
 export * as RegisteredFunctions from "./RegisteredFunctions";

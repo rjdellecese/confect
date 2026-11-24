@@ -22,6 +22,10 @@ export const isSpec = (u: unknown): u is AnyWithProps =>
  * middleware. Import the codegen-assembled spec rather than constructing it by
  * hand; it does not describe the database schema.
  *
+ * For the application's complete contract, use `typeof spec` with a type-only
+ * default import from `confect/_generated/spec`. Specify the group record
+ * explicitly for a handwritten subset.
+ *
  * **Details**
  *
  * A spec can contain both Convex groups and Node.js action groups. The runtime
@@ -71,6 +75,9 @@ export const groups = <Spec_ extends AnyWithProps>(
 ): Spec_[TypeId] => self[TypeId];
 
 /**
+ * Assembles named groups for the generated project contract. Default-import
+ * `confect/_generated/spec` rather than building the root directly.
+ *
  * @internal
  */
 export const fromGroups = (
