@@ -18,7 +18,7 @@
     "jsonc-parser": "^3.3.1"
   },
   "devDependencies": {
-    "@convex-dev/workpool": "0.4.16",
+    "@convex-dev/workpool": "0.5.0",
     "@effect/tsgo": "0.73.2",
     "@effect/vitest": "4.1.0",
     "@types/node": "26.6.6",

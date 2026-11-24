@@ -286,8 +286,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/server
       '@convex-dev/workpool':
-        specifier: 0.4.16
-        version: 0.4.16(@standard-schema/spec@1.1.0)(convex-helpers@0.1.136(@standard-schema/spec@1.1.0)(convex@1.51.0(react@19.3.1))(hono@4.13.5)(prettier@3.9.5)(react@19.3.1)(typescript@5.9.3)(zod@3.25.76))(convex@1.51.0(react@19.3.1))(hono@4.13.5)(prettier@3.9.5)(react@19.3.1)(typescript@5.9.3)(zod@3.25.76)
+        specifier: 0.5.0
+        version: 0.5.0(@standard-schema/spec@1.1.0)(convex-helpers@0.1.136(@standard-schema/spec@1.1.0)(convex@1.51.0(react@19.3.1))(hono@4.13.5)(prettier@3.9.5)(react@19.3.1)(typescript@5.9.3)(zod@3.25.76))(convex@1.51.0(react@19.3.1))(hono@4.13.5)(prettier@3.9.5)(react@19.3.1)(typescript@5.9.3)(zod@3.25.76)
       convex:
         specifier: 1.51.0
         version: 1.51.0(react@19.3.1)
@@ -357,8 +357,8 @@ importers:
         version: 3.3.1
     devDependencies:
       '@convex-dev/workpool':
-        specifier: 0.4.16
-        version: 0.4.16(@standard-schema/spec@1.1.0)(convex-helpers@0.1.136(@standard-schema/spec@1.1.0)(convex@1.51.0(react@19.3.1))(hono@4.13.5)(prettier@3.9.5)(react@19.3.1)(typescript@5.9.3)(zod@3.25.76))(convex@1.51.0(react@19.3.1))(hono@4.13.5)(prettier@3.9.5)(react@19.3.1)(typescript@5.9.3)(zod@3.25.76)
+        specifier: 0.5.0
+        version: 0.5.0(@standard-schema/spec@1.1.0)(convex-helpers@0.1.136(@standard-schema/spec@1.1.0)(convex@1.51.0(react@19.3.1))(hono@4.13.5)(prettier@3.9.5)(react@19.3.1)(typescript@5.9.3)(zod@3.25.76))(convex@1.51.0(react@19.3.1))(hono@4.13.5)(prettier@3.9.5)(react@19.3.1)(typescript@5.9.3)(zod@3.25.76)
       '@effect/tsgo':
         specifier: 0.73.2
         version: 0.73.2
@@ -602,8 +602,8 @@ importers:
         specifier: workspace:*
         version: link:../../tools/test-types
       convex-test:
-        specifier: 0.0.72
-        version: 0.0.72(convex@1.51.0(react@19.3.1))
+        specifier: 0.0.73
+        version: 0.0.73(convex@1.51.0(react@19.3.1))
       dotenv:
         specifier: 18.0.10
         version: 18.0.10
@@ -673,7 +673,7 @@ importers:
         version: 1.51.0(react@19.3.1)
       convex-test:
         specifier: '>=0.0.67 <0.1.0'
-        version: 0.0.72(convex@1.51.0(react@19.3.1))
+        version: 0.0.73(convex@1.51.0(react@19.3.1))
     devDependencies:
       '@types/node':
         specifier: 26.6.6
@@ -996,8 +996,8 @@ packages:
     peerDependencies:
       convex: 1.51.0
 
-  '@convex-dev/workpool@0.4.16':
-    resolution: {integrity: sha512-QtR9lEidys0yGtjlbtJzhcC6RGxs4uICnewWZmiolDnUlX4Y8z5v4hGwDzON3TRDIzL3Pd/WPY/jXRKZnQW4Bg==}
+  '@convex-dev/workpool@0.5.0':
+    resolution: {integrity: sha512-BKa4ZPOP22+IQGC09J3WvOI4sY4Yg0C1ZsitjfAYvP9UQRxRz4XnH77HeBwOkYO4TO3/hyy5HfSF5UtWUBBXXQ==}
     peerDependencies:
       convex: 1.51.0
       convex-helpers: ^0.1.94
@@ -3958,8 +3958,8 @@ packages:
       zod:
         optional: true
 
-  convex-test@0.0.72:
-    resolution: {integrity: sha512-yeI8w2PKT/TO3VnXLWJPz2CDCwaKx8sIcy8HaFJDvcqwdXZBKY+EtD2MOU+iIih+O87Saudx2SVl/1sJZmZyOA==}
+  convex-test@0.0.73:
+    resolution: {integrity: sha512-4VAuW26Iy/6mMKsmWfS3e97golfO0mPGd/qDcN5IT4uCeXHP1a3tYIaOPgXhOKaEuBIw93qLa2URB9uH3Mqo0Q==}
     peerDependencies:
       convex: 1.51.0
 
@@ -7237,7 +7237,7 @@ snapshots:
       - typescript
       - zod
 
-  '@convex-dev/workpool@0.4.16(@standard-schema/spec@1.1.0)(convex-helpers@0.1.136(@standard-schema/spec@1.1.0)(convex@1.51.0(react@19.3.1))(hono@4.13.5)(prettier@3.9.5)(react@19.3.1)(typescript@5.9.3)(zod@3.25.76))(convex@1.51.0(react@19.3.1))(hono@4.13.5)(prettier@3.9.5)(react@19.3.1)(typescript@5.9.3)(zod@3.25.76)':
+  '@convex-dev/workpool@0.5.0(@standard-schema/spec@1.1.0)(convex-helpers@0.1.136(@standard-schema/spec@1.1.0)(convex@1.51.0(react@19.3.1))(hono@4.13.5)(prettier@3.9.5)(react@19.3.1)(typescript@5.9.3)(zod@3.25.76))(convex@1.51.0(react@19.3.1))(hono@4.13.5)(prettier@3.9.5)(react@19.3.1)(typescript@5.9.3)(zod@3.25.76)':
     dependencies:
       '@convex-dev/batch-worker': 0.3.6(@standard-schema/spec@1.1.0)(convex@1.51.0(react@19.3.1))(hono@4.13.5)(prettier@3.9.5)(react@19.3.1)(typescript@5.9.3)(zod@3.25.76)
       convex: 1.51.0(react@19.3.1)
@@ -9729,7 +9729,7 @@ snapshots:
       typescript: 5.9.3
       zod: 3.25.76
 
-  convex-test@0.0.72(convex@1.51.0(react@19.3.1)):
+  convex-test@0.0.73(convex@1.51.0(react@19.3.1)):
     dependencies:
       convex: 1.51.0(react@19.3.1)
 
