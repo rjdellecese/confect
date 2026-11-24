@@ -24,7 +24,7 @@ const JsonString = Schema.fromJsonString(Schema.String);
 
 export class SkillIgnoreError extends Schema.TaggedError<
   SkillIgnoreError,
-  {}
+  { readonly brand: unique symbol }
 >()("SkillIgnoreError", { reason: Schema.String }) {
   readonly [Runtime.errorReported] = false;
 
@@ -45,10 +45,10 @@ export const installedDirectoryName = (name: string): string =>
     0,
     255,
   )(
-    Str.replace(
+    Str.replaceAll(
       /^[.-]+|[.-]+$/g,
       "",
-    )(Str.replace(/[^a-z0-9._]+/g, "-")(Str.toLowerCase(name))),
+    )(Str.replaceAll(/[^a-z0-9._]+/g, "-")(Str.toLowerCase(name))),
   ) || "unnamed-skill";
 
 export const vendoredSkillDirectories = Effect.fnUntraced(function* (
@@ -114,7 +114,9 @@ export const updateManagedBlock = Effect.fnUntraced(function* (
   managedBlock: string,
 ) {
   const lines = Str.split("\n")(Str.replaceAll("\r\n", "\n")(ignoreText));
-  if (lines.at(-1) === "") lines.pop();
+  if (lines.at(-1) === "") {
+    lines.pop();
+  }
 
   const startIndexes = Array.flatMap(lines, (line, index) =>
     line === START_MARKER ? [index] : [],
@@ -136,7 +138,9 @@ export const updateManagedBlock = Effect.fnUntraced(function* (
 
   const managedLines = Str.split("\n")(managedBlock);
   if (startIndexes.length === 0) {
-    if (lines.length > 0 && lines.at(-1) !== "") lines.push("");
+    if (lines.length > 0 && lines.at(-1) !== "") {
+      lines.push("");
+    }
     lines.push(...managedLines);
   } else {
     const start = startIndexes[0];

@@ -1,12 +1,12 @@
 import { FunctionSpec, GroupSpec } from "@confect/core";
 import * as Schema from "effect/Schema";
 
-export class RejectedWrite extends Schema.TaggedError<RejectedWrite, {}>()(
-  "RejectedWrite",
-  {
-    value: Schema.String,
-  },
-) {}
+export class RejectedWrite extends Schema.TaggedError<
+  RejectedWrite,
+  { readonly brand: unique symbol }
+>()("RejectedWrite", {
+  value: Schema.String,
+}) {}
 
 export default GroupSpec.make()
   .addFunction(

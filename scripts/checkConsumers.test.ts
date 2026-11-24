@@ -113,12 +113,12 @@ test("walks actual package resolution paths, including a nested peer mismatch", 
           '{"name":"companion","version":"1.0.0","peerDependencies":{"effect":"^4.0.3"}}',
         ],
       ]) {
-        yield* fs.makeDirectory(path.join(directory, location!), {
+        yield* fs.makeDirectory(path.join(directory, location), {
           recursive: true,
         });
         yield* fs.writeFileString(
-          path.join(directory, location!, "package.json"),
-          manifest!,
+          path.join(directory, location, "package.json"),
+          manifest,
         );
       }
       const graph = yield* inspectGraph(directory);

@@ -11,7 +11,7 @@ export const requireQueryStreamExperimental = Rule.define({
     description:
       "Require canonical experimental tags on query-stream exports and overload signatures.",
   }),
-  create: function* () {
+  *create() {
     const ctx = yield* RuleContext;
     const filename = Str.replaceAll("\\", "/")(ctx.filename);
     const isModule = /\/packages\/[^/]+\/src\/QueryStream[^/]*\.ts$/.test(
@@ -25,24 +25,29 @@ export const requireQueryStreamExperimental = Rule.define({
         | ESTree.ExportAllDeclaration
         | ESTree.ExportDefaultDeclaration,
     ) => {
-      if (node.parent.type !== "Program") return Effect.void;
+      if (node.parent.type !== "Program") {
+        return Effect.void;
+      }
 
       if (
         !isModule &&
         !(
           isBarrel &&
           "source" in node &&
-          node.source != null &&
+          node.source !== null &&
+          node.source !== undefined &&
           /^\.\/QueryStream[^/]*$/.test(node.source.value)
         )
-      )
+      ) {
         return Effect.void;
+      }
 
       const declaration =
         node.type === "ExportAllDeclaration" ? undefined : node.declaration;
       if (
         declaration?.type === "FunctionDeclaration" &&
-        declaration.body != null &&
+        declaration.body !== null &&
+        declaration.body !== undefined &&
         Array.some(
           ctx.sourceCode.ast.body,
           (statement) =>
@@ -52,8 +57,9 @@ export const requireQueryStreamExperimental = Rule.define({
             statement.declaration?.type === "TSDeclareFunction" &&
             statement.declaration.id?.name === declaration.id?.name,
         )
-      )
+      ) {
         return Effect.void;
+      }
 
       const comment = ctx.sourceCode.getCommentsBefore(node).at(-1);
       if (
@@ -67,8 +73,9 @@ export const requireQueryStreamExperimental = Rule.define({
           (line) =>
             Str.trim(Str.replace(/^\s*\*\s?/, "")(line)) === "@experimental",
         )
-      )
+      ) {
         return Effect.void;
+      }
 
       return ctx.report(
         Diagnostic.make({

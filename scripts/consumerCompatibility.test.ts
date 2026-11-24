@@ -7,9 +7,8 @@ import {
   packedManifestProblems,
   profiles,
   provenanceProblems,
-  type Candidate,
-  type InstalledPackage,
 } from "./consumerCompatibility";
+import type { Candidate, InstalledPackage } from "./consumerCompatibility";
 
 const effect = (version: string): InstalledPackage => ({
   path: "/app/effect",

@@ -13,12 +13,15 @@ const runOnImport = (source: string) =>
     Testing.importDecl(source),
   );
 
+const unexpectedFix = () =>
+  expect.unreachable("Only replaceText should be called");
+
 describe("prefer-effect-vitest", () => {
   it("reports an import from vitest", () => {
     const result = runOnImport("vitest");
 
     expect(result).toHaveLength(1);
-    expect(Option.getOrThrow(Testing.messages(result)[0]!)).toContain(
+    expect(Option.getOrThrow(Testing.messages(result)[0])).toContain(
       '"@effect/vitest"',
     );
   });
@@ -58,7 +61,7 @@ describe("prefer-effect-vitest", () => {
     );
 
     expect(result).toHaveLength(1);
-    expect(result[0]!.diagnostic.fix).toBeUndefined();
+    expect(result[0].diagnostic.fix).toBeUndefined();
   });
 
   it("reports a namespace import", () => {
@@ -76,15 +79,25 @@ describe("prefer-effect-vitest", () => {
   it("autofixes the module specifier to @effect/vitest", () => {
     const result = runOnImport("vitest");
 
-    const fix = result[0]!.diagnostic.fix;
+    const fix = result[0].diagnostic.fix;
     expect(fix).toBeDefined();
 
-    const fixer = {
-      replaceText: (ranged: unknown, text: string) => ({ ranged, text }),
-    } as unknown as Fixer;
+    const fixer: Fixer = {
+      replaceText: (node, text) => {
+        expect(node).toEqual({ type: "Literal", value: "vitest" });
+        return { range: [0, 8], text };
+      },
+      replaceTextRange: unexpectedFix,
+      insertTextAfter: unexpectedFix,
+      insertTextAfterRange: unexpectedFix,
+      insertTextBefore: unexpectedFix,
+      insertTextBeforeRange: unexpectedFix,
+      remove: unexpectedFix,
+      removeRange: unexpectedFix,
+    };
 
     expect(fix!(fixer)).toEqual({
-      ranged: { type: "Literal", value: "vitest" },
+      range: [0, 8],
       text: '"@effect/vitest"',
     });
   });

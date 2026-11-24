@@ -14,6 +14,7 @@ const message =
  * some problems in resolving the mocks API."
  */
 const vitestOnlyNames = ["vi"];
+const isVitestOnly = (name: string) => Array.contains(vitestOnlyNames, name);
 
 const importedName = (
   specifier: ESTree.ImportDeclaration["specifiers"][number],
@@ -46,7 +47,7 @@ export const preferEffectVitest = Rule.define({
       'Import test APIs from "@effect/vitest" instead of "vitest" in test files.',
     fixable: "code",
   }),
-  create: function* () {
+  *create() {
     const ctx = yield* RuleContext;
     return Visitor.on("ImportDeclaration", (node) =>
       Option.match(AST.matchImport(node, "vitest"), {
@@ -55,8 +56,6 @@ export const preferEffectVitest = Rule.define({
           const importedNames = Array.getSomes(
             Array.map(matched.specifiers, importedName),
           );
-          const isVitestOnly = (name: string) =>
-            Array.contains(vitestOnlyNames, name);
 
           if (
             Array.isArrayNonEmpty(matched.specifiers) &&

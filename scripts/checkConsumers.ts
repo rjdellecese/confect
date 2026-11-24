@@ -25,11 +25,13 @@ import {
   packedManifestProblems,
   provenanceProblems,
   profiles,
-  type Candidate,
-  type InstalledPackage,
-  type Lane,
-  type Manager,
-  type Profile,
+} from "./consumerCompatibility";
+import type {
+  Candidate,
+  InstalledPackage,
+  Lane,
+  Manager,
+  Profile,
 } from "./consumerCompatibility";
 
 const Json = Schema.fromJsonString(Schema.Unknown, { space: 2 });
@@ -121,11 +123,12 @@ const command = Effect.fn("Consumer.command")(
       { concurrency: "unbounded" },
     );
     const output = `${result.stdout}${result.stderr}`;
-    if (result.status !== 0)
+    if (result.status !== 0) {
       return yield* ConsumerGateFailure.make({
         phase,
         details: { program, args, status: result.status, output },
       });
+    }
     return output;
   },
   Effect.scoped,
@@ -141,10 +144,13 @@ const resolvePackage = Effect.fn("Consumer.resolvePackage")(function* (
   let current = directory;
   while (true) {
     const location = path.join(current, "node_modules", name);
-    if (yield* fs.exists(path.join(location, "package.json")))
+    if (yield* fs.exists(path.join(location, "package.json"))) {
       return yield* fs.realPath(location);
+    }
     const parent = path.dirname(current);
-    if (parent === current) return;
+    if (parent === current) {
+      return;
+    }
     current = parent;
   }
 });
@@ -160,7 +166,9 @@ const resolutions = Effect.fn("Consumer.resolutions")(function* (
     ...manifest.peerDependencies,
   })) {
     const location = yield* resolvePackage(directory, name);
-    if (location !== undefined && location !== "") result[name] = location;
+    if (location !== undefined && location !== "") {
+      result[name] = location;
+    }
   }
   return result;
 });
@@ -176,8 +184,10 @@ export const inspectGraph = Effect.fn("Consumer.inspectGraph")(function* (
   const queue = Record.values(rootResolutions);
   const packages = new Map<string, InstalledPackage>();
   for (let i = 0; i < queue.length; i++) {
-    const location = queue[i]!;
-    if (packages.has(location)) continue;
+    const location = queue[i];
+    if (packages.has(location)) {
+      continue;
+    }
     const manifest = yield* manifestAt(location);
     const dependencies = yield* resolutions(location, manifest);
     packages.set(location, {
@@ -217,7 +227,7 @@ const candidatesFor = Effect.fn("Consumer.candidatesFor")(function* (
       output,
       `${Str.replace("/", "-")(Str.replace("@", "")(source.name))}-${source.version}.tgz`,
     );
-    if (artifacts === undefined || artifacts === "")
+    if (artifacts === undefined || artifacts === "") {
       yield* command(
         "pnpm",
         ["pack", "--pack-destination", output],
@@ -229,6 +239,7 @@ const candidatesFor = Effect.fn("Consumer.candidatesFor")(function* (
         undefined,
         "pack",
       );
+    }
     const packed = yield* command(
       "tar",
       ["-xOf", tarball, "package/package.json"],
@@ -239,11 +250,12 @@ const candidatesFor = Effect.fn("Consumer.candidatesFor")(function* (
       Effect.flatMap(Schema.decodeEffect(Schema.fromJsonString(Manifest))),
     );
     const problems = packedManifestProblems(source, packed, versions);
-    if (problems.length > 0)
+    if (problems.length > 0) {
       return yield* ConsumerGateFailure.make({
         phase: "packed manifest",
         details: problems,
       });
+    }
     const tarballBytes = yield* fs.readFile(tarball);
     const integrity = `sha512-${new Bun.CryptoHasher("sha512").update(tarballBytes).digest("base64")}`;
     candidates.push({ manifest: packed, tarball, integrity });
@@ -298,7 +310,7 @@ const verifyProvenance = Effect.fn("Consumer.verifyProvenance")(function* (
             : undefined,
           manager,
         ).length > 0
-      )
+      ) {
         return yield* ConsumerGateFailure.make({
           phase: "candidate provenance",
           details: {
@@ -307,6 +319,7 @@ const verifyProvenance = Effect.fn("Consumer.verifyProvenance")(function* (
             expected: candidate.tarball,
           },
         });
+      }
     }
     yield* command(
       executable,
@@ -334,7 +347,7 @@ const verifyProvenance = Effect.fn("Consumer.verifyProvenance")(function* (
             : undefined,
           manager,
         ).length > 0
-      )
+      ) {
         return yield* ConsumerGateFailure.make({
           phase: "candidate provenance",
           details: {
@@ -343,6 +356,7 @@ const verifyProvenance = Effect.fn("Consumer.verifyProvenance")(function* (
             expected: candidate.tarball,
           },
         });
+      }
     }
   }
 });
@@ -362,11 +376,12 @@ export const checkConsumer = Effect.fn("Consumer.check")(function* (
   const directory = yield* fs
     .makeTempDirectory({ directory: tmpdir(), prefix: "confect-consumer-" })
     .pipe(Effect.flatMap(fs.realPath));
-  if (Str.startsWith(`${repository}/`)(directory))
+  if (Str.startsWith(`${repository}/`)(directory)) {
     return yield* ConsumerGateFailure.make({
       phase: "isolation",
       details: directory,
     });
+  }
   const executablePath = yield* Config.String("PATH");
   const executable = yield* packageManagerExecutable(
     manager,
@@ -379,9 +394,9 @@ export const checkConsumer = Effect.fn("Consumer.check")(function* (
     path.sep === "/" ? ":" : ";",
     repository,
   );
-  yield* fs.makeDirectory(env.HOME!, { recursive: true });
-  yield* fs.writeFileString(env.npm_config_userconfig!, "");
-  yield* fs.writeFileString(env.npm_config_globalconfig!, "");
+  yield* fs.makeDirectory(env.HOME, { recursive: true });
+  yield* fs.writeFileString(env.npm_config_userconfig, "");
+  yield* fs.writeFileString(env.npm_config_globalconfig, "");
   const result: Record<string, unknown> = {
     profile,
     lane,
@@ -461,7 +476,9 @@ export const checkConsumer = Effect.fn("Consumer.check")(function* (
       node: Str.trim(nodeVersion),
       [manager]: Str.trim(managerVersion),
     };
-    for (const [file, contents] of Record.toEntries(consumerFiles(profile))) {
+    for (const [file, contents] of Record.toEntries<string, string>(
+      consumerFiles(profile),
+    )) {
       const target = path.join(directory, file);
       yield* fs.makeDirectory(path.dirname(target), { recursive: true });
       yield* fs.writeFileString(target, contents);
@@ -473,11 +490,12 @@ export const checkConsumer = Effect.fn("Consumer.check")(function* (
     const output = yield* command(executable, args, directory, env, "install");
     result.installOutput = output;
     const problems = installProblems(0, output);
-    if (problems.length > 0)
+    if (problems.length > 0) {
       return yield* ConsumerGateFailure.make({
         phase: "install diagnostics",
         details: { problems, output },
       });
+    }
     const graph = yield* inspectGraph(directory);
     result.graph = graph;
     const invalid = graphProblems(
@@ -486,11 +504,12 @@ export const checkConsumer = Effect.fn("Consumer.check")(function* (
       graph.rootResolutions,
       directory,
     );
-    if (invalid.length > 0)
+    if (invalid.length > 0) {
       return yield* ConsumerGateFailure.make({
         phase: "installed graph",
         details: invalid,
       });
+    }
     yield* verifyProvenance(directory, manager, executable, candidates, env);
     result.codegen = yield* command(
       "node",
@@ -545,12 +564,13 @@ if (import.meta.main) {
       (profile !== "react" && profile !== "foldkit") ||
       (lane !== "baseline" && lane !== "fresh") ||
       (manager !== "npm" && manager !== "pnpm")
-    )
+    ) {
       return yield* ConsumerGateFailure.make({
         phase: "arguments",
         details:
           "Usage: --profile react|foldkit --lane baseline|fresh --manager npm|pnpm [--artifacts DIR] [--report FILE]",
       });
+    }
     const result = yield* checkConsumer(
       profile,
       lane,
@@ -578,10 +598,11 @@ if (import.meta.main) {
     yield* Console.log(
       `Full graph, artifact identities, and diagnostics: ${report}`,
     );
-    if (result.acceptance !== "passed")
+    if (result.acceptance !== "passed") {
       return yield* ConsumerGateFailure.make({
         phase: "acceptance",
         details: result.failure,
       });
+    }
   }).pipe(Effect.provide(BunServices.layer), BunRuntime.runMain);
 }

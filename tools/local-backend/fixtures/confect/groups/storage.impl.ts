@@ -144,21 +144,24 @@ const exerciseFiles = FunctionImpl.make(
   ({ sizes, storageIds }) =>
     Effect.gen(function* () {
       const storageService = yield* Storage;
-      const storedIds: GenericId<"_storage">[] = [];
-      const failures: string[] = [];
+      const storedIds: Array<GenericId<"_storage">> = [];
+      const failures: Array<string> = [];
       for (const size of sizes) {
         const result = yield* Effect.exit(
           storageService.store(new Blob([new Uint8Array(size)])),
         );
-        if (Exit.isFailure(result)) failures.push(Cause.pretty(result.cause));
-        else {
+        if (Exit.isFailure(result)) {
+          failures.push(Cause.pretty(result.cause));
+        } else {
           storedIds.push(result.value);
           yield* storageService.get(result.value);
         }
       }
       for (const storageId of storageIds) {
         const result = yield* Effect.exit(storageService.get(storageId));
-        if (Exit.isFailure(result)) failures.push(Cause.pretty(result.cause));
+        if (Exit.isFailure(result)) {
+          failures.push(Cause.pretty(result.cause));
+        }
       }
       return {
         storageIds: storedIds,
