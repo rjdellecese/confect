@@ -167,7 +167,9 @@ layer(TestLayer, { timeout: "120 seconds" })("declaration emit", (it) => {
     () =>
       Effect.gen(function* () {
         const { declarations } = yield* DeclarationEmit;
-        expect(declarations["services.ts"]).toMatchSnapshot();
+        expect(declarations["services.ts"]).toMatchSnapshot(
+          "generated service types",
+        );
       }),
     120_000,
   );
@@ -193,7 +195,7 @@ layer(TestLayer, { timeout: "120 seconds" })("declaration emit", (it) => {
         const { declarations, diagnostics } = yield* DeclarationEmit;
 
         expect(diagnostics).toBe("");
-        expect(declarations[entry]).toMatchSnapshot();
+        expect(declarations[entry]).toMatchSnapshot("generated declaration");
       }),
     120_000,
   );

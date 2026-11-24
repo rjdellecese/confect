@@ -1,6 +1,7 @@
 import { Ref } from "@confect/core";
 import type { CronJob as ConvexCronJob } from "convex/server";
-import { cronJobs as makeConvexCrons, type Crons } from "convex/server";
+import { cronJobs as makeConvexCrons } from "convex/server";
+import type { Crons } from "convex/server";
 import { pipe } from "effect/Function";
 import * as Array from "effect/Array";
 import * as Cron from "effect/Cron";
@@ -218,7 +219,9 @@ export const cronToConvexCronString = (cron: Cron.Cron): string => {
 };
 
 const setToField = (set: ReadonlySet<number>): string => {
-  if (set.size === 0) return "*";
+  if (set.size === 0) {
+    return "*";
+  }
   return pipe(
     set,
     Array.sort(Order.Number),

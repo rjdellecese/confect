@@ -15,6 +15,20 @@ import * as HttpRouter from "effect/http/HttpRouter";
 import * as HttpServerResponse from "effect/http/HttpServerResponse";
 import { vi } from "vitest";
 
+const mount = <S extends DatabaseSchema.AnyWithProps>(
+  search: VectorSearch.VectorSearchTag<DataModel.FromDatabaseSchema<S>>,
+) =>
+  HttpRouter_.make<S>(
+    HttpRouter.add(
+      "GET",
+      "/health",
+      Effect.as(search, HttpServerResponse.text("ok")),
+    ),
+  );
+
+const embeddingFields = () =>
+  Schema.Struct({ embedding: Schema.Array(Schema.Finite) });
+
 describe("HttpRouter", () => {
   const documents = Table.make(() =>
     Schema.Struct({
@@ -124,23 +138,13 @@ describe("HttpRouter", () => {
   });
 
   it("allows a generic schema's vector search in its HTTP handlers", () => {
-    const mount = <S extends DatabaseSchema.AnyWithProps>(
-      search: VectorSearch.VectorSearchTag<DataModel.FromDatabaseSchema<S>>,
-    ) =>
-      HttpRouter_.make<S>(
-        HttpRouter.add(
-          "GET",
-          "/health",
-          Effect.as(search, HttpServerResponse.text("ok")),
-        ),
-      );
-    mount<typeof schema>(Search);
+    expect(
+      mount<typeof schema>(Search).lookup("/health", "GET"),
+    ).not.toBeNull();
   });
 
   it("does not evaluate or alter table schemas when constructing a router", () => {
-    const fields = vi.fn(() =>
-      Schema.Struct({ embedding: Schema.Array(Schema.Finite) }),
-    );
+    const fields = vi.fn<typeof embeddingFields>(embeddingFields);
     const table = Table.make(fields).vectorIndex("embedding", {
       vectorField: "embedding",
       dimensions: 2,

@@ -192,7 +192,7 @@ describe("QueryStreamCursor serialization", () => {
       ),
     ).toEqual({
       runtimeLabels: ["created", "_id", "body", "_id"],
-      keyValues: keyValues,
+      keyValues,
     });
     expect(
       QueryStreamKey.values(

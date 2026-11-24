@@ -12,8 +12,8 @@ import * as HttpClientResponse from "effect/http/HttpClientResponse";
 import { vi } from "vitest";
 
 const { getServiceToken, getServiceUrl } = vi.hoisted(() => ({
-  getServiceToken: vi.fn(),
-  getServiceUrl: vi.fn(),
+  getServiceToken: vi.fn<typeof ConvexServer.getServiceToken>(),
+  getServiceUrl: vi.fn<typeof ConvexServer.getServiceUrl>(),
 }));
 
 vi.mock("convex/server", (importOriginal) =>

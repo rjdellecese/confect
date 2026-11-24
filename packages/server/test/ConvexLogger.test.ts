@@ -12,12 +12,12 @@ import { vi } from "vitest";
 
 const makeConsole = Effect.map(TestConsole.make, (console) => ({
   ...console,
-  debug: vi.fn(),
-  info: vi.fn(),
-  warn: vi.fn(),
-  error: vi.fn(),
-  log: vi.fn(),
-  trace: vi.fn(),
+  debug: vi.fn<typeof console.debug>(),
+  info: vi.fn<typeof console.info>(),
+  warn: vi.fn<typeof console.warn>(),
+  error: vi.fn<typeof console.error>(),
+  log: vi.fn<typeof console.log>(),
+  trace: vi.fn<typeof console.trace>(),
 }));
 
 describe("ConvexLogger", () => {

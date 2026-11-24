@@ -3,11 +3,14 @@ import * as Schema from "effect/Schema";
 import { Id } from "../_generated/id";
 import notesTable from "../_generated/tables/notes";
 
-export class NotFound extends Schema.TaggedError<NotFound, {}>()("NotFound", {
-  id: Schema.String,
-}) {}
+export class NotFound extends Schema.TaggedError<NotFound, unknown>()(
+  "NotFound",
+  {
+    id: Schema.String,
+  },
+) {}
 
-export class Forbidden extends Schema.TaggedError<Forbidden, {}>()(
+export class Forbidden extends Schema.TaggedError<Forbidden, unknown>()(
   "Forbidden",
   {
     reason: Schema.String,

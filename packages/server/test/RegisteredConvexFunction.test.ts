@@ -19,15 +19,26 @@ import { vi } from "vitest";
 
 afterEach(() => vi.restoreAllMocks());
 
+const handler = () => Effect.succeed("ok");
+const forwardedHandler = () => Promise.resolve("forwarded");
+
 vi.mock("convex/server", (importOriginal) =>
   importOriginal<typeof Convex>().then((original) => ({
     ...original,
-    queryGeneric: vi.fn(original.queryGeneric),
-    internalQueryGeneric: vi.fn(original.internalQueryGeneric),
-    mutationGeneric: vi.fn(original.mutationGeneric),
-    internalMutationGeneric: vi.fn(original.internalMutationGeneric),
-    actionGeneric: vi.fn(original.actionGeneric),
-    internalActionGeneric: vi.fn(original.internalActionGeneric),
+    queryGeneric: vi.fn<typeof original.queryGeneric>(original.queryGeneric),
+    internalQueryGeneric: vi.fn<typeof original.internalQueryGeneric>(
+      original.internalQueryGeneric,
+    ),
+    mutationGeneric: vi.fn<typeof original.mutationGeneric>(
+      original.mutationGeneric,
+    ),
+    internalMutationGeneric: vi.fn<typeof original.internalMutationGeneric>(
+      original.internalMutationGeneric,
+    ),
+    actionGeneric: vi.fn<typeof original.actionGeneric>(original.actionGeneric),
+    internalActionGeneric: vi.fn<typeof original.internalActionGeneric>(
+      original.internalActionGeneric,
+    ),
   })),
 );
 
@@ -86,7 +97,6 @@ describe("make", () => {
   ])(
     "prepares a closed definition and registers a $name handler",
     ({ spec, register }) => {
-      const handler = () => Effect.succeed("ok");
       const item = FunctionRegistryItem.make({
         functionSpec: spec,
         groupMiddlewareAttachments: [],
@@ -105,7 +115,6 @@ describe("make", () => {
       expect(Str.toLowerCase(prepared._tag)).toBe(
         `${spec.functionVisibility}${spec.runtimeAndFunctionType.functionType}`,
       );
-      const forwardedHandler = () => Promise.resolve("forwarded");
       const registered = RegisteredConvexFunction.register({
         ...prepared,
         handler: forwardedHandler,

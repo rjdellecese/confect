@@ -76,7 +76,7 @@ layer(contextMetadataLayer, { timeout: "120 seconds" })(
           const warmQuerySubjects = new Set<string | null>();
           const warmMutationSubjects = new Set<string | null>();
           const calls = new Map<number, string | null>();
-          let previousValues: readonly string[] = [];
+          let previousValues: ReadonlyArray<string> = [];
 
           for (let nonce = 0; nonce < 18; nonce++) {
             const subject = subjects[nonce % subjects.length] ?? null;
@@ -106,13 +106,19 @@ layer(contextMetadataLayer, { timeout: "120 seconds" })(
               const previous = result.previousInvocation;
               if (previous !== null && calls.has(previous.nonce)) {
                 expect(previous.subject).toBe(calls.get(previous.nonce));
-                if (previous.subject !== subject) warmSubjects.add(subject);
+                if (previous.subject !== subject) {
+                  warmSubjects.add(subject);
+                }
               }
             }
             calls.set(nonce, subject);
             previousValues = [value];
-            if (warmQuerySubjects.size === 3 && warmMutationSubjects.size === 3)
+            if (
+              warmQuerySubjects.size === 3 &&
+              warmMutationSubjects.size === 3
+            ) {
               break;
+            }
           }
 
           expect(warmQuerySubjects).toEqual(new Set(subjects));

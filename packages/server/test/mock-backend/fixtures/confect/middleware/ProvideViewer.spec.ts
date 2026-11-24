@@ -9,7 +9,7 @@ export class Viewer extends Context.Service<
   "@confect/server-mock-backend-fixtures/confect/middleware/ProvideViewer.spec/Viewer",
 ) {}
 
-export class NoViewer extends Schema.TaggedError<NoViewer, {}>()(
+export class NoViewer extends Schema.TaggedError<NoViewer, unknown>()(
   "NoViewer",
   {},
 ) {}

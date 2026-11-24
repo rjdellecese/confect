@@ -7,7 +7,6 @@ import type {
   WithoutSystemFields,
 } from "convex/server";
 import type { GenericId } from "convex/values";
-import type { BaseDatabaseReader } from "@confect/core/Types";
 import { pipe } from "effect/Function";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
@@ -157,7 +156,7 @@ export interface DatabaseWriterTableAccessor<
  */
 export interface DatabaseWriterService<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
-  Docs = {},
+  Docs = unknown,
 > {
   /**
    * Selects an application table for writes without reading or changing any
@@ -204,7 +203,7 @@ export interface DatabaseWriterService<
  */
 export type DatabaseWriterTag<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
-  Docs = {},
+  Docs = unknown,
 > = Context.Service<
   DatabaseWriterService<DatabaseSchema_>,
   DatabaseWriterService<DatabaseSchema_, Docs>
@@ -216,7 +215,6 @@ export type DatabaseWriterTag<
 export const make = <Model extends GenericDataModel>(
   convexDatabaseWriter: GenericDatabaseWriter<Model>,
 ): DatabaseWriterService<DatabaseSchema.FromConvexDataModel<Model>> => {
-  const reader: BaseDatabaseReader<any> = convexDatabaseWriter;
   const table = <TableName extends TableNamesInDataModel<Model>>(
     tableDef: Table.AnyWithProps & { readonly tableName: TableName },
   ) => {
@@ -246,7 +244,7 @@ export const make = <Model extends GenericDataModel>(
         Table.AnyWithProps,
         TableName
       >(
-        reader,
+        convexDatabaseWriter,
         tableDef,
       )(id);
 
@@ -307,7 +305,7 @@ export const make = <Model extends GenericDataModel>(
  */
 export const DatabaseWriter = <
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
-  Docs = {},
+  Docs = unknown,
 >(): DatabaseWriterTag<DatabaseSchema_, Docs> =>
   Context.Service<
     DatabaseWriterService<DatabaseSchema_>,

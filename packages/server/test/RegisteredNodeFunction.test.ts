@@ -27,7 +27,7 @@ it("registers a Node group without a factory parameter", () => {
   const registered = RegisteredNodeFunction.buildForGroup<typeof group>(layer);
   expect(registered.run).toBeDefined();
   expectTypeOf(registered.run).toExtend<
-    RegisteredAction<"public", Record<string, unknown>, unknown>
+    RegisteredAction<"public", Record<string, never>, Promise<string>>
   >();
   expectTypeOf<
     Parameters<typeof RegisteredNodeFunction.buildForGroup>["length"]

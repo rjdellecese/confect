@@ -68,7 +68,7 @@ export interface GroupImpl<
 /**
  * @internal
  */
-export interface Any extends GroupImpl<FinalizationStatus> {}
+export type Any = GroupImpl<FinalizationStatus>;
 
 /**
  * @internal
@@ -79,11 +79,11 @@ export const isGroupImpl = (u: unknown): u is Any =>
 /**
  * @internal
  */
-export interface AnyFinalized extends GroupImpl<"Finalized"> {}
+export type AnyFinalized = GroupImpl<"Finalized">;
 /**
  * @internal
  */
-export interface AnyUnfinalized extends GroupImpl<"Unfinalized"> {}
+export type AnyUnfinalized = GroupImpl<"Unfinalized">;
 
 /**
  * @internal

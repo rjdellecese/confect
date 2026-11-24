@@ -1,7 +1,11 @@
 import type * as MiddlewareAttachment from "@confect/core/MiddlewareAttachment";
 import type * as FunctionSpec from "@confect/core/FunctionSpec";
 import * as Lazy from "@confect/core/Lazy";
-import type { FunctionType, FunctionVisibility } from "convex/server";
+import type {
+  DefaultFunctionArgs,
+  FunctionType,
+  FunctionVisibility,
+} from "convex/server";
 import * as Match from "effect/Match";
 import * as Predicate from "effect/Predicate";
 import type * as Schema from "effect/Schema";
@@ -45,8 +49,8 @@ export interface ConfectFunctionRegistryItem {
   readonly name: string;
   readonly functionVisibility: FunctionVisibility;
   readonly functionType: FunctionType;
-  readonly args: Schema.Codec<any, any>;
-  readonly returns: Schema.Codec<any, any>;
+  readonly args: Schema.Codec<unknown, DefaultFunctionArgs>;
+  readonly returns: Schema.Codec<unknown>;
   readonly error?: Schema.Codec<any, any>;
   readonly middlewareAttachments: ReadonlyArray<MiddlewareAttachment.MiddlewareAttachment>;
   readonly handler: Handler.AnyConfectProvenance;

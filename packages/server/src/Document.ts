@@ -140,7 +140,7 @@ export const encode = Function.dual<
  */
 export class DocumentDecodeError extends Schema.TaggedError<
   DocumentDecodeError,
-  {}
+  unknown
 >()("DocumentDecodeError", {
   /**
    * Name of the table whose document codec rejected the stored value.
@@ -190,7 +190,7 @@ export class DocumentDecodeError extends Schema.TaggedError<
  */
 export class DocumentEncodeError extends Schema.TaggedError<
   DocumentEncodeError,
-  {}
+  unknown
 >()("DocumentEncodeError", {
   /**
    * Name of the table whose field codec rejected the decoded input.

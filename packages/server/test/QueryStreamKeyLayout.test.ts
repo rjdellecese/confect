@@ -69,7 +69,7 @@ describe("QueryStreamKeyLayout", () => {
     },
   );
 
-  it.each([-1, 0.5, 2, NaN, Infinity])(
+  it.each([-1, 0.5, 2, Number.NaN, Infinity])(
     "rejects an invalid equality prefix: %s",
     (count) => {
       const result = QueryStreamKeyLayout.fromIndex(["_id"], count);

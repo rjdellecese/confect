@@ -43,7 +43,10 @@ export const isDatabaseSchema = (u: unknown): u is Any =>
  * @category Models
  */
 export interface DatabaseSchema<
-  Tables_ extends Readonly<Record<string, Table.AnyWithProps>> = {},
+  Tables_ extends Readonly<Record<string, Table.AnyWithProps>> = Record<
+    never,
+    Table.AnyWithProps
+  >,
 > {
   readonly [TypeId]: Readonly<Tables_>;
 }
@@ -51,9 +54,9 @@ export interface DatabaseSchema<
 /**
  * @internal
  */
-export interface AnyWithProps extends DatabaseSchema<
+export type AnyWithProps = DatabaseSchema<
   Readonly<Record<string, Table.AnyWithProps>>
-> {}
+>;
 
 /**
  * @internal

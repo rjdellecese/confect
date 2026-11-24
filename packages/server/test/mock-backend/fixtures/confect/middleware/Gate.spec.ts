@@ -1,7 +1,7 @@
 import { MiddlewareSpec } from "@confect/core";
 import * as Schema from "effect/Schema";
 
-export class GateClosed extends Schema.TaggedError<GateClosed, {}>()(
+export class GateClosed extends Schema.TaggedError<GateClosed, unknown>()(
   "GateClosed",
   {
     reason: Schema.String,

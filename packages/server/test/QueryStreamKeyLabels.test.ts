@@ -18,7 +18,7 @@ describe("QueryStreamKeyLabels", () => {
       ReadonlyArray<string>
     >().not.toExtend<QueryStreamKeyLabels.QueryStreamKeyLabels>();
     expectTypeOf(labels).toExtend<ReadonlyArray<string>>();
-    expectTypeOf(labels).not.toExtend<string[]>();
+    expectTypeOf(labels).not.toExtend<Array<string>>();
     expectTypeOf(labels[0]).toEqualTypeOf<"author">();
     expectTypeOf(labels.length).toEqualTypeOf<2>();
     expectTypeOf(
@@ -41,7 +41,7 @@ describe("QueryStreamKeyLabels", () => {
     expect(labels).toBe(input);
     expect(input).toEqual(["author", "created"]);
     expectTypeOf(labels).toExtend<readonly ["author", "created"]>();
-    expectTypeOf(labels).not.toExtend<string[]>();
+    expectTypeOf(labels).not.toExtend<Array<string>>();
   });
 
   it("preserves tuple positions when concatenating branded label types", () => {

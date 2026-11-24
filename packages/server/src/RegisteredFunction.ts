@@ -7,15 +7,19 @@ import {
   compileArgsSchema,
   compileReturnsSchema,
 } from "@confect/core/SchemaToValidator";
-import {
-  type DefaultFunctionArgs,
-  type FunctionVisibility,
-  type GenericActionCtx,
-  type RegisteredAction,
-  type RegisteredMutation,
-  type RegisteredQuery,
+import type {
+  DefaultFunctionArgs,
+  FunctionVisibility,
+  GenericActionCtx,
+  RegisteredAction,
+  RegisteredMutation,
+  RegisteredQuery,
 } from "convex/server";
-import type { PropertyValidators, Validator, Value } from "convex/values";
+import type {
+  GenericValidator,
+  PropertyValidators,
+  Value,
+} from "convex/values";
 import { ConvexError } from "convex/values";
 import { pipe } from "effect/Function";
 import * as Console from "effect/Console";
@@ -46,9 +50,9 @@ import * as VectorSearch from "./VectorSearch";
  * @internal
  */
 export type Any =
-  | RegisteredQuery<FunctionVisibility, DefaultFunctionArgs, any>
-  | RegisteredMutation<FunctionVisibility, DefaultFunctionArgs, any>
-  | RegisteredAction<FunctionVisibility, DefaultFunctionArgs, any>;
+  | RegisteredQuery<FunctionVisibility, DefaultFunctionArgs, unknown>
+  | RegisteredMutation<FunctionVisibility, DefaultFunctionArgs, unknown>
+  | RegisteredAction<FunctionVisibility, DefaultFunctionArgs, unknown>;
 
 type ConfectRegisteredFunction<
   FunctionSpec_ extends FunctionSpec.AnyWithProps,
@@ -143,7 +147,7 @@ export type RegisteredFunction<
  */
 export const toConvexDefinition = <
   Args extends PropertyValidators,
-  Returns extends Validator<any, any, any>,
+  Returns extends GenericValidator,
   Handler_,
 >(prepared: {
   readonly args: () => Args;
@@ -249,7 +253,7 @@ export const runHandlerPromise =
     // A `ConvexError` defect escapes into the (escaped) failure channel so
     // the `throw` below rethrows it with its identity intact.
     const rethrowConvexErrorDefects = Effect.catchDefect(
-      (defect: unknown): Effect.Effect<never, ConvexError<any>> =>
+      (defect: unknown): Effect.Effect<never, Error> =>
         defect instanceof ConvexError
           ? Effect.fail(defect)
           : Effect.die(defect),

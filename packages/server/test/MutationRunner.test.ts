@@ -2,12 +2,23 @@ import { FunctionSpec, Ref } from "@confect/core";
 import * as MutationRunner from "@confect/server/MutationRunner";
 import * as MutationTransactionContext from "@confect/server/MutationTransactionContext";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
-import type { TransactionLimits } from "convex/server";
+import type {
+  GenericDataModel,
+  GenericMutationCtx,
+  DefaultFunctionArgs,
+  TransactionLimits,
+} from "convex/server";
 import { ConvexError } from "convex/values";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 import { vi } from "vitest";
+
+type NativeCall = (
+  ref: Parameters<GenericMutationCtx<GenericDataModel>["runMutation"]>[0],
+  args?: DefaultFunctionArgs,
+  options?: MutationTransactionContext.MutationOptions,
+) => Promise<string>;
 
 class NotFound extends Schema.TaggedError<
   NotFound,
@@ -35,7 +46,7 @@ describe("MutationRunner", () => {
   it.effect(
     "encodes arguments and decodes results lazily on each execution",
     () => {
-      const native = vi.fn().mockResolvedValue("2");
+      const native = vi.fn<NativeCall>().mockResolvedValue("2");
       return Effect.gen(function* () {
         const services = yield* Layer.build(MutationRunner.layer(native));
         return yield* Effect.gen(function* () {
@@ -63,7 +74,7 @@ describe("MutationRunner", () => {
   it.effect(
     "uses the basic runner for omitted and explicitly undefined options",
     () => {
-      const native = vi.fn().mockResolvedValue("ok");
+      const native = vi.fn<NativeCall>().mockResolvedValue("ok");
       return Effect.gen(function* () {
         const services = yield* Layer.build(MutationRunner.layer(native));
         return yield* Effect.gen(function* () {
@@ -98,9 +109,12 @@ describe("MutationRunner", () => {
   it.effect(
     "routes defined options to mutation controls without changing their identity",
     () => {
-      const native = vi.fn().mockResolvedValue("basic");
-      const runMutation = vi.fn().mockResolvedValue("controlled");
-      const ctx = { runQuery: vi.fn(), runMutation };
+      const native = vi.fn<NativeCall>().mockResolvedValue("basic");
+      const runMutation = vi.fn<NativeCall>().mockResolvedValue("controlled");
+      const ctx = {
+        runQuery: () => expect.unreachable("Unexpected runQuery call"),
+        runMutation,
+      };
       return Effect.gen(function* () {
         const runner = yield* MutationRunner.MutationRunner;
         for (const options of [{}, { transactionLimits: {} }]) {
@@ -128,7 +142,7 @@ describe("MutationRunner", () => {
     () => {
       const failure = new Error("offline");
       const native = vi
-        .fn()
+        .fn<NativeCall>()
         .mockRejectedValueOnce(new ConvexError({ _tag: "NotFound", id: "abc" }))
         .mockResolvedValueOnce("not a number")
         .mockRejectedValueOnce(failure);
@@ -161,8 +175,8 @@ describe("MutationRunner", () => {
   it.effect(
     "dispatches optional options variables by their runtime value",
     () => {
-      const native = vi.fn().mockResolvedValue("basic");
-      const runMutation = vi.fn().mockResolvedValue("controlled");
+      const native = vi.fn<NativeCall>().mockResolvedValue("basic");
+      const runMutation = vi.fn<NativeCall>().mockResolvedValue("controlled");
       return Effect.gen(function* () {
         const runner = yield* MutationRunner.MutationRunner;
         const options: ReadonlyArray<
@@ -184,7 +198,7 @@ describe("MutationRunner", () => {
         Effect.provide([
           MutationRunner.layer(native),
           MutationTransactionContext.layer({
-            runQuery: vi.fn(),
+            runQuery: () => expect.unreachable("Unexpected runQuery call"),
             runMutation,
           }),
         ]),
@@ -196,7 +210,9 @@ describe("MutationRunner", () => {
     "requires mutation controls for options variables including optional ones",
     () =>
       Effect.gen(function* () {
-        const services = yield* Layer.build(MutationRunner.layer(vi.fn()));
+        const services = yield* Layer.build(
+          MutationRunner.layer(vi.fn<NativeCall>()),
+        );
         return yield* Effect.gen(function* () {
           const runner = yield* MutationRunner.MutationRunner;
           const check = (

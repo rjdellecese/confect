@@ -29,7 +29,7 @@ import type {
 } from "convex/server";
 import { ConvexError } from "convex/values";
 import { identity, dual, pipe } from "effect/Function";
-import { pipeArguments, type Pipeable } from "effect/Pipeable";
+import * as Pipeable from "effect/Pipeable";
 import * as Array from "effect/Array";
 import type * as Channel from "effect/Channel";
 import * as Chunk from "effect/Chunk";
@@ -79,7 +79,7 @@ const OrderDirection = Schema.Literals(["asc", "desc"]);
  */
 export class ReadBudgetExceededError extends Schema.TaggedError<
   ReadBudgetExceededError,
-  {}
+  unknown
 >()("ReadBudgetExceededError", {
   /**
    * Physical documents read, including filtered documents and repeated reads.
@@ -118,7 +118,7 @@ export class ReadBudgetExceededError extends Schema.TaggedError<
  */
 export class IncompatibleStreamsError extends Schema.TaggedError<
   IncompatibleStreamsError,
-  {}
+  unknown
 >()("IncompatibleStreamsError", {
   /**
    * Direction of the first merge input, which defines the expected order.
@@ -166,7 +166,7 @@ export class IncompatibleStreamsError extends Schema.TaggedError<
  */
 export class InnerStreamOrderMismatchError extends Schema.TaggedError<
   InnerStreamOrderMismatchError,
-  {}
+  unknown
 >()("InnerStreamOrderMismatchError", {
   /**
    * Direction required by the outer stream.
@@ -202,7 +202,7 @@ export class InnerStreamOrderMismatchError extends Schema.TaggedError<
  */
 export class InnerStreamLayoutMismatchError extends Schema.TaggedError<
   InnerStreamLayoutMismatchError,
-  {}
+  unknown
 >()("InnerStreamLayoutMismatchError", {
   /**
    * Layout supplied as flatMap's innerKeyLayout template.
@@ -238,7 +238,7 @@ export class InnerStreamLayoutMismatchError extends Schema.TaggedError<
  */
 export class MissingReversalRecipeError extends Schema.TaggedError<
   MissingReversalRecipeError,
-  {}
+  unknown
 >()("MissingReversalRecipeError", {}) {
   override get message(): string {
     return "QueryStream.reverse: this stream cannot be reversed without a reversal recipe";
@@ -396,7 +396,7 @@ export class QueryStream<
    *
    * @category Combinators
    */
-  declare readonly pipe: Pipeable["pipe"];
+  declare readonly pipe: Pipeable.Pipeable["pipe"];
   /**
    * @internal
    */
@@ -541,9 +541,7 @@ Object.defineProperties(queryStreamPrototype, {
   [TypeId]: { value: TypeId },
   [Stream.TypeId]: { value: streamVariance },
   pipe: {
-    value: function (this: unknown) {
-      return pipeArguments(this, arguments);
-    },
+    value: Object.getOwnPropertyDescriptors(Pipeable.Prototype).pipe.value,
   },
   channel: {
     get(this: QueryStream<unknown>) {
@@ -597,39 +595,35 @@ export const isQueryStream = (u: unknown): u is Any =>
  *
  * @experimental
  */
-export const empty =
-  <Doc>(): {
-    <const KeyLabels extends QueryStreamKeyLabels.QueryStreamKeyLabels>(
-      keyLayout: QueryStreamKeyLayout.QueryStreamKeyLayout<KeyLabels>,
-    ): QueryStream<Doc, KeyLabels, "asc", never, never>;
-    <
-      const KeyLabels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
-      OrderDirection extends
-        QueryStreamOrderDirection.QueryStreamOrderDirection,
-    >(
-      keyLayout: QueryStreamKeyLayout.QueryStreamKeyLayout<KeyLabels>,
-      orderDirection: OrderDirection,
-    ): QueryStream<Doc, KeyLabels, OrderDirection, never, never>;
-  } =>
-  <KeyLabels extends QueryStreamKeyLabels.QueryStreamKeyLabels>(
+export const empty = <Doc>() => {
+  const annotated: Stream.Stream<Element<Doc>> = Stream.empty;
+  function make<
+    const KeyLabels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
+  >(
+    keyLayout: QueryStreamKeyLayout.QueryStreamKeyLayout<KeyLabels>,
+  ): QueryStream<Doc, KeyLabels, "asc", never, never>;
+  function make<
+    const KeyLabels extends QueryStreamKeyLabels.QueryStreamKeyLabels,
+    OrderDirection extends QueryStreamOrderDirection.QueryStreamOrderDirection,
+  >(
+    keyLayout: QueryStreamKeyLayout.QueryStreamKeyLayout<KeyLabels>,
+    orderDirection: OrderDirection,
+  ): QueryStream<Doc, KeyLabels, OrderDirection, never, never>;
+  function make<KeyLabels extends QueryStreamKeyLabels.QueryStreamKeyLabels>(
     keyLayout: QueryStreamKeyLayout.QueryStreamKeyLayout<KeyLabels>,
     orderDirection: QueryStreamOrderDirection.QueryStreamOrderDirection = "asc",
-  ) => {
-    // The overloads preserve the supplied direction or its ascending default.
-    const make = (
-      currentOrderDirection: QueryStreamOrderDirection.QueryStreamOrderDirection,
-    ): QueryStream<Doc, KeyLabels, any, never, never> =>
-      new QueryStream(
-        currentOrderDirection,
-        keyLayout,
-        Stream.empty,
-        undefined,
-        // Narrowing nothing is nothing, and so is reversing it.
-        () => make(currentOrderDirection),
-        () => make(QueryStreamOrderDirection.flip(currentOrderDirection)),
-      );
-    return make(orderDirection);
-  };
+  ) {
+    return new QueryStream(
+      orderDirection,
+      keyLayout,
+      annotated,
+      undefined,
+      () => make(keyLayout, orderDirection),
+      () => make(keyLayout, QueryStreamOrderDirection.flip(orderDirection)),
+    );
+  }
+  return make;
+};
 
 // -----------------------------------------------------------------------------
 // Constructors
@@ -891,8 +885,8 @@ type MergeSource<Doc, E> = Data.TaggedEnum<{
     readonly head: Element<Doc>;
     readonly tail: Chunk.Chunk<Element<Doc>>;
   };
-  Exhausted: {};
-  BudgetLimited: {};
+  Exhausted: Record<never, never>;
+  BudgetLimited: Record<never, never>;
 }>;
 
 interface MergeSourceDefinition extends Data.TaggedEnum.WithGenerics<2> {
@@ -960,8 +954,9 @@ const mergeStep =
       });
       if (
         Array.some(filled, (source) => MergeSource.$is("BudgetLimited")(source))
-      )
+      ) {
         return undefined;
+      }
       const isEarlier = Order.isLessThan(keyOrder);
 
       const earliest = Array.reduce(
@@ -1598,6 +1593,15 @@ type FlatMapBound = Data.TaggedEnum<{
 
 const FlatMapBound = Data.taggedEnum<FlatMapBound>();
 
+const outerBound = (bound: FlatMapBound): QueryStreamKeyBounds.KeyBound =>
+  FlatMapBound.$match(bound, {
+    Outer: ({ keyValues, inclusive }) => ({ keyValues, inclusive }),
+    Inner: ({ outerKeyValues }) => ({
+      keyValues: outerKeyValues,
+      inclusive: true,
+    }),
+  });
+
 const combineLowerRefinements = (
   existing: Option.Option<InnerRefinement>,
   incoming: Option.Option<InnerRefinement>,
@@ -1786,7 +1790,9 @@ const makeFlatMap = <
                 Effect.gen(function* () {
                   const readBudget =
                     yield* QueryStreamReadBudget.QueryStreamReadBudget;
-                  if (yield* readBudget.isStopped) return Stream.empty;
+                  if (yield* readBudget.isStopped) {
+                    return Stream.empty;
+                  }
                   const original = yield* Option.match(
                     Option.gen(function* () {
                       yield* onEmpty;
@@ -1838,15 +1844,6 @@ const makeFlatMap = <
           ),
         });
   };
-
-  const outerBound = (bound: FlatMapBound): QueryStreamKeyBounds.KeyBound =>
-    FlatMapBound.$match(bound, {
-      Outer: ({ keyValues, inclusive }) => ({ keyValues, inclusive }),
-      Inner: ({ outerKeyValues }) => ({
-        keyValues: outerKeyValues,
-        inclusive: true,
-      }),
-    });
 
   return new QueryStream(
     self.orderDirection,
@@ -2130,10 +2127,13 @@ const makeDistinct = <
           R | QueryStreamReadBudget.QueryStreamReadBudget
         > =>
           Effect.gen(function* () {
-            if (yield* readBudget.isStopped)
+            if (yield* readBudget.isStopped) {
               return Tuple.make([], Option.none());
+            }
             const discovered = yield* Stream.runHead(current.annotated);
-            if (Option.isNone(discovered)) return Tuple.make([], Option.none());
+            if (Option.isNone(discovered)) {
+              return Tuple.make([], Option.none());
+            }
             const element = discovered.value;
             const { doc, keyValues } = element;
             const prefixKeyValues = Array.take(keyValues, distinctLength);
@@ -2190,8 +2190,9 @@ const makeDistinct = <
                 next,
               );
             }
-            if (yield* readBudget.isStopped)
+            if (yield* readBudget.isStopped) {
               return Tuple.make([], Option.none());
+            }
             const checkpointKeyValues = Option.getOrElse(
               firstKeyValues,
               () => keyValues,
@@ -2393,8 +2394,9 @@ const narrowByParsedBounds = <
 ): QueryStream<Doc, KeyLabels, OrderDirection, E, R> => {
   const unbounded =
     Option.isNone(parsedBounds.lower) && Option.isNone(parsedBounds.upper);
-  if (!unbounded && self.narrowWith !== undefined)
+  if (!unbounded && self.narrowWith !== undefined) {
     return self.narrowWith(parsedBounds);
+  }
   // Recipe calls check their layout in the constructor's wrapper. No-op and
   // in-memory narrowing need the same check even without a recipe call.
   Result.getOrThrowWith(
@@ -2485,10 +2487,10 @@ const narrowInMemory = <
  *
  * @experimental
  */
-export class NotUniqueError extends Schema.TaggedError<NotUniqueError, {}>()(
-  "NotUniqueError",
-  {},
-) {
+export class NotUniqueError extends Schema.TaggedError<
+  NotUniqueError,
+  unknown
+>()("NotUniqueError", {}) {
   /**
    * Returns a message explaining the at-most-one expectation.
    *

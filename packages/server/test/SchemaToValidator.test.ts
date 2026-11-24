@@ -1,9 +1,11 @@
 // @effect-diagnostics schemaNumber:off
 import { describe, effect, expect, expectTypeOf, test } from "@effect/vitest";
 import { paginationOptsValidator } from "convex/server";
-import { v, type VBoolean, type VString, type VUnion } from "convex/values";
+import { v } from "convex/values";
+import type { VBoolean, VString, VUnion } from "convex/values";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
+import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 
 import { GenericId } from "@confect/core/GenericId";
@@ -21,10 +23,10 @@ import {
   TopLevelMustBeObjectOrUnionError,
   UnsupportedPropertySignatureKeyTypeError,
   UnsupportedSchemaTypeError,
-  type ValueToValidator,
 } from "@confect/core/SchemaToValidator";
+import type { ValueToValidator } from "@confect/core/SchemaToValidator";
 
-describe(compileAst, () => {
+describe("compileAst", () => {
   describe("allowed", () => {
     effect("any", () =>
       Effect.gen(function* () {
@@ -293,7 +295,7 @@ describe(compileAst, () => {
 
       effect("array with recursive element", () =>
         Effect.gen(function* () {
-          type Foo = readonly Foo[];
+          type Foo = ReadonlyArray<Foo>;
           const Foo = Schema.Array(
             Schema.suspend((): Schema.Codec<Foo> => Foo),
           );
@@ -327,7 +329,7 @@ describe(compileAst, () => {
       effect("union with recursive element", () =>
         Effect.gen(function* () {
           type Foo = {
-            foos: readonly Foo[];
+            foos: ReadonlyArray<Foo>;
           } | null;
           const Foo = Schema.Union([
             Schema.Struct({
@@ -521,7 +523,7 @@ describe(compileAst, () => {
   });
 });
 
-describe(compileSchema, () => {
+describe("compileSchema", () => {
   test("any", () => {
     const expectedValidator = v.any();
 
@@ -807,7 +809,7 @@ describe("suspend", () => {
     const expectedValidator = v.any();
     type ExpectedValidator = typeof expectedValidator;
 
-    type Foo = readonly Foo[];
+    type Foo = ReadonlyArray<Foo>;
     const Foo = Schema.Array(Schema.suspend((): Schema.Codec<Foo> => Foo));
     const compiledValidator = compileSchema(Foo);
     type CompiledValidator = typeof compiledValidator;
@@ -837,7 +839,7 @@ describe("suspend", () => {
     type ExpectedValidator = typeof expectedValidator;
 
     type Foo = {
-      foos: readonly Foo[];
+      foos: ReadonlyArray<Foo>;
     } | null;
     const Foo = Schema.Union([
       Schema.Struct({
@@ -1010,7 +1012,7 @@ describe("ValueToValidator", () => {
       const _expectedValidator = v.array(v.string());
       type ExpectedValidator = typeof _expectedValidator;
 
-      type CompiledValidator = ValueToValidator<string[]>;
+      type CompiledValidator = ValueToValidator<Array<string>>;
 
       expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
     });
@@ -1019,7 +1021,7 @@ describe("ValueToValidator", () => {
       const _expectedValidator = v.array(v.float64());
       type ExpectedValidator = typeof _expectedValidator;
 
-      type CompiledValidator = ValueToValidator<number[]>;
+      type CompiledValidator = ValueToValidator<Array<number>>;
 
       expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
     });
@@ -1028,7 +1030,7 @@ describe("ValueToValidator", () => {
       const _expectedValidator = v.array(v.literal("foo"));
       type ExpectedValidator = typeof _expectedValidator;
 
-      type CompiledValidator = ValueToValidator<"foo"[]>;
+      type CompiledValidator = ValueToValidator<Array<"foo">>;
 
       expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
     });
@@ -1037,7 +1039,7 @@ describe("ValueToValidator", () => {
       const _expectedValidator = v.array(v.array(v.string()));
       type ExpectedValidator = typeof _expectedValidator;
 
-      type CompiledValidator = ValueToValidator<string[][]>;
+      type CompiledValidator = ValueToValidator<Array<Array<string>>>;
 
       expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
     });
@@ -1046,7 +1048,7 @@ describe("ValueToValidator", () => {
       const _expectedValidator = v.array(v.any());
       type ExpectedValidator = typeof _expectedValidator;
 
-      type CompiledValidator = ValueToValidator<any[]>;
+      type CompiledValidator = ValueToValidator<Array<any>>;
 
       expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
     });
@@ -1055,7 +1057,7 @@ describe("ValueToValidator", () => {
       const _expectedValidator = v.any();
       type ExpectedValidator = typeof _expectedValidator;
 
-      type NestedArray = (string | NestedArray)[];
+      type NestedArray = Array<string | NestedArray>;
       type CompiledValidator = ValueToValidator<NestedArray>;
 
       expectTypeOf<CompiledValidator>().toExtend<ExpectedValidator>();
@@ -1065,7 +1067,7 @@ describe("ValueToValidator", () => {
       const _expectedValidator = v.array(v.string());
       type ExpectedValidator = typeof _expectedValidator;
 
-      type NonEmptyArray = readonly [string, ...string[]];
+      type NonEmptyArray = readonly [string, ...Array<string>];
       type CompiledValidator = ValueToValidator<NonEmptyArray>;
 
       expectTypeOf<CompiledValidator>().toExtend<ExpectedValidator>();
@@ -1077,7 +1079,7 @@ describe("ValueToValidator", () => {
       const _expectedValidator = v.object({});
       type ExpectedValidator = typeof _expectedValidator;
 
-      type CompiledValidator = ValueToValidator<{}>;
+      type CompiledValidator = ValueToValidator<Record<never, never>>;
 
       expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
     });
@@ -1113,7 +1115,7 @@ describe("ValueToValidator", () => {
 
       type CompiledValidator = ValueToValidator<{
         badge: string;
-        rows?: { badge: string }[] | undefined;
+        rows?: Array<{ badge: string }> | undefined;
       }>;
 
       expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
@@ -1217,7 +1219,7 @@ describe("ValueToValidator", () => {
       });
       type ExpectedValidator = typeof _expectedValidator;
 
-      type CompiledValidator = ValueToValidator<{ foo: { bar: any[] } }>;
+      type CompiledValidator = ValueToValidator<{ foo: { bar: Array<any> } }>;
 
       expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
     });
@@ -1232,7 +1234,9 @@ describe("ValueToValidator", () => {
       );
       type ExpectedValidator = typeof _expectedValidator;
 
-      type CompiledValidator = ValueToValidator<string | number | boolean[]>;
+      type CompiledValidator = ValueToValidator<
+        string | number | Array<boolean>
+      >;
 
       expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
     });
@@ -1368,7 +1372,7 @@ describe("ValueToValidator", () => {
       const _expectedValidator = v.any();
       type ExpectedValidator = typeof _expectedValidator;
 
-      type Foo = Foo[];
+      type Foo = Array<Foo>;
       type CompiledValidator = ValueToValidator<Foo>;
 
       expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
@@ -1388,7 +1392,7 @@ describe("ValueToValidator", () => {
       const _expectedValidator = v.any();
       type ExpectedValidator = typeof _expectedValidator;
 
-      type Foo = { foos: Foo[] } | null;
+      type Foo = { foos: Array<Foo> } | null;
       type CompiledValidator = ValueToValidator<Foo>;
 
       expectTypeOf<CompiledValidator>().toEqualTypeOf<ExpectedValidator>();
@@ -1396,7 +1400,7 @@ describe("ValueToValidator", () => {
   });
 });
 
-describe(compileTableSchema, () => {
+describe("compileTableSchema", () => {
   test("succeeds if provided Schema is a Struct", () => {
     const compiledValidator = compileTableSchema(
       Schema.Struct({
@@ -1522,21 +1526,16 @@ describe(compileTableSchema, () => {
     );
   });
 
-  effect("fails if provided Schema is not a Struct or a Union", () =>
-    Effect.gen(function* () {
-      const exit = yield* Effect.try({
-        try: () => compileTableSchema(Schema.String),
-        catch: (e) => e as TopLevelMustBeObjectOrUnionError,
-      }).pipe(Effect.exit);
+  test("fails if provided Schema is not a Struct or a Union", () => {
+    const result = Result.try(() => compileTableSchema(Schema.String));
 
-      expect(exit).toStrictEqual(
-        Exit.fail(TopLevelMustBeObjectOrUnionError.make()),
-      );
-    }),
-  );
+    expect(result).toStrictEqual(
+      Result.fail(TopLevelMustBeObjectOrUnionError.make()),
+    );
+  });
 });
 
-describe(compileArgsSchema, () => {
+describe("compileArgsSchema", () => {
   test("extracts the wrapping schema and returns the object", () => {
     const compiledArgsValidator = compileArgsSchema(
       Schema.Struct({
@@ -1567,32 +1566,24 @@ describe(compileArgsSchema, () => {
     });
   });
 
-  effect("fails if provided Schema contains index signatures", () =>
-    Effect.gen(function* () {
-      const structWithIndexSignatures = Schema.StructWithRest(
-        Schema.Struct({ foo: Schema.String }),
-        [Schema.Record(Schema.String, Schema.String)],
-      );
+  test("fails if provided Schema contains index signatures", () => {
+    const structWithIndexSignatures = Schema.StructWithRest(
+      Schema.Struct({ foo: Schema.String }),
+      [Schema.Record(Schema.String, Schema.String)],
+    );
 
-      const exit = yield* Effect.try({
-        try: () => compileArgsSchema(structWithIndexSignatures),
-        catch: (e) => e as IndexSignaturesAreNotSupportedError,
-      }).pipe(Effect.exit);
+    const result = Result.try(() =>
+      compileArgsSchema(structWithIndexSignatures),
+    );
 
-      expect(exit).toStrictEqual(
-        Exit.fail(IndexSignaturesAreNotSupportedError.make()),
-      );
-    }),
-  );
+    expect(result).toStrictEqual(
+      Result.fail(IndexSignaturesAreNotSupportedError.make()),
+    );
+  });
 
-  effect("fails if provided Schema is not a Struct", () =>
-    Effect.gen(function* () {
-      const exit = yield* Effect.try({
-        try: () => compileArgsSchema(Schema.String),
-        catch: (e) => e as TopLevelMustBeObjectError,
-      }).pipe(Effect.exit);
+  test("fails if provided Schema is not a Struct", () => {
+    const result = Result.try(() => compileArgsSchema(Schema.String));
 
-      expect(exit).toStrictEqual(Exit.fail(TopLevelMustBeObjectError.make()));
-    }),
-  );
+    expect(result).toStrictEqual(Result.fail(TopLevelMustBeObjectError.make()));
+  });
 });

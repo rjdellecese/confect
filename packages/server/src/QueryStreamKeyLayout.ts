@@ -24,7 +24,7 @@ const NumberValue = Schema.declare<number>(
  */
 export type Position = Data.TaggedEnum<{
   Visible: { readonly label: string };
-  ImplicitId: {};
+  ImplicitId: Record<never, never>;
 }>;
 
 const Position = Data.taggedEnum<Position>();
@@ -151,7 +151,7 @@ type DropPrefix<
  */
 export class InvalidEqualityPrefixError extends Schema.TaggedError<
   InvalidEqualityPrefixError,
-  {}
+  unknown
 >()("InvalidEqualityPrefixError", {
   fieldPaths: Schema.String.pipe(
     Schema.Array,
@@ -174,7 +174,7 @@ export class InvalidEqualityPrefixError extends Schema.TaggedError<
  */
 export class InvalidLabelPrefixError extends Schema.TaggedError<
   InvalidLabelPrefixError,
-  {}
+  unknown
 >()("InvalidLabelPrefixError", {
   keyLabels: QueryStreamKeyLabels.QueryStreamKeyLabels,
   prefixKeyLabels: QueryStreamKeyLabels.QueryStreamKeyLabels,
@@ -193,7 +193,7 @@ export class InvalidLabelPrefixError extends Schema.TaggedError<
  */
 export class LabelCountMismatchError extends Schema.TaggedError<
   LabelCountMismatchError,
-  {}
+  unknown
 >()("LabelCountMismatchError", {
   keyLabels: QueryStreamKeyLabels.QueryStreamKeyLabels,
   replacementKeyLabels: QueryStreamKeyLabels.QueryStreamKeyLabels,
@@ -372,7 +372,7 @@ export const Equivalence: Equivalence_.Equivalence<QueryStreamKeyLayout> =
  */
 export class KeyLayoutMismatchError extends Schema.TaggedError<
   KeyLayoutMismatchError,
-  {}
+  unknown
 >()("KeyLayoutMismatchError", {
   expectedKeyLayout: QueryStreamKeyLayout,
   actualKeyLayout: QueryStreamKeyLayout,

@@ -163,22 +163,27 @@ export const make = <Table_ extends Table.AnyWithProps>(
       { concurrency: 1 },
     );
 
-    return {
+    const result: PaginationResult<TableInfo_["document"]> = {
       page: parsedPage,
       isDone: paginationResult.isDone,
       continueCursor: paginationResult.continueCursor,
-      /* v8 ignore start */
-      ...(paginationResult.splitCursor !== undefined &&
+    };
+    /* v8 ignore start */
+    if (
+      paginationResult.splitCursor !== undefined &&
       paginationResult.splitCursor !== null &&
       paginationResult.splitCursor !== ""
-        ? { splitCursor: paginationResult.splitCursor }
-        : {}),
-      ...(paginationResult.pageStatus !== undefined &&
+    ) {
+      result.splitCursor = paginationResult.splitCursor;
+    }
+    if (
+      paginationResult.pageStatus !== undefined &&
       paginationResult.pageStatus !== null
-        ? { pageStatus: paginationResult.pageStatus }
-        : {}),
-      /* v8 ignore stop */
-    };
+    ) {
+      result.pageStatus = paginationResult.pageStatus;
+    }
+    /* v8 ignore stop */
+    return result;
   });
 
   return {

@@ -13,7 +13,7 @@ describe("QueryStreamReadBudget", () => {
     "rejects invalid %s when decoding limits",
     (field) =>
       Effect.gen(function* () {
-        for (const value of [-1, 0.5, NaN, Infinity, -Infinity]) {
+        for (const value of [-1, 0.5, Number.NaN, Infinity, -Infinity]) {
           const error = yield* Schema.decodeEffect(
             QueryStreamReadBudget.Limits,
           )({
@@ -76,7 +76,7 @@ describe("QueryStreamReadBudget", () => {
           Match.value(firstLimit).pipe(
             Match.when("rows", () => ({
               maximumRowsRead: 1,
-              maximumBytesRead: 10000,
+              maximumBytesRead: 10_000,
             })),
             Match.when("bytes", () => ({
               maximumRowsRead: 10,

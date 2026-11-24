@@ -6,7 +6,7 @@ import type * as QueryStreamKeyLabels from "@confect/server/QueryStreamKeyLabels
 import * as Table from "@confect/server/Table";
 import { expect, expectTypeOf, it } from "@effect/vitest";
 import type { GenericDatabaseReader } from "convex/server";
-import type { GenericId } from "convex/values";
+import { GenericId } from "@confect/core/GenericId";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import type * as Stream from "effect/Stream";
@@ -18,14 +18,18 @@ const notes = Table.make(() =>
 ).index("by_score", ["score"])("notes");
 const users = Table.make(() => Schema.Struct({ name: Schema.String }))("users");
 const schema = DatabaseSchema.make({ notes, users });
-type NativeReader = GenericDatabaseReader<
-  DataModel.ToConvexDataModel<DataModel.FromDatabaseSchema<typeof schema>>
+type Model = DataModel.ToConvexDataModel<
+  DataModel.FromDatabaseSchema<typeof schema>
 >;
-const noteId = "note" as GenericId<"notes">;
+type NativeReader = GenericDatabaseReader<Model>;
+const unexpectedQuery = (): never => {
+  throw new Error("Unexpected table scan");
+};
+const noteId = GenericId("notes").make("note");
 
 it.effect("reads through the selected handle's codec and native receiver", () =>
   Effect.gen(function* () {
-    const storageId = "storage" as GenericId<"_storage">;
+    const storageId = GenericId("_storage").make("storage");
     const stored = {
       _id: storageId,
       _creationTime: 2,
@@ -36,11 +40,15 @@ it.effect("reads through the selected handle's codec and native receiver", () =>
       get: vi
         .fn<NativeReader["get"]>()
         .mockResolvedValue({ _id: noteId, _creationTime: 1, score: "42" }),
+      query: unexpectedQuery,
+      normalizeId: () => null,
       system: {
+        query: unexpectedQuery,
+        normalizeId: () => null,
         get: vi.fn<NativeReader["system"]["get"]>().mockResolvedValue(stored),
       },
     };
-    const reader = DatabaseReader.make(native as unknown as NativeReader);
+    const reader = DatabaseReader.make<Model>(native);
     const app = yield* reader.table(notes).get(noteId);
     expectTypeOf(app.score).toEqualTypeOf<number>();
     expect(app.score).toBe(42);
@@ -102,6 +110,9 @@ it("infers named documents, indexes and IDs only for app and system handles", ()
   expectTypeOf(check).toBeFunction();
 });
 
+const byRank = <Range>(q: { eq(field: "rank", value: number): Range }) =>
+  q.eq("rank", 1);
+
 it("reads a shared index without losing the document union or stream layout", () => {
   const members = Table.make(() =>
     Schema.Struct({ name: Schema.String, age: Schema.Finite }),
@@ -148,10 +159,13 @@ it("reads a shared index without losing the document union or stream layout", ()
     expectTypeOf(table.stream("by_value"));
     // @ts-expect-error Only teams has this index.
     table.index("by_rank");
+    const teamsReader = reader.table(teams);
+    expectTypeOf(teamsReader.index("by_value", byRank)).toBeObject();
+    expectTypeOf(teamsReader.stream("by_value", byRank)).toBeObject();
     // @ts-expect-error A range for one table cannot be used for both.
-    table.index("by_value", (q) => q.eq("rank", 1));
+    table.index("by_value", byRank);
     // @ts-expect-error A range for one table cannot be used for both.
-    expectTypeOf(table.stream("by_value", (q) => q.eq("rank", 1)));
+    expectTypeOf(table.stream("by_value", byRank));
   };
   expectTypeOf(check).toBeFunction();
 });

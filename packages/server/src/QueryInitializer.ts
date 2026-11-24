@@ -300,9 +300,8 @@ export const make = <
     DataModel.DocumentWithName<DataModel_, TableName>,
     Document.DocumentDecodeError | GetByIndexFailure
   > => {
-    const indexFieldPaths: GenericTableIndexes[keyof GenericTableIndexes] = (
-      table.indexes as GenericTableIndexes
-    )[indexName as keyof GenericTableIndexes]!;
+    const indexFieldPaths: GenericTableIndexes[keyof GenericTableIndexes] =
+      table.indexes[indexName as keyof GenericTableIndexes];
 
     return pipe(
       Effect.promise(() =>
@@ -342,12 +341,7 @@ export const make = <
     } else {
       const [indexName, ...indexFieldValues] = args;
 
-      return getByIndex(
-        indexName as keyof Indexes<
-          DataModel.TableInfoWithName<DataModel_, TableName>
-        >,
-        indexFieldValues,
-      );
+      return getByIndex(indexName, indexFieldValues);
     }
   }) as QueryInitializerFunction<"get">;
 
@@ -461,7 +455,7 @@ export const make = <
             );
 
     return QueryStream.fromReflection({
-      reader: convexDatabaseReader as QueryStream.ReflectionReader,
+      reader: convexDatabaseReader,
       table,
       indexName,
       indexFieldPaths,
@@ -494,8 +488,11 @@ export const make = <
  */
 export const getById =
   <Tables extends Table.AnyWithProps, TableName extends Table.Name<Tables>>(
-    convexDatabaseReader: BaseDatabaseReader<
-      DataModel.ToConvexDataModel<DataModel.FromTables<Tables>>
+    convexDatabaseReader: Pick<
+      BaseDatabaseReader<
+        DataModel.ToConvexDataModel<DataModel.FromTables<Tables>>
+      >,
+      "get"
     >,
     table: Table.WithName<Tables, TableName>,
   ) =>
@@ -519,23 +516,23 @@ export const getById =
  *
  * @category Errors
  */
-export class GetByIdFailure extends Schema.TaggedError<GetByIdFailure, {}>()(
-  "GetByIdFailure",
-  {
-    /**
-     * The requested document ID.
-     *
-     * @category Getters
-     */
-    id: Schema.String,
-    /**
-     * The selected table's name.
-     *
-     * @category Getters
-     */
-    tableName: Schema.String,
-  },
-) {
+export class GetByIdFailure extends Schema.TaggedError<
+  GetByIdFailure,
+  unknown
+>()("GetByIdFailure", {
+  /**
+   * The requested document ID.
+   *
+   * @category Getters
+   */
+  id: Schema.String,
+  /**
+   * The selected table's name.
+   *
+   * @category Getters
+   */
+  tableName: Schema.String,
+}) {
   /**
    * Returns a message identifying the table and missing document ID.
    *
@@ -559,7 +556,7 @@ export class GetByIdFailure extends Schema.TaggedError<GetByIdFailure, {}>()(
  */
 export class GetByIndexFailure extends Schema.TaggedError<
   GetByIndexFailure,
-  {}
+  unknown
 >()("GetByIndexFailure", {
   /**
    * The selected table's name.
@@ -590,7 +587,7 @@ export class GetByIndexFailure extends Schema.TaggedError<
     const fieldValues = Result.getOrThrowWith(
       Schema.encodeResult(
         Schema.fromJsonString(Schema.Unknown, {
-          replacer: (_key, value) =>
+          replacer: (_key, value: unknown) =>
             typeof value === "bigint" ? value.toString() : value,
         }),
       )(this.indexFieldValues),

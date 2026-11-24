@@ -1,9 +1,5 @@
-import {
-  convexToJson,
-  jsonToConvex,
-  compareValues,
-  type Value,
-} from "convex/values";
+import { convexToJson, jsonToConvex, compareValues } from "convex/values";
+import type { Value } from "convex/values";
 import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
 import * as Order_ from "effect/Order";

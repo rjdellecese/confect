@@ -96,7 +96,7 @@ export const forSchema = <
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
 >(): Builder<DatabaseSchema_> => ({
   make: (group, name, handler) => {
-    const functionSpec = group.functions[name]!;
+    const functionSpec = group.functions[name];
 
     return Layer.effect(
       FunctionImpl({ name }),

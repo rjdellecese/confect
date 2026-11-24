@@ -3,12 +3,24 @@ import * as QueryRunner from "@confect/server/QueryRunner";
 import * as QueryTransactionContext from "@confect/server/QueryTransactionContext";
 import * as MutationTransactionContext from "@confect/server/MutationTransactionContext";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
-import type { AdvancedRunQueryOptions, TransactionLimits } from "convex/server";
+import type {
+  GenericDataModel,
+  GenericActionCtx,
+  DefaultFunctionArgs,
+  AdvancedRunQueryOptions,
+  TransactionLimits,
+} from "convex/server";
 import { ConvexError } from "convex/values";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 import { vi } from "vitest";
+
+type NativeCall = (
+  ref: Parameters<GenericActionCtx<GenericDataModel>["runQuery"]>[0],
+  args?: DefaultFunctionArgs,
+  options?: AdvancedRunQueryOptions,
+) => Promise<string>;
 
 class NotFound extends Schema.TaggedError<
   NotFound,
@@ -36,7 +48,7 @@ describe("QueryRunner", () => {
   it.effect(
     "encodes arguments and decodes results lazily on each execution",
     () => {
-      const native = vi.fn().mockResolvedValue("2");
+      const native = vi.fn<NativeCall>().mockResolvedValue("2");
       return Effect.gen(function* () {
         const services = yield* Layer.build(QueryRunner.layer(native));
         return yield* Effect.gen(function* () {
@@ -64,7 +76,7 @@ describe("QueryRunner", () => {
   it.effect(
     "uses the basic runner for omitted and explicitly undefined options",
     () => {
-      const native = vi.fn().mockResolvedValue("ok");
+      const native = vi.fn<NativeCall>().mockResolvedValue("ok");
       return Effect.gen(function* () {
         const services = yield* Layer.build(QueryRunner.layer(native));
         return yield* Effect.gen(function* () {
@@ -99,11 +111,14 @@ describe("QueryRunner", () => {
   it.effect(
     "routes every defined options object to the appropriate transaction controls",
     () => {
-      const native = vi.fn().mockResolvedValue("basic");
-      const queryNative = vi.fn().mockResolvedValue("query");
-      const mutationNative = vi.fn().mockResolvedValue("mutation");
+      const native = vi.fn<NativeCall>().mockResolvedValue("basic");
+      const queryNative = vi.fn<NativeCall>().mockResolvedValue("query");
+      const mutationNative = vi.fn<NativeCall>().mockResolvedValue("mutation");
       const queryCtx = { runQuery: queryNative };
-      const mutationCtx = { runQuery: mutationNative, runMutation: vi.fn() };
+      const mutationCtx = {
+        runQuery: mutationNative,
+        runMutation: () => expect.unreachable("Unexpected runMutation call"),
+      };
       return Effect.gen(function* () {
         const runner = yield* QueryRunner.QueryRunner;
         const limits = { transactionLimits: {} };
@@ -136,7 +151,7 @@ describe("QueryRunner", () => {
     () => {
       const failure = new Error("offline");
       const native = vi
-        .fn()
+        .fn<NativeCall>()
         .mockRejectedValueOnce(new ConvexError({ _tag: "NotFound", id: "abc" }))
         .mockResolvedValueOnce("not a number")
         .mockRejectedValueOnce(failure);
@@ -169,9 +184,9 @@ describe("QueryRunner", () => {
   it.effect(
     "dispatches widened options by their runtime value, including false and undefined",
     () => {
-      const native = vi.fn().mockResolvedValue("basic");
-      const query = vi.fn().mockResolvedValue("query");
-      const mutation = vi.fn().mockResolvedValue("mutation");
+      const native = vi.fn<NativeCall>().mockResolvedValue("basic");
+      const query = vi.fn<NativeCall>().mockResolvedValue("query");
+      const mutation = vi.fn<NativeCall>().mockResolvedValue("mutation");
       return Effect.gen(function* () {
         const runner = yield* QueryRunner.QueryRunner;
         const cases: ReadonlyArray<
@@ -196,7 +211,8 @@ describe("QueryRunner", () => {
           QueryTransactionContext.layer({ runQuery: query }),
           MutationTransactionContext.layer({
             runQuery: mutation,
-            runMutation: vi.fn(),
+            runMutation: () =>
+              expect.unreachable("Unexpected runMutation call"),
           }),
         ]),
       );
@@ -207,7 +223,9 @@ describe("QueryRunner", () => {
     "tracks options variables and unions conservatively without weakening ref types",
     () =>
       Effect.gen(function* () {
-        const services = yield* Layer.build(QueryRunner.layer(vi.fn()));
+        const services = yield* Layer.build(
+          QueryRunner.layer(vi.fn<NativeCall>()),
+        );
         return yield* Effect.gen(function* () {
           const runner = yield* QueryRunner.QueryRunner;
           const check = (

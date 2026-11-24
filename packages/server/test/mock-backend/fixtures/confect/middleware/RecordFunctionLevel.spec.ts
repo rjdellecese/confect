@@ -3,7 +3,7 @@ import * as Schema from "effect/Schema";
 
 export class FunctionGateClosed extends Schema.TaggedError<
   FunctionGateClosed,
-  {}
+  unknown
 >()("FunctionGateClosed", {}) {}
 
 /**

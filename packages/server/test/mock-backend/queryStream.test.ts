@@ -6,12 +6,13 @@ import * as QueryStreamKeyLayout from "@confect/server/QueryStreamKeyLayout";
 import type * as QueryStreamOrderDirection from "@confect/server/QueryStreamOrderDirection";
 import * as QueryStreamReadBudget from "@confect/server/QueryStreamReadBudget";
 import * as QueryStreamCursor from "@confect/server/QueryStreamCursor";
-import { type Document, QueryStream } from "@confect/server";
+import { QueryStream } from "@confect/server";
+import type { Document } from "@confect/server";
 import { assert, describe, expect, expectTypeOf, it } from "@effect/vitest";
 import { assertEquals } from "@effect/vitest/utils";
 import * as Array from "effect/Array";
 import * as Context from "effect/Context";
-import { getDocumentSize, type Value } from "convex/values";
+import { getDocumentSize } from "convex/values";
 import * as Effect from "effect/Effect";
 import * as Deferred from "effect/Deferred";
 import * as Option from "effect/Option";
@@ -24,8 +25,23 @@ import notesTable from "./fixtures/confect/_generated/tables/notes";
 import {
   DatabaseReader,
   DatabaseWriter,
+  MutationCtx,
 } from "./fixtures/confect/_generated/services";
 import * as TestConfect from "./TestConfect";
+
+const tagsOf = (page: ReadonlyArray<{ tag?: string }>) =>
+  Array.map(page, (doc) => doc.tag);
+
+const initials = (page: ReadonlyArray<{ text: string }>) =>
+  Array.map(page, (note) => note.text[0]);
+
+const collectTags = <E, R>(
+  stream: Stream.Stream<{ tag?: string }, E, R>,
+): Effect.Effect<ReadonlyArray<string | undefined>, E, R> =>
+  Stream.runCollect(stream).pipe(Effect.map(tagsOf));
+
+const pageTags = (pages: ReadonlyArray<ReadonlyArray<{ tag?: string }>>) =>
+  Array.flatMap(pages, tagsOf);
 
 const collectTexts = <E, R>(
   stream: Stream.Stream<{ text: string }, E, R>,
@@ -393,9 +409,6 @@ it.layer(TestConfect.layer, { buildPerTest: true })("QueryStream", (test) => {
             ),
           );
 
-          const tagsOf = (page: ReadonlyArray<{ tag?: string }>) =>
-            Array.map(page, (doc) => doc.tag);
-
           const page1 = yield* QueryStream.paginate(composed, {
             numItems: 2,
             cursor: null,
@@ -536,11 +549,13 @@ it.layer(TestConfect.layer, { buildPerTest: true })("QueryStream", (test) => {
 
             const reader = yield* DatabaseReader;
             const noteStream = reader.table(notesTable).stream("by_text");
-            const initials = (page: ReadonlyArray<{ text: string }>) =>
-              Array.map(page, (note) => note.text[0]);
-            const [first] = yield* Stream.runCollect(noteStream);
-            const maximumBytesRead =
-              2.5 * getDocumentSize(first as unknown as Record<string, Value>);
+
+            const ctx = yield* MutationCtx;
+            const first = yield* Effect.promise(() =>
+              ctx.db.query("notes").withIndex("by_text").first(),
+            );
+            assert(first !== null);
+            const maximumBytesRead = 2.5 * getDocumentSize(first);
 
             const page = yield* QueryStream.paginate(noteStream, {
               numItems: 10,
@@ -1256,7 +1271,9 @@ it.layer(TestConfect.layer, { buildPerTest: true })("QueryStream", (test) => {
             const releaseA = yield* Deferred.make<void>();
             const completionOrder: Array<string> = [];
             const transform = Effect.fnUntraced(function* (text: string) {
-              if (text === "a") yield* Deferred.await(releaseA);
+              if (text === "a") {
+                yield* Deferred.await(releaseA);
+              }
               completionOrder.push(text);
               if (text !== "a" && completionOrder.length === predecessors) {
                 yield* Deferred.succeed(releaseA, undefined);
@@ -1429,14 +1446,7 @@ it.layer(TestConfect.layer, { buildPerTest: true })("QueryStream", (test) => {
             yield* writer.table(notesTable).insert({ text, tag });
           }
 
-          const tagsOf = <E, R>(
-            stream: Stream.Stream<{ tag?: string }, E, R>,
-          ): Effect.Effect<ReadonlyArray<string | undefined>, E, R> =>
-            Stream.runCollect(stream).pipe(
-              Effect.map((docs) => Array.map(docs, (doc) => doc.tag)),
-            );
-
-          const firstPerText = yield* tagsOf(
+          const firstPerText = yield* collectTags(
             reader
               .table(notesTable)
               .stream("by_text")
@@ -1446,7 +1456,7 @@ it.layer(TestConfect.layer, { buildPerTest: true })("QueryStream", (test) => {
 
           // In descending order, the first document of each group is the
           // group's last in ascending order.
-          const firstPerTextDesc = yield* tagsOf(
+          const firstPerTextDesc = yield* collectTags(
             reader
               .table(notesTable)
               .stream("by_text", "desc")
@@ -1582,13 +1592,6 @@ it.layer(TestConfect.layer, { buildPerTest: true })("QueryStream", (test) => {
             yield* writer.table(notesTable).insert({ text, tag });
           }
 
-          const tagsOf = <E, R>(
-            stream: Stream.Stream<{ tag?: string }, E, R>,
-          ): Effect.Effect<ReadonlyArray<string | undefined>, E, R> =>
-            Stream.runCollect(stream).pipe(
-              Effect.map((docs) => Array.map(docs, (doc) => doc.tag)),
-            );
-
           // Type-level key ["text", "_creationTime", "_creationTime"]; the
           // runtime key also carries the outer row's `_id` in the middle.
           const joined = reader
@@ -1638,13 +1641,13 @@ it.layer(TestConfect.layer, { buildPerTest: true })("QueryStream", (test) => {
 
           // Distinct over the outer key keeps each outer row's first inner
           // document; the "x0" row has none.
-          const tagsOfResult = yield* tagsOf(
+          const tagsOfResult = yield* collectTags(
             joined.pipe(QueryStream.distinct(["text"])),
           );
           expect(tagsOfResult).toEqual(["a1", "b1"]);
 
           // A prefix reaching into the inner key spans the outer `_id`.
-          const tagsOfResult2 = yield* tagsOf(
+          const tagsOfResult2 = yield* collectTags(
             joined.pipe(
               QueryStream.distinct(["text", "_creationTime", "_creationTime"]),
             ),
@@ -1699,17 +1702,14 @@ it.layer(TestConfect.layer, { buildPerTest: true })("QueryStream", (test) => {
             ),
           ]);
           const expected = ["l1", "l2", "l1", "l2", "l1", "l2", "l1", "l2"];
-          const tags = (
-            pages: ReadonlyArray<ReadonlyArray<{ tag?: string }>>,
-          ) =>
-            Array.flatMap(pages, (page) => Array.map(page, (doc) => doc.tag));
+
           const paginateAllResult = yield* paginateAll(merged, 1);
-          expect(tags(paginateAllResult)).toEqual(expected);
+          expect(pageTags(paginateAllResult)).toEqual(expected);
           const paginateAllResult2 = yield* paginateAll(
             QueryStream.reverse(merged),
             2,
           );
-          expect(tags(paginateAllResult2)).toEqual(Array.reverse(expected));
+          expect(pageTags(paginateAllResult2)).toEqual(Array.reverse(expected));
         }),
       );
     }),
@@ -1877,9 +1877,9 @@ it.layer(TestConfect.layer, { buildPerTest: true })("QueryStream", (test) => {
           for (const cursor of ["_notjson", "[1, 2]"]) {
             const defect = yield* fromCursor(cursor);
             assert(Predicate.hasProperty(defect, "data"));
-            expect(
-              (defect.data as { paginationError?: string }).paginationError,
-            ).toBe("InvalidCursor");
+            expect(defect.data).toMatchObject({
+              paginationError: "InvalidCursor",
+            });
           }
         }),
       );

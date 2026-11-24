@@ -8,12 +8,10 @@ import * as FunctionRegistryItem from "@confect/server/FunctionRegistryItem";
 import type * as Handler from "@confect/server/Handler";
 import * as RegisteredConvexFunction from "@confect/server/RegisteredConvexFunction";
 import { RegisteredNodeFunction } from "@confect/server/node";
-import { convexTest, type TestConvex } from "convex-test";
-import {
-  defineSchema,
-  makeFunctionReference,
-  type SignJwtOptions,
-} from "convex/server";
+import { convexTest } from "convex-test";
+import type { TestConvex } from "convex-test";
+import { defineSchema, makeFunctionReference } from "convex/server";
+import type { SignJwtOptions } from "convex/server";
 import { createLocalJWKSet, errors, jwtVerify } from "jose";
 import * as Console from "effect/Console";
 import * as TestConsole from "effect/testing/TestConsole";
@@ -229,9 +227,7 @@ it.layer(TestConfect.layer, { buildPerTest: true })(
           yield* c.run(
             Effect.gen(function* () {
               const auth = yield* MutationAuth;
-              const extraClaims: Record<string, string> = {
-                [claim]: "forbidden",
-              };
+              const extraClaims = { [claim]: "forbidden" };
               const options: SignJwtOptions = {
                 claims: { aud: "confect-integration", ...extraClaims },
                 expiresInSeconds: 60,
@@ -918,6 +914,34 @@ it.layer(TestConfect.layer, { buildPerTest: true })(
   },
 );
 
+const start = <A, E>(effect: Effect.Effect<A, E>) => Effect.runPromise(effect);
+
+const checkpoint = (signal: Promise<void>, operation: Promise<unknown>) =>
+  Effect.promise(() =>
+    Promise.race([
+      signal,
+      operation.then(() => assert.fail("Operation finished before checkpoint")),
+    ]),
+  );
+const wait = <A>(promise: Promise<A>) => Effect.promise(() => promise);
+const request = <A, E, R>(
+  effect: Effect.Effect<A, E, R>,
+  requested: ReturnType<typeof Promise.withResolvers<void>>,
+) =>
+  Effect.gen(function* () {
+    const fiber = yield* Effect.forkChild(effect, { startImmediately: true });
+    requested.resolve();
+    return yield* Fiber.join(fiber);
+  });
+const store = (blob: Blob) =>
+  Effect.flatMap(Storage.Storage, (storage) => storage.store(blob));
+const readBlobText = (id: Id<"_storage">) =>
+  Effect.gen(function* () {
+    const storage = yield* Storage.Storage;
+    const blob = yield* storage.get(id);
+    return yield* Effect.promise(() => blob.text());
+  });
+
 describe("action storage transaction isolation", () => {
   const actionSpec = FunctionSpec.publicAction({
     name: "run",
@@ -983,35 +1007,6 @@ describe("action storage transaction isolation", () => {
       return this.release.promise.then(() => super.arrayBuffer());
     }
   }
-  const start = <A, E>(effect: Effect.Effect<A, E>) =>
-    Effect.runPromise(effect);
-  const checkpoint = (signal: Promise<void>, operation: Promise<unknown>) =>
-    Effect.promise(() =>
-      Promise.race([
-        signal,
-        operation.then(() =>
-          assert.fail("Operation finished before checkpoint"),
-        ),
-      ]),
-    );
-  const wait = <A>(promise: Promise<A>) => Effect.promise(() => promise);
-  const request = <A, E, R>(
-    effect: Effect.Effect<A, E, R>,
-    requested: ReturnType<typeof Promise.withResolvers<void>>,
-  ) =>
-    Effect.gen(function* () {
-      const fiber = yield* Effect.forkChild(effect, { startImmediately: true });
-      requested.resolve();
-      return yield* Fiber.join(fiber);
-    });
-  const store = (blob: Blob) =>
-    Effect.flatMap(Storage.Storage, (storage) => storage.store(blob));
-  const text = (id: Id<"_storage">) =>
-    Effect.gen(function* () {
-      const storage = yield* Storage.Storage;
-      const blob = yield* storage.get(id);
-      return yield* Effect.promise(() => blob.text());
-    });
   const files = Effect.gen(function* () {
     const reader = yield* DatabaseReader;
     return yield* reader
@@ -1079,7 +1074,9 @@ describe("action storage transaction isolation", () => {
           allowStore.resolve();
           yield* checkpoint(requested.promise, action);
           commit.resolve();
-          if (mutation !== undefined) yield* wait(mutation);
+          if (mutation !== undefined) {
+            yield* wait(mutation);
+          }
           blob.release.resolve();
           yield* wait(action);
           yield* t.run(
@@ -1088,7 +1085,7 @@ describe("action storage transaction isolation", () => {
               expect(stored).toHaveLength(1);
               const file = stored[0];
               assert(file !== undefined);
-              const content = yield* text(file._id);
+              const content = yield* readBlobText(file._id);
               expect(content).toBe("action");
             }),
           );
@@ -1133,9 +1130,9 @@ describe("action storage transaction isolation", () => {
         const secondId = yield* wait(second);
         yield* t.run(
           Effect.gen(function* () {
-            const firstText = yield* text(firstId);
+            const firstText = yield* readBlobText(firstId);
             expect(firstText).toBe("first");
-            const secondText = yield* text(secondId);
+            const secondText = yield* readBlobText(secondId);
             expect(secondText).toBe("second");
             const stored = yield* files;
             expect(stored).toHaveLength(2);
@@ -1182,14 +1179,18 @@ describe("action storage transaction isolation", () => {
           }),
         ),
       );
-      const rejected = expect(mutation).rejects.toThrow("unrelated rollback");
+      const outcome = Promise.allSettled([mutation]);
       let action: Promise<unknown> | undefined;
       yield* Effect.gen(function* () {
         yield* checkpoint(mutating.promise, mutation);
         action = start(t.action(actionRef));
         yield* checkpoint(requested.promise, action);
         rollback.resolve();
-        yield* Effect.promise(() => rejected);
+        const [settled] = yield* wait(outcome);
+        expect(settled).toEqual({
+          status: "rejected",
+          reason: "unrelated rollback",
+        });
         yield* wait(action);
         yield* t.run(
           Effect.gen(function* () {
@@ -1208,9 +1209,7 @@ describe("action storage transaction isolation", () => {
         Effect.ensuring(
           Effect.gen(function* () {
             rollback.resolve();
-            yield* Effect.promise(() =>
-              Promise.allSettled([mutation, rejected, action]),
-            );
+            yield* Effect.promise(() => Promise.allSettled([mutation, action]));
           }),
         ),
       );
@@ -1221,7 +1220,7 @@ describe("action storage transaction isolation", () => {
     Effect.gen(function* () {
       const t = makeTest(store(new Blob(["existing"])));
       const existing = yield* t.action(actionRef);
-      const created: Id<"_storage">[] = [];
+      const created: Array<Id<"_storage">> = [];
       yield* Effect.promise(() =>
         expect(
           start(
@@ -1233,7 +1232,7 @@ describe("action storage transaction isolation", () => {
                   id: existing,
                 });
                 created.push(id);
-                const nestedText = yield* text(id);
+                const nestedText = yield* readBlobText(id);
                 expect(nestedText).toBe("nested");
                 expect((yield* Effect.flip(storage.get(existing))).id).toBe(
                   existing,
@@ -1247,7 +1246,7 @@ describe("action storage transaction isolation", () => {
       yield* t.run(
         Effect.gen(function* () {
           const storage = yield* Storage.Storage;
-          const restoredText = yield* text(existing);
+          const restoredText = yield* readBlobText(existing);
           expect(restoredText).toBe("existing");
           expect(created).toHaveLength(1);
           for (const id of created) {
@@ -1270,7 +1269,7 @@ describe("action storage transaction isolation", () => {
         const id = yield* outer.run(inner.action(actionRef), Id("_storage"));
         yield* inner.run(
           Effect.gen(function* () {
-            const content = yield* text(id);
+            const content = yield* readBlobText(id);
             expect(content).toBe("inner");
           }),
         );
@@ -1289,7 +1288,7 @@ describe("action storage transaction isolation", () => {
       Effect.gen(function* () {
         const outer = makeTest(store(new Blob(["ancestor"])));
         const inner = makeTest(store(new Blob(["inner"])));
-        const created: Id<"_storage">[] = [];
+        const created: Array<Id<"_storage">> = [];
         yield* Effect.promise(() =>
           expect(
             start(
@@ -1300,7 +1299,7 @@ describe("action storage transaction isolation", () => {
                     Id("_storage"),
                   );
                   created.push(id);
-                  const content = yield* text(id);
+                  const content = yield* readBlobText(id);
                   expect(content).toBe("ancestor");
                   return yield* Effect.die("ancestor rollback");
                 }),
@@ -1320,8 +1319,9 @@ describe("action storage transaction isolation", () => {
         yield* outer.run(
           Effect.gen(function* () {
             const storage = yield* Storage.Storage;
-            for (const id of created)
+            for (const id of created) {
               expect((yield* Effect.flip(storage.get(id))).id).toBe(id);
+            }
           }),
         );
       }),
@@ -1375,12 +1375,14 @@ describe("action storage transaction isolation", () => {
           allowStore.resolve();
           yield* checkpoint(requested.promise, action);
           commit.resolve();
-          if (mutation !== undefined) yield* wait(mutation);
+          if (mutation !== undefined) {
+            yield* wait(mutation);
+          }
           blob.release.resolve();
           const id = yield* wait(action);
           yield* t.run(
             Effect.gen(function* () {
-              const content = yield* text(id);
+              const content = yield* readBlobText(id);
               expect(content).toBe("isolated");
               const stored = yield* files;
               expect(Array.map(stored, (file) => file._id)).toEqual([id]);
@@ -1408,26 +1410,27 @@ describe("action storage transaction isolation", () => {
   );
 });
 
-describe("mutation Blob transactions", () => {
-  const modules = import.meta.glob("./fixtures/convex/_generated/*.js");
-  const run = <A, E>(
-    t: TestConvex<typeof convexSchema>,
-    effect: Effect.Effect<A, E, Handler.MutationServices<typeof confectSchema>>,
-  ) =>
-    Effect.promise(() =>
-      t.mutation((ctx) =>
-        Effect.runPromise(
-          effect.pipe(
-            Effect.provide(
-              RegisteredConvexFunction.mutationLayer<typeof confectSchema>(
-                tableNames,
-                ctx,
-              ),
+const run = <A, E>(
+  t: TestConvex<typeof convexSchema>,
+  effect: Effect.Effect<A, E, Handler.MutationServices<typeof confectSchema>>,
+) =>
+  Effect.promise(() =>
+    t.mutation((ctx) =>
+      Effect.runPromise(
+        effect.pipe(
+          Effect.provide(
+            RegisteredConvexFunction.mutationLayer<typeof confectSchema>(
+              tableNames,
+              ctx,
             ),
           ),
         ),
       ),
-    );
+    ),
+  );
+
+describe("mutation Blob transactions", () => {
+  const modules = import.meta.glob("./fixtures/convex/_generated/*.js");
 
   it.effect.each(["application/octet-stream", ""])(
     "preserves bytes, SHA256 and MIME type %j",
@@ -1509,7 +1512,7 @@ describe("mutation Blob transactions", () => {
             return yield* storage.store(new Blob(["existing"]));
           }),
         );
-        const createdIds: (typeof existingId)[] = [];
+        const createdIds: Array<typeof existingId> = [];
         const result = yield* Effect.exit(
           run(
             t,
@@ -1717,8 +1720,8 @@ describe("function logging", () => {
       Effect.gen(function* () {
         const console = {
           ...(yield* TestConsole.make),
-          warn: vi.fn(),
-          log: vi.fn(),
+          warn: vi.fn<Console.Console["warn"]>(),
+          log: vi.fn<Console.Console["log"]>(),
         };
         const item = FunctionRegistryItem.make({
           functionSpec: spec,
@@ -2085,8 +2088,9 @@ describe("DatabaseReader table isolation", () => {
                 yield* writer.table(otherNotes).delete(ids.other);
                 const pendingChanges = yield* readTables;
                 expect(pendingChanges).toEqual(changed(inserted));
-                if (outcome === "rollback")
+                if (outcome === "rollback") {
                   return yield* Effect.die("table-read rollback");
+                }
                 return inserted;
               }),
               Id("notes"),
@@ -2219,7 +2223,7 @@ it.layer(TestConfect.layer, { buildPerTest: true })(
         );
 
         const retrievedText = yield* c
-          .query(refs.public.databaseReader.getNote, { noteId: noteId })
+          .query(refs.public.databaseReader.getNote, { noteId })
           .pipe(Effect.map((note) => note.text));
 
         assertEquals(retrievedText, text);
@@ -2290,6 +2294,8 @@ it.layer(TestConfect.layer, { buildPerTest: true })(
   },
 );
 
+const patchNote = (writer: DatabaseWriter) => writer.table(notesTable).patch;
+
 it.layer(TestConfect.layer, { buildPerTest: true })(
   "DatabaseWriter",
   (test) => {
@@ -2324,8 +2330,6 @@ it.layer(TestConfect.layer, { buildPerTest: true })(
     );
 
     test("patch accepts undefined according to field types and compiler optionality", () => {
-      const patchNote = (writer: DatabaseWriter) =>
-        writer.table(notesTable).patch;
       type Patch = Parameters<ReturnType<typeof patchNote>>[1];
 
       expectTypeOf<{ tag: undefined }>().toExtend<Patch>();

@@ -90,7 +90,7 @@ type TableReader<Table_ extends Table.AnyWithProps, Docs> =
  */
 export interface DatabaseReaderService<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
-  Docs = {},
+  Docs = unknown,
 > {
   /**
    * Selects a bound application or system table for lookups and queries without
@@ -142,7 +142,7 @@ export interface NativeReader<Model extends GenericDataModel> {
     Table_ extends IncludedTables<DatabaseSchema.FromConvexDataModel<Model>>,
   >(
     table: Table_ & NativeTable<Model & SystemDataModel, Table_>,
-  ) => TableReader<Table_, {}>;
+  ) => TableReader<Table_, unknown>;
 }
 
 /**
@@ -178,7 +178,7 @@ export const make = <Model extends GenericDataModel>(
  */
 export type DatabaseReaderTag<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
-  Docs = {},
+  Docs = unknown,
 > = Context.Service<
   DatabaseReaderService<DatabaseSchema_>,
   DatabaseReaderService<DatabaseSchema_, Docs>
@@ -193,7 +193,7 @@ export type DatabaseReaderTag<
  */
 export const DatabaseReader = <
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
-  Docs = {},
+  Docs = unknown,
 >(): DatabaseReaderTag<DatabaseSchema_, Docs> =>
   Context.Service<
     DatabaseReaderService<DatabaseSchema_>,

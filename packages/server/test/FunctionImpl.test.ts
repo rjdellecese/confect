@@ -1,6 +1,7 @@
 import * as RecordEffect from "effect/Record";
 import { FunctionSpec, GroupSpec } from "@confect/core";
-import { Registry, type RegistryItems } from "@confect/server";
+import { Registry } from "@confect/server";
+import type { RegistryItems } from "@confect/server";
 import { FunctionImpl, GroupImpl } from "@confect/server";
 import { describe, expect, it } from "@effect/vitest";
 import * as Context from "effect/Context";
@@ -55,8 +56,8 @@ describe("FunctionImpl.make", () => {
           "insert",
           "list",
         ]);
-        expect((registry as Record<string, unknown>).insert).toBeDefined();
-        expect((registry as Record<string, unknown>).list).toBeDefined();
+        expect(registry.insert).toBeDefined();
+        expect(registry.list).toBeDefined();
       }),
   );
 
