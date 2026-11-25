@@ -3,7 +3,7 @@ import * as Schema from "effect/Schema";
 
 export class StorageRollback extends Schema.TaggedError<
   StorageRollback,
-  unknown
+  { readonly brand: unique symbol }
 >()("StorageRollback", { storageId: GenericId.GenericId("_storage") }) {}
 
 const blobResult = () =>

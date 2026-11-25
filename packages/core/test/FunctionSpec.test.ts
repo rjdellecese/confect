@@ -421,10 +421,10 @@ describe("paginated queries", () => {
 });
 
 describe("middleware options", () => {
-  class AccessDenied extends Schema.TaggedError<AccessDenied, unknown>()(
-    "AccessDenied",
-    {},
-  ) {}
+  class AccessDenied extends Schema.TaggedError<
+    AccessDenied,
+    { readonly brand: unique symbol }
+  >()("AccessDenied", {}) {}
 
   class RequireRole extends MiddlewareSpec.MiddlewareSpec<RequireRole>()(
     "RequireRole",

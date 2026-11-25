@@ -129,13 +129,16 @@ describe("make", () => {
 });
 
 describe("runWithCodec", () => {
-  class NotFound extends Schema.TaggedError<NotFound, unknown>()("NotFound", {
+  class NotFound extends Schema.TaggedError<
+    NotFound,
+    { readonly brand: unique symbol }
+  >()("NotFound", {
     id: Schema.String,
   }) {}
 
   class TransportFailure extends Schema.TaggedError<
     TransportFailure,
-    unknown
+    { readonly brand: unique symbol }
   >()("TransportFailure", {
     cause: Schema.Unknown,
   }) {}
@@ -468,7 +471,10 @@ describe("Error type extraction", () => {
   });
 
   test("error schema extracts the error type", () => {
-    class NotFound extends Schema.TaggedError<NotFound, unknown>()("NotFound", {
+    class NotFound extends Schema.TaggedError<
+      NotFound,
+      { readonly brand: unique symbol }
+    >()("NotFound", {
       id: Schema.String,
     }) {}
 
@@ -483,15 +489,18 @@ describe("Error type extraction", () => {
   });
 
   test("union error schema extracts the union type", () => {
-    class NotFound extends Schema.TaggedError<NotFound, unknown>()("NotFound", {
+    class NotFound extends Schema.TaggedError<
+      NotFound,
+      { readonly brand: unique symbol }
+    >()("NotFound", {
       id: Schema.String,
     }) {}
-    class Forbidden extends Schema.TaggedError<Forbidden, unknown>()(
-      "Forbidden",
-      {
-        reason: Schema.String,
-      },
-    ) {}
+    class Forbidden extends Schema.TaggedError<
+      Forbidden,
+      { readonly brand: unique symbol }
+    >()("Forbidden", {
+      reason: Schema.String,
+    }) {}
 
     const _spec = FunctionSpec.publicMutation({
       name: "remove",
@@ -524,12 +533,12 @@ describe("isConvexError", () => {
 describe("decodeError", () => {
   it.effect("decodes error data using the error schema", () =>
     Effect.gen(function* () {
-      class NotFound extends Schema.TaggedError<NotFound, unknown>()(
-        "NotFound",
-        {
-          id: Schema.String,
-        },
-      ) {}
+      class NotFound extends Schema.TaggedError<
+        NotFound,
+        { readonly brand: unique symbol }
+      >()("NotFound", {
+        id: Schema.String,
+      }) {}
 
       const spec = FunctionSpec.publicMutation({
         name: "update",
@@ -564,7 +573,10 @@ describe("decodeError", () => {
 });
 
 describe("decodeErrorOption", () => {
-  class NotFound extends Schema.TaggedError<NotFound, unknown>()("NotFound", {
+  class NotFound extends Schema.TaggedError<
+    NotFound,
+    { readonly brand: unique symbol }
+  >()("NotFound", {
     id: Schema.String,
   }) {}
 
@@ -616,7 +628,10 @@ describe("decodeErrorOption", () => {
 });
 
 describe("decodeErrorOrElse", () => {
-  class NotFound extends Schema.TaggedError<NotFound, unknown>()("NotFound", {
+  class NotFound extends Schema.TaggedError<
+    NotFound,
+    { readonly brand: unique symbol }
+  >()("NotFound", {
     id: Schema.String,
   }) {}
 
@@ -669,7 +684,10 @@ describe("decodeErrorOrElse", () => {
 
 describe("hasErrorSchema", () => {
   test("returns true for Confect ref with an error schema", () => {
-    class NotFound extends Schema.TaggedError<NotFound, unknown>()("NotFound", {
+    class NotFound extends Schema.TaggedError<
+      NotFound,
+      { readonly brand: unique symbol }
+    >()("NotFound", {
       id: Schema.String,
     }) {}
 
@@ -925,7 +943,7 @@ describe("paginated queries", () => {
     test("is satisfied by a paginated query ref with an error schema", () => {
       class PaginationFailed extends Schema.TaggedError<
         PaginationFailed,
-        unknown
+        { readonly brand: unique symbol }
       >()("PaginationFailed", {}) {}
 
       const refWithError = Ref.make(
@@ -1020,14 +1038,14 @@ describe("error schema laziness at decode time", () => {
     const specErrorBuilt = MutableRef.make(false);
     const middlewareErrorBuilt = MutableRef.make(false);
 
-    class NotFound extends Schema.TaggedError<NotFound, unknown>()(
-      "NotFound",
-      {},
-    ) {}
-    class Blocked extends Schema.TaggedError<Blocked, unknown>()(
-      "Blocked",
-      {},
-    ) {}
+    class NotFound extends Schema.TaggedError<
+      NotFound,
+      { readonly brand: unique symbol }
+    >()("NotFound", {}) {}
+    class Blocked extends Schema.TaggedError<
+      Blocked,
+      { readonly brand: unique symbol }
+    >()("Blocked", {}) {}
 
     class Gate extends MiddlewareSpec.MiddlewareSpec<Gate>()("LazyDecodeGate", {
       functionTypes: { query: true, mutation: true, action: true },
@@ -1073,10 +1091,10 @@ describe("make with middleware options", () => {
   it("derives middleware specs from ordered attachments without forcing schemas", () => {
     const optionsBuilt = MutableRef.make(false);
     const errorBuilt = MutableRef.make(false);
-    class Blocked extends Schema.TaggedError<Blocked, unknown>()(
-      "Blocked",
-      {},
-    ) {}
+    class Blocked extends Schema.TaggedError<
+      Blocked,
+      { readonly brand: unique symbol }
+    >()("Blocked", {}) {}
     class Policy extends MiddlewareSpec.MiddlewareSpec<Policy>()("Policy", {
       options: () => {
         MutableRef.set(optionsBuilt, true);

@@ -24,7 +24,7 @@ const JsonString = Schema.fromJsonString(Schema.String);
 
 export class SkillIgnoreError extends Schema.TaggedError<
   SkillIgnoreError,
-  unknown
+  { readonly brand: unique symbol }
 >()("SkillIgnoreError", { reason: Schema.String }) {
   readonly [Runtime.errorReported] = false;
 

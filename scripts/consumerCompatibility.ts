@@ -89,7 +89,7 @@ export const provenanceProblems = (
 
 export class ConsumerGateFailure extends Schema.TaggedError<
   ConsumerGateFailure,
-  unknown
+  { readonly brand: unique symbol }
 >()("ConsumerGateFailure", { phase: Schema.String, details: Schema.Unknown }) {}
 
 export interface GraphProblem {

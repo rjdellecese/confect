@@ -2,10 +2,10 @@ import { MiddlewareSpec } from "@confect/core";
 import * as Schema from "effect/Schema";
 import type { Viewer } from "./ProvideViewer.spec";
 
-export class NameTooShort extends Schema.TaggedError<NameTooShort, unknown>()(
-  "NameTooShort",
-  {},
-) {}
+export class NameTooShort extends Schema.TaggedError<
+  NameTooShort,
+  { readonly brand: unique symbol }
+>()("NameTooShort", {}) {}
 
 /**
  * Cross-middleware dependency: `requires` the `Viewer` provided by

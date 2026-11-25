@@ -15,12 +15,15 @@ class CurrentUser extends Context.Service<
   { readonly name: string }
 >()("@confect/core/test/MiddlewareSpec.test/CurrentUser") {}
 
-class NotSignedIn extends Schema.TaggedError<NotSignedIn, unknown>()(
-  "NotSignedIn",
-  {},
-) {}
+class NotSignedIn extends Schema.TaggedError<
+  NotSignedIn,
+  { readonly brand: unique symbol }
+>()("NotSignedIn", {}) {}
 
-class NotFound extends Schema.TaggedError<NotFound, unknown>()("NotFound", {
+class NotFound extends Schema.TaggedError<
+  NotFound,
+  { readonly brand: unique symbol }
+>()("NotFound", {
   id: Schema.String,
 }) {}
 

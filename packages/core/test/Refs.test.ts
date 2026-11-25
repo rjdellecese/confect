@@ -365,13 +365,16 @@ describe("make", () => {
 
 describe("middleware error unions", () => {
   it("preserves the declared codecs on a ref with middleware errors", () => {
-    class NotFound extends Schema.TaggedError<NotFound, unknown>()("NotFound", {
+    class NotFound extends Schema.TaggedError<
+      NotFound,
+      { readonly brand: unique symbol }
+    >()("NotFound", {
       id: Schema.String,
     }) {}
-    class Blocked extends Schema.TaggedError<Blocked, unknown>()(
-      "Blocked",
-      {},
-    ) {}
+    class Blocked extends Schema.TaggedError<
+      Blocked,
+      { readonly brand: unique symbol }
+    >()("Blocked", {}) {}
     class Gate extends MiddlewareSpec.MiddlewareSpec<Gate>()("Gate", {
       error: () => Blocked,
       functionTypes: { query: true, mutation: false, action: false },
@@ -398,10 +401,10 @@ describe("middleware error unions", () => {
   });
 
   it("adds them to Confect refs and keeps them off plain Convex refs", () => {
-    class Blocked extends Schema.TaggedError<Blocked, unknown>()(
-      "Blocked",
-      {},
-    ) {}
+    class Blocked extends Schema.TaggedError<
+      Blocked,
+      { readonly brand: unique symbol }
+    >()("Blocked", {}) {}
 
     class GateMutations extends MiddlewareSpec.MiddlewareSpec<GateMutations>()(
       "GateMutations",
@@ -438,10 +441,10 @@ describe("middleware error unions", () => {
 });
 
 describe("make with middleware options", () => {
-  class AccessDenied extends Schema.TaggedError<AccessDenied, unknown>()(
-    "AccessDenied",
-    {},
-  ) {}
+  class AccessDenied extends Schema.TaggedError<
+    AccessDenied,
+    { readonly brand: unique symbol }
+  >()("AccessDenied", {}) {}
 
   class RequireRole extends MiddlewareSpec.MiddlewareSpec<RequireRole>()(
     "RequireRole",

@@ -394,7 +394,7 @@ export type FunctionTypes<MiddlewareSpec_ extends AnyMiddlewareSpec> =
  *   CurrentUser,
  *   { name: string }
  * >()("CurrentUser") {}
- * class NotSignedIn extends Schema.TaggedError<NotSignedIn, unknown>()(
+ * class NotSignedIn extends Schema.TaggedError<NotSignedIn>()(
  *   "NotSignedIn",
  *   {},
  * ) {}

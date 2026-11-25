@@ -31,7 +31,7 @@ const PackProblem = Schema.Struct({
 
 export class InvalidPackContents extends Schema.TaggedError<
   InvalidPackContents,
-  unknown
+  { readonly brand: unique symbol }
 >()("InvalidPackContents", {
   packages: Schema.Array(
     Schema.Struct({
@@ -61,14 +61,14 @@ export class InvalidPackContents extends Schema.TaggedError<
   }
 }
 
-export class NpmPackError extends Schema.TaggedError<NpmPackError, unknown>()(
-  "NpmPackError",
-  {
-    directory: Schema.String,
-    exitCode: Schema.Finite,
-    stderr: Schema.String,
-  },
-) {
+export class NpmPackError extends Schema.TaggedError<
+  NpmPackError,
+  { readonly brand: unique symbol }
+>()("NpmPackError", {
+  directory: Schema.String,
+  exitCode: Schema.Finite,
+  stderr: Schema.String,
+}) {
   override get message() {
     return `npm pack failed for ${this.directory} (exit ${this.exitCode}): ${Str.trim(this.stderr)}`;
   }
@@ -76,7 +76,7 @@ export class NpmPackError extends Schema.TaggedError<NpmPackError, unknown>()(
 
 export class InvalidPackOutput extends Schema.TaggedError<
   InvalidPackOutput,
-  unknown
+  { readonly brand: unique symbol }
 >()("InvalidPackOutput", { directory: Schema.String, cause: Schema.Unknown }) {
   override get message() {
     return `Invalid npm pack JSON for ${this.directory}`;
