@@ -16,18 +16,30 @@ import * as Convex from "convex/server";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import { vi } from "vitest";
+import { convexDeploymentExport } from "./convexDeploymentExport";
 
 afterEach(() => vi.restoreAllMocks());
+
+const handler = () => Effect.succeed("ok");
+const forwardedHandler = () => Promise.resolve("forwarded");
 
 vi.mock("convex/server", (importOriginal) =>
   importOriginal<typeof Convex>().then((original) => ({
     ...original,
-    queryGeneric: vi.fn(original.queryGeneric),
-    internalQueryGeneric: vi.fn(original.internalQueryGeneric),
-    mutationGeneric: vi.fn(original.mutationGeneric),
-    internalMutationGeneric: vi.fn(original.internalMutationGeneric),
-    actionGeneric: vi.fn(original.actionGeneric),
-    internalActionGeneric: vi.fn(original.internalActionGeneric),
+    queryGeneric: vi.fn<typeof original.queryGeneric>(original.queryGeneric),
+    internalQueryGeneric: vi.fn<typeof original.internalQueryGeneric>(
+      original.internalQueryGeneric,
+    ),
+    mutationGeneric: vi.fn<typeof original.mutationGeneric>(
+      original.mutationGeneric,
+    ),
+    internalMutationGeneric: vi.fn<typeof original.internalMutationGeneric>(
+      original.internalMutationGeneric,
+    ),
+    actionGeneric: vi.fn<typeof original.actionGeneric>(original.actionGeneric),
+    internalActionGeneric: vi.fn<typeof original.internalActionGeneric>(
+      original.internalActionGeneric,
+    ),
   })),
 );
 
@@ -86,7 +98,6 @@ describe("make", () => {
   ])(
     "prepares a closed definition and registers a $name handler",
     ({ spec, register }) => {
-      const handler = () => Effect.succeed("ok");
       const item = FunctionRegistryItem.make({
         functionSpec: spec,
         groupMiddlewareAttachments: [],
@@ -105,7 +116,6 @@ describe("make", () => {
       expect(Str.toLowerCase(prepared._tag)).toBe(
         `${spec.functionVisibility}${spec.runtimeAndFunctionType.functionType}`,
       );
-      const forwardedHandler = () => Promise.resolve("forwarded");
       const registered = RegisteredConvexFunction.register({
         ...prepared,
         handler: forwardedHandler,
@@ -127,17 +137,15 @@ describe("make", () => {
       ).toMatchObject({
         get: expect.any(Function),
       });
-      const exported = registered as unknown as {
-        exportArgs: () => string;
-        exportReturns: () => string;
-      };
-      const argsJson = exported.exportArgs();
+      const argsJson = convexDeploymentExport(registered, "exportArgs");
       expect(compileArgs).toHaveBeenCalledOnce();
       expect(compileReturns).not.toHaveBeenCalled();
-      const returnsJson = exported.exportReturns();
+      const returnsJson = convexDeploymentExport(registered, "exportReturns");
       expect(compileReturns).toHaveBeenCalledOnce();
-      expect(exported.exportArgs()).toBe(argsJson);
-      expect(exported.exportReturns()).toBe(returnsJson);
+      expect(convexDeploymentExport(registered, "exportArgs")).toBe(argsJson);
+      expect(convexDeploymentExport(registered, "exportReturns")).toBe(
+        returnsJson,
+      );
       expect(compileArgs).toHaveBeenCalledOnce();
       expect(compileReturns).toHaveBeenCalledOnce();
       expect(

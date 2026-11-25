@@ -1,3 +1,4 @@
+import * as Predicate from "effect/Predicate";
 import { Spec } from "@confect/core";
 import * as Command from "effect/cli/Command";
 import * as FileSystem from "effect/FileSystem";
@@ -29,9 +30,8 @@ import {
   registeredFunctionsRelativePath,
   validateAllImpls,
   withImplFiles,
-  type LeafModule,
-  type LoadedLeafModule,
 } from "../LeafModule";
+import type { LeafModule, LoadedLeafModule } from "../LeafModule";
 import {
   logFileAdded,
   logFileModified,
@@ -399,7 +399,9 @@ const getGeneratedSpecPath = Effect.gen(function* () {
 const loadGeneratedSpec = Effect.gen(function* () {
   const specPath = yield* getGeneratedSpecPath;
   const { module: specModule } = yield* Bundler.bundle(specPath);
-  const spec = specModule.default;
+  const spec = Predicate.hasProperty(specModule, "default")
+    ? specModule.default
+    : undefined;
 
   if (!Spec.isSpec(spec)) {
     return yield* Effect.die(

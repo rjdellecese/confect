@@ -13,8 +13,17 @@ import * as PaginationResult from "./PaginationResult";
  * @internal
  */
 export type ArgsFields = {
-  readonly [key: PropertyKey]: Schema.ConstraintCodec<any, any>;
+  readonly [key: PropertyKey]: Schema.ConstraintCodec<unknown>;
 };
+
+/**
+ * The codec view exposed by erased function specs. Concrete specs retain their
+ * exact codecs.
+ *
+ * @internal
+ */
+// oxlint-disable-next-line typescript/no-explicit-any -- FunctionSpec.AnyConfect intentionally projects any for decoded args, results and failures.
+export type ErasedCodec = Schema.Codec<any, any>;
 
 /**
  * A struct-shaped Confect args schema that keeps its exact field map while
@@ -27,7 +36,8 @@ export type ArgsFields = {
  */
 export interface ArgsSchema<
   ArgsFields_ extends ArgsFields,
-> extends Schema.Codec<any, any> {
+> extends ErasedCodec {
+  readonly Encoded: DefaultFunctionArgs;
   readonly fields: ArgsFields_;
 }
 
@@ -44,14 +54,11 @@ export type AnyArgsSchema = ArgsSchema<ArgsFields>;
 export type FunctionProvenance = Data.TaggedEnum<{
   Confect: {
     args: AnyArgsSchema;
-    returns: Schema.Codec<any, any>;
-    error?: Schema.Codec<any, any>;
+    returns: ErasedCodec;
+    error?: ErasedCodec;
     kind: ConfectKind;
   };
-  Convex: {
-    "~args": DefaultFunctionArgs;
-    "~returns": any;
-  };
+  Convex: Omit<AnyConvex, "_tag">;
 }>;
 
 /**
@@ -77,7 +84,7 @@ export interface Standard {
  */
 export interface Paginated<
   UserArgsFields_ extends ArgsFields = ArgsFields,
-  Item extends Schema.Codec<any, any> = Schema.Codec<any, any>,
+  Item extends Schema.Codec<unknown> = Schema.Codec<unknown>,
 > {
   readonly _tag: "Paginated";
   /**
@@ -91,7 +98,7 @@ export interface Paginated<
   /**
    * Mutable array of items—the page decode target.
    */
-  readonly page: Schema.Codec<any, any>;
+  readonly page: Schema.Codec<Array<Item["Type"]>, Array<Item["Encoded"]>>;
 }
 
 /**
@@ -99,8 +106,8 @@ export interface Paginated<
  */
 export interface Confect<
   ArgsFields_ extends ArgsFields,
-  Returns extends Schema.Codec<any, any>,
-  Error extends Schema.Codec<any, any> = never,
+  Returns extends Schema.Codec<unknown>,
+  Error extends Schema.Codec<unknown> = never,
   Kind extends ConfectKind = ConfectKind,
 > {
   readonly _tag: "Confect";
@@ -117,8 +124,8 @@ export interface Confect<
 export interface AnyConfect {
   readonly _tag: "Confect";
   readonly args: AnyArgsSchema;
-  readonly returns: Schema.Codec<any, any>;
-  readonly error?: Schema.Codec<any, any>;
+  readonly returns: ErasedCodec;
+  readonly error?: ErasedCodec;
   readonly kind: ConfectKind;
 }
 
@@ -134,7 +141,8 @@ export interface Convex<Args extends DefaultFunctionArgs, Returns> {
 /**
  * @internal
  */
-export interface AnyConvex extends Convex<DefaultFunctionArgs, any> {}
+// oxlint-disable-next-line typescript/no-explicit-any -- An erased native spec no longer names its registered function, but still accepts its inferred return type.
+export type AnyConvex = Convex<DefaultFunctionArgs, any>;
 
 /**
  * @internal
@@ -142,6 +150,17 @@ export interface AnyConvex extends Convex<DefaultFunctionArgs, any> {}
 export const FunctionProvenance = Data.taggedEnum<FunctionProvenance>();
 
 const Standard: Standard = { _tag: "Standard" };
+
+type ConfectHeader<Fields extends ArgsFields, Kind extends ConfectKind> = Pick<
+  Confect<Fields, Schema.Codec<unknown>, never, Kind>,
+  "_tag" | "kind" | "~ArgsFields"
+>;
+
+const withArgsFields = <Fields extends ArgsFields, Kind extends ConfectKind>(
+  kind: Kind,
+) =>
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- The spec carries its exact argument fields at the type level without building the schema to populate a runtime property.
+  ({ _tag: "Confect", kind }) as ConfectHeader<Fields, Kind>;
 
 /**
  * Build a `Confect` provenance from lazy args-fields and schema thunks. `args`,
@@ -164,14 +183,14 @@ const Standard: Standard = { _tag: "Standard" };
  */
 export const Confect = <
   const ArgsFields_ extends ArgsFields,
-  Returns extends Schema.Codec<any, any>,
-  Error extends Schema.Codec<any, any> = never,
+  Returns extends Schema.Codec<unknown>,
+  Error extends Schema.Codec<unknown> = never,
 >(
   args: () => ArgsFields_,
   returns: () => Returns,
   error?: () => Error,
 ): Confect<ArgsFields_, Returns, Error, Standard> => {
-  const provenance = { _tag: "Confect" as const, kind: Standard };
+  const provenance = withArgsFields<ArgsFields_, Standard>(Standard);
 
   Lazy.defineProperty(provenance, "args", () => Schema.Struct(args()));
   Lazy.defineProperty(provenance, "returns", returns);
@@ -179,7 +198,7 @@ export const Confect = <
     Lazy.defineProperty(provenance, "error", error);
   }
 
-  return provenance as Confect<ArgsFields_, Returns, Error, Standard>;
+  return provenance;
 };
 
 /**
@@ -209,25 +228,25 @@ export type PaginatedArgs<UserArgsFields extends ArgsFields> = Schema.Struct<
  *
  * @internal
  */
-export type PaginatedReturns<Item extends Schema.Codec<any, any>> =
+export type PaginatedReturns<Item extends Schema.Codec<unknown>> =
   PaginationResult.PaginationResult<Item> extends infer ComposedReturns extends
-    Schema.Codec<any, any>
+    Schema.Codec<unknown>
     ? ComposedReturns
     : never;
 
 /**
  * @internal
  */
-export interface ConfectPaginated<
+export type ConfectPaginated<
   UserArgsFields extends ArgsFields,
-  Item extends Schema.Codec<any, any>,
-  Error extends Schema.Codec<any, any> = never,
-> extends Confect<
+  Item extends Schema.Codec<unknown>,
+  Error extends Schema.Codec<unknown> = never,
+> = Confect<
   PaginatedArgsFields<UserArgsFields>,
   PaginatedReturns<Item>,
   Error,
   Paginated<UserArgsFields, Item>
-> {}
+>;
 
 /**
  * @internal
@@ -250,27 +269,27 @@ export interface AnyConfectPaginated extends AnyConfect {
  */
 export const ConfectPaginated = <
   const UserArgsFields_ extends ArgsFields,
-  Item extends Schema.Codec<any, any>,
-  Error extends Schema.Codec<any, any> = never,
+  Item extends Schema.Codec<unknown>,
+  Error extends Schema.Codec<unknown> = never,
 >(
   userArgs: () => UserArgsFields_,
   item: () => Item,
   error?: () => Error,
 ): ConfectPaginated<UserArgsFields_, Item, Error> => {
   const kind = { _tag: "Paginated" as const };
-  const paginatedKind = kind as Paginated<UserArgsFields_, Item>;
-
   Lazy.defineProperty(kind, "userArgs", () => Schema.Struct(userArgs()));
   Lazy.defineProperty(kind, "item", item);
   Lazy.defineProperty(kind, "page", () =>
-    paginatedKind.item.pipe(Schema.Array, Schema.mutable),
+    kind.item.pipe(Schema.Array, Schema.mutable),
   );
 
-  const provenance = { _tag: "Confect" as const, kind: paginatedKind };
-  const self = provenance as ConfectPaginated<UserArgsFields_, Item, Error>;
+  const provenance = withArgsFields<
+    PaginatedArgsFields<UserArgsFields_>,
+    typeof kind
+  >(kind);
 
   Lazy.defineProperty(provenance, "args", () => {
-    const fields = paginatedKind.userArgs.fields;
+    const fields = kind.userArgs.fields;
     if ("paginationOpts" in fields) {
       throw new globalThis.Error(
         "A paginated query's args schema must not declare `paginationOpts`—" +
@@ -283,22 +302,18 @@ export const ConfectPaginated = <
     });
   });
   Lazy.defineProperty(provenance, "returns", () =>
-    PaginationResult.PaginationResult(paginatedKind.item),
+    PaginationResult.PaginationResult(kind.item),
   );
   if (error !== undefined) {
     Lazy.defineProperty(provenance, "error", error);
   }
 
-  return self;
+  return provenance;
 };
 
 /**
  * @internal
  */
 export const Convex = <Args extends DefaultFunctionArgs, Returns>() =>
-  FunctionProvenance.Convex(
-    {} as {
-      "~args": Args;
-      "~returns": Returns;
-    },
-  );
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- Native specs carry Args and Returns as phantom fields, without adding observable runtime properties.
+  ({ _tag: "Convex" }) as Convex<Args, Returns>;

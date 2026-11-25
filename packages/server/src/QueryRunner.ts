@@ -1,5 +1,5 @@
 import * as Ref from "@confect/core/Ref";
-import type { GenericActionCtx } from "convex/server";
+import type { GenericActionCtx, GenericDataModel } from "convex/server";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -25,7 +25,9 @@ const run = Effect.fn("QueryRunner.runQuery")(
   <A, E, R>(effect: Effect.Effect<A, E, R>): Effect.Effect<A, E, R> => effect,
 );
 
-const make = (nativeRunQuery: GenericActionCtx<any>["runQuery"]) => {
+const make = (
+  nativeRunQuery: GenericActionCtx<GenericDataModel>["runQuery"],
+) => {
   /**
    * Runs a query with decoded arguments and no transaction overrides in any
    * function context.
@@ -131,6 +133,7 @@ const make = (nativeRunQuery: GenericActionCtx<any>["runQuery"]) => {
   > {
     return run(
       Effect.gen(function* () {
+        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- The public overload permits omitted args only for a keyless ref. Its conditional tuple is no longer available beside the transaction options here.
         const actualArgs = (args ?? {}) as Ref.Args<Query>;
         if (options?.useStaleSnapshot !== undefined) {
           const controls =
@@ -195,5 +198,6 @@ export type QueryRunner = typeof QueryRunner.Identifier;
 /**
  * @internal
  */
-export const layer = (runQuery: GenericActionCtx<any>["runQuery"]) =>
-  Layer.succeed(QueryRunner, make(runQuery));
+export const layer = (
+  runQuery: GenericActionCtx<GenericDataModel>["runQuery"],
+) => Layer.succeed(QueryRunner, make(runQuery));

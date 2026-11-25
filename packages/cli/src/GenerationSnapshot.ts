@@ -1,4 +1,5 @@
-import { type GroupSpec, Identifier } from "@confect/core";
+import { Identifier } from "@confect/core";
+import type { GroupSpec } from "@confect/core";
 import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
 import * as HashMap from "effect/HashMap";
@@ -46,8 +47,12 @@ export const GroupTree: Schema.Codec<GroupTree> = Schema.Struct({
   ),
 });
 
-class Snapshot {
+export class Snapshot {
   readonly #leaves: HashMap.HashMap<SpecModulePath.SpecModulePath, GroupTree>;
+
+  static is(this: void, input: unknown): input is Snapshot {
+    return typeof input === "object" && input !== null && #leaves in input;
+  }
 
   private constructor(
     leaves: HashMap.HashMap<SpecModulePath.SpecModulePath, GroupTree>,
@@ -69,7 +74,7 @@ class Snapshot {
   }
 }
 
-export interface GenerationSnapshot extends Snapshot {}
+export type GenerationSnapshot = Snapshot;
 
 const Entries = Schema.Array(Schema.Tuple([Schema.String, GroupTree]));
 const CanonicalSpecPath = SpecModulePath.SpecModulePath.check(
@@ -99,8 +104,9 @@ const parseTree = (
     }
     yield* Result.try({
       try: () => {
-        for (const name of tree.functionNames)
+        for (const name of tree.functionNames) {
           Identifier.validateConfectFunctionIdentifier(name);
+        }
       },
       catch: () =>
         SnapshotError.make({
@@ -160,8 +166,9 @@ const fromEntries = (
       const path = rootPath(relativePath);
       yield* Result.try({
         try: () => {
-          for (const segment of path.pathSegments)
+          for (const segment of path.pathSegments) {
             Identifier.validateConfectFunctionIdentifier(segment);
+          }
         },
         catch: () =>
           SnapshotError.make({
@@ -204,44 +211,43 @@ export const parse = (
   );
 
 export const GenerationSnapshot = Entries.pipe(
-  Schema.decodeTo(
-    Schema.declare<GenerationSnapshot>((input) => input instanceof Snapshot),
-    {
-      decode: SchemaGetter.transformEffect((entries, options) =>
-        Effect.fromResult(fromEntries(entries)).pipe(
-          Effect.mapError(
-            (error) =>
-              new SchemaIssue.InvalidValue(
-                {
-                  message: Match.value(error).pipe(
-                    Match.tagsExhaustive({
-                      SnapshotError: (failure) => failure.message,
-                      ParentChildNameCollisionError: (failure) =>
-                        `${failure.parentSpecPath} declares a ${failure.collisionKind} named ${failure.collisionName} that collides with ${failure.childSpecPath}`,
-                    }),
-                  ),
-                },
-                entries,
-                options,
-              ),
-          ),
+  Schema.decodeTo(Schema.declare<GenerationSnapshot>(Snapshot.is), {
+    decode: SchemaGetter.transformEffect((entries, options) =>
+      Effect.fromResult(fromEntries(entries)).pipe(
+        Effect.mapError(
+          (error) =>
+            new SchemaIssue.InvalidValue(
+              {
+                message: Match.value(error).pipe(
+                  Match.tagsExhaustive({
+                    SnapshotError: (failure) => failure.message,
+                    ParentChildNameCollisionError: (failure) =>
+                      `${failure.parentSpecPath} declares a ${failure.collisionKind} named ${failure.collisionName} that collides with ${failure.childSpecPath}`,
+                  }),
+                ),
+              },
+              entries,
+              options,
+            ),
         ),
       ),
-      encode: SchemaGetter.transform((snapshot) =>
-        HashMap.toEntries(snapshot.leaves),
-      ),
-    },
-  ),
+    ),
+    encode: SchemaGetter.transform((snapshot) =>
+      HashMap.toEntries(snapshot.leaves),
+    ),
+  }),
 );
 
-const summarize = (group: GroupSpec.AnyWithProps): GroupTree => ({
-  runtime: group.runtime,
-  ...(group.experimental_reuseContext
-    ? { experimental_reuseContext: true }
-    : {}),
-  functionNames: Record.keys(group.functions),
-  groups: Record.map(group.groups, summarize),
-});
+const summarize = (group: GroupSpec.AnyWithProps): GroupTree => {
+  const tree = {
+    runtime: group.runtime,
+    functionNames: Record.keys(group.functions),
+    groups: Record.map(group.groups, summarize),
+  };
+  return group.experimental_reuseContext
+    ? { ...tree, experimental_reuseContext: true }
+    : tree;
+};
 
 export const update = (
   snapshot: GenerationSnapshot,
@@ -251,7 +257,9 @@ export const update = (
   SnapshotError | ParentChildNameCollisionError
 > =>
   Result.gen(function* () {
-    if (leaves.length === 0) return snapshot;
+    if (leaves.length === 0) {
+      return snapshot;
+    }
     const replacement = yield* fromLoadedLeaves(leaves);
     return yield* Snapshot.parseLeaves(
       HashMap.union(snapshot.leaves, replacement.leaves),
@@ -279,20 +287,23 @@ const groups = (snapshot: GenerationSnapshot): ReadonlyArray<GroupSummary> => {
   const visit = (
     path: GroupPath.GroupPath,
     tree: GroupTree,
-  ): ReadonlyArray<GroupSummary> => [
-    {
+  ): ReadonlyArray<GroupSummary> => {
+    const summary = {
       path,
       runtime: tree.runtime,
-      ...(tree.experimental_reuseContext === true
-        ? { experimental_reuseContext: true }
-        : {}),
       functionNames: Array.sort(tree.functionNames, String.Order),
-    },
-    ...Array.flatMap(
-      Array.sort(Record.keys(tree.groups), String.Order),
-      (name: string) => visit(GroupPath.append(path, name), tree.groups[name]!),
-    ),
-  ];
+    };
+    return [
+      tree.experimental_reuseContext === true
+        ? { ...summary, experimental_reuseContext: true }
+        : summary,
+      ...Array.flatMap(
+        Array.sort(Record.keys(tree.groups), String.Order),
+        (name: string) =>
+          visit(GroupPath.append(path, name), tree.groups[name]),
+      ),
+    ];
+  };
   return Array.flatMap(Array.fromIterable(snapshot.leaves), ([path, tree]) =>
     visit(rootPath(path), tree),
   );
@@ -372,8 +383,10 @@ const parseNoParentChildNameCollisions = (
         `${Array.join(segments.slice(0, depth), "/")}.spec.ts`,
       );
       const parent = HashMap.get(leaves, parentPath);
-      if (Option.isNone(parent)) continue;
-      const collisionName = segments[depth]!;
+      if (Option.isNone(parent)) {
+        continue;
+      }
+      const collisionName = segments[depth];
       const collisionKind = parent.value.functionNames.includes(collisionName)
         ? "function"
         : Record.has(parent.value.groups, collisionName)

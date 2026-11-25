@@ -293,10 +293,10 @@ describe("AddGroups", () => {
 });
 
 describe("middleware options", () => {
-  class AccessDenied extends Schema.TaggedError<AccessDenied, {}>()(
-    "AccessDenied",
-    {},
-  ) {}
+  class AccessDenied extends Schema.TaggedError<
+    AccessDenied,
+    { readonly brand: unique symbol }
+  >()("AccessDenied", {}) {}
 
   class RequireRole extends MiddlewareSpec.MiddlewareSpec<RequireRole>()(
     "RequireRole",
@@ -320,15 +320,19 @@ describe("middleware options", () => {
   });
 
   it("requires exactly the declared attachment options", () => {
-    GroupSpec.make().middleware(RequireRole, { roles: ["Buyer"] });
-    GroupSpec.make().middleware(Observe);
-    // @ts-expect-error
+    const attached = GroupSpec.make()
+      .middleware(RequireRole, { roles: ["Buyer"] })
+      .middleware(Observe);
+    expectTypeOf<GroupSpec.MiddlewareSpecs<typeof attached>>().toEqualTypeOf<
+      typeof RequireRole | typeof Observe
+    >();
+    // @ts-expect-error - RequireRole requires an options object
     GroupSpec.make().middleware(RequireRole);
-    // @ts-expect-error
+    // @ts-expect-error - Unknown is not a declared role
     GroupSpec.make().middleware(RequireRole, { roles: ["Unknown"] });
-    // @ts-expect-error
+    // @ts-expect-error - undefined is not an options object
     GroupSpec.make().middleware(RequireRole, undefined);
-    // @ts-expect-error
+    // @ts-expect-error - Observe does not accept options
     GroupSpec.make().middleware(Observe, {});
   });
 
@@ -339,7 +343,7 @@ describe("middleware options", () => {
     }) {}
     const group = GroupSpec.make().middleware(Limit, { limit: 5 });
     expect(group.middlewareAttachments[0]?.options).toEqual({ limit: 5 });
-    // @ts-expect-error
+    // @ts-expect-error - limit must be a decoded number
     GroupSpec.make().middleware(Limit, { limit: "5" });
   });
 

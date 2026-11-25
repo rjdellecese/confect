@@ -102,7 +102,9 @@ const pageTags = Effect.fnUntraced(function* <
     if (result.page.length > 0) {
       pages.push(Array.map(result.page, (row) => row.tag));
     }
-    if (result.isDone) return pages;
+    if (result.isDone) {
+      return pages;
+    }
     expect(result.continueCursor).not.toBe(cursor);
     cursor = result.continueCursor;
   }
@@ -145,13 +147,13 @@ it.layer(TestConfect.layer, { buildPerTest: true })(
             const keyValues = [a2.text, a2._creationTime, a2._id];
             const tagsResult5 = yield* tags(
               QueryStream.narrow(distinct, {
-                start: { keyValues: keyValues, inclusive: true },
+                start: { keyValues, inclusive: true },
               }),
             );
             expect(tagsResult5).toEqual([]);
             const tagsResult6 = yield* tags(
               QueryStream.narrow(distinct, {
-                end: { keyValues: keyValues, inclusive: true },
+                end: { keyValues, inclusive: true },
               }),
             );
             expect(tagsResult6).toEqual(["a1"]);
@@ -325,25 +327,25 @@ it.layer(TestConfect.layer, { buildPerTest: true })(
 
             const tagsResult14 = yield* tags(
               QueryStream.narrow(distinct, {
-                start: { keyValues: keyValues, inclusive: true },
+                start: { keyValues, inclusive: true },
               }),
             );
             expect(tagsResult14).toEqual(["a1", "b1", "c1"]);
             const tagsResult15 = yield* tags(
               QueryStream.narrow(distinct, {
-                start: { keyValues: keyValues, inclusive: false },
+                start: { keyValues, inclusive: false },
               }),
             );
             expect(tagsResult15).toEqual(["b1", "c1"]);
             const tagsResult16 = yield* tags(
               QueryStream.narrow(distinct, {
-                end: { keyValues: keyValues, inclusive: true },
+                end: { keyValues, inclusive: true },
               }),
             );
             expect(tagsResult16).toEqual(["a1"]);
             const tagsResult17 = yield* tags(
               QueryStream.narrow(distinct, {
-                end: { keyValues: keyValues, inclusive: false },
+                end: { keyValues, inclusive: false },
               }),
             );
             expect(tagsResult17).toEqual([]);

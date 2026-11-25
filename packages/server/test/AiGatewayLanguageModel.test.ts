@@ -18,10 +18,8 @@ import * as HttpClient from "effect/http/HttpClient";
 import type * as HttpClientRequest from "effect/http/HttpClientRequest";
 import * as HttpClientResponse from "effect/http/HttpClientResponse";
 import * as InternalAiGatewayLanguageClient from "../src/internal/AiGatewayLanguageClient";
-import {
-  AiGatewayServiceToken,
-  type Service as AiGatewayServiceTokenService,
-} from "../src/internal/AiGatewayServiceToken";
+import { AiGatewayServiceToken } from "../src/internal/AiGatewayServiceToken";
+import type { Service as AiGatewayServiceTokenService } from "../src/internal/AiGatewayServiceToken";
 
 vi.mock("convex/server", (importOriginal) =>
   importOriginal<typeof ConvexServer>().then((original) => ({

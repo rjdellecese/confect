@@ -185,7 +185,7 @@ describe("QueryStreamKeyBounds", () => {
     "admits the endpoint only for inclusive=%s bounds",
     (inclusive) => {
       const keyValues = ["a"];
-      const bound = Option.some({ keyValues: keyValues, inclusive });
+      const bound = Option.some({ keyValues, inclusive });
       expect(admittedByLower(bound)(keyValues)).toBe(inclusive);
       expect(admittedByUpper(bound)(keyValues)).toBe(inclusive);
     },
@@ -307,20 +307,16 @@ describe("QueryStreamKeyBounds", () => {
     expect(
       intersect(parsedBounds(none, none), parsedBounds(none, none)),
     ).toEqual(parsedBounds(none, none));
-    for (const [left, right] of [
-      [none, first],
-      [first, none],
-    ]) {
-      const result = intersect(
-        parsedBounds(left, left),
-        parsedBounds(right, right),
-      );
-      expect(result).toEqual(parsedBounds(first, first));
-      if (Option.isNone(left)) {
-        expect(result.lower).toBe(first);
-        expect(result.upper).toBe(first);
-      }
-    }
+    const fromRight = intersect(
+      parsedBounds(none, none),
+      parsedBounds(first, first),
+    );
+    expect(fromRight).toEqual(parsedBounds(first, first));
+    expect(fromRight.lower).toBe(first);
+    expect(fromRight.upper).toBe(first);
+    expect(
+      intersect(parsedBounds(first, first), parsedBounds(none, none)),
+    ).toEqual(parsedBounds(first, first));
     for (const [left, right] of [
       [first, second],
       [second, first],
@@ -398,7 +394,7 @@ describe("QueryStreamKeyBounds", () => {
     expectTypeOf<{ start: Bound; end: Bound }>().toExtend<Narrow>();
     expectTypeOf<{ start: Bound; end: undefined }>().toExtend<Narrow>();
     expectTypeOf<{ start: undefined; end: Bound }>().toExtend<Narrow>();
-    expectTypeOf<{}>().not.toExtend<Narrow>();
+    expectTypeOf<Record<never, never>>().not.toExtend<Narrow>();
     expectTypeOf<{ start: undefined; end: undefined }>().not.toExtend<Narrow>();
     expectTypeOf<{ start?: Bound; end?: Bound }>().not.toExtend<Narrow>();
   });

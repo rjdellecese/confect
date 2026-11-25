@@ -1,5 +1,6 @@
 import * as Ref from "@confect/core/Ref";
-import { ConvexHttpClient, type HttpMutationOptions } from "convex/browser";
+import { ConvexHttpClient } from "convex/browser";
+import type { HttpMutationOptions } from "convex/browser";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -18,17 +19,17 @@ import * as Schema from "effect/Schema";
  *
  * @category Errors
  */
-export class HttpClientError extends Schema.TaggedError<HttpClientError, {}>()(
-  "HttpClientError",
-  {
-    /**
-     * The original rejected value, including undeclared Convex errors.
-     *
-     * @category Errors
-     */
-    cause: Schema.Unknown,
-  },
-) {}
+export class HttpClientError extends Schema.TaggedError<
+  HttpClientError,
+  { readonly brand: unique symbol }
+>()("HttpClientError", {
+  /**
+   * The original rejected value, including undeclared Convex errors.
+   *
+   * @category Errors
+   */
+  cause: Schema.Unknown,
+}) {}
 
 const runQuery = Effect.fn("HttpClient.query")(
   <A, E>(effect: Effect.Effect<A, E>): Effect.Effect<A, E> => effect,
@@ -41,6 +42,8 @@ const runMutation = Effect.fn("HttpClient.mutation")(
 const runAction = Effect.fn("HttpClient.action")(
   <A, E>(effect: Effect.Effect<A, E>): Effect.Effect<A, E> => effect,
 );
+
+const mapUnknownError = (cause: unknown) => HttpClientError.make({ cause });
 
 const make = (
   address: string,
@@ -56,8 +59,6 @@ const make = (
     client.clearAuth();
   });
 
-  const mapUnknownError = (cause: unknown) => HttpClientError.make({ cause });
-
   const query = <Query extends Ref.AnyPublicQuery>(
     ref: Query,
     ...rest: Ref.OptionalArgs<Query>
@@ -65,7 +66,7 @@ const make = (
     Ref.Returns<Query>,
     Ref.Error<Query> | HttpClientError | Schema.SchemaError
   > => {
-    const args = (rest[0] ?? {}) as Ref.Args<Query>;
+    const args = Ref.argsOrEmpty<Query>(rest);
     return runQuery(
       Ref.runWithCodec(
         ref,
@@ -84,7 +85,7 @@ const make = (
     Ref.Returns<Mutation>,
     Ref.Error<Mutation> | HttpClientError | Schema.SchemaError
   > => {
-    const args = (rest[0] ?? {}) as Ref.Args<Mutation>;
+    const args = Ref.argsOrEmpty<Mutation>(rest);
     const mutationOptions: HttpMutationOptions = rest[1] ?? {
       skipQueue: false,
     };
@@ -106,7 +107,7 @@ const make = (
     Ref.Returns<Action>,
     Ref.Error<Action> | HttpClientError | Schema.SchemaError
   > => {
-    const args = (rest[0] ?? {}) as Ref.Args<Action>;
+    const args = Ref.argsOrEmpty<Action>(rest);
     return runAction(
       Ref.runWithCodec(
         ref,

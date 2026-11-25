@@ -93,24 +93,22 @@ export type QueryResult<A, E = never> = Loading | Success<A> | Failure<E>;
  *
  * @internal
  */
-export const isQueryResult = (
-  input: unknown,
-): input is QueryResult<unknown, unknown> =>
-  Predicate.hasProperty(input, TypeId) && input[TypeId] === TypeId;
+export const isQueryResult = Predicate.compose(
+  Predicate.hasProperty(TypeId),
+  (input): input is QueryResult<unknown, unknown> => input[TypeId] === TypeId,
+);
 
-const Proto = {
-  [TypeId]: TypeId,
-  pipe(this: QueryResult<unknown, unknown>, ...args: ReadonlyArray<unknown>) {
-    return Pipeable.pipeArguments(
-      this,
-      args as unknown as Parameters<typeof Pipeable.pipeArguments>[1],
-    );
-  },
+class QueryResultProto extends Pipeable.Class implements Proto {
+  get [TypeId](): typeof TypeId {
+    return TypeId;
+  }
   [Equal.symbol](
     this: QueryResult<unknown, unknown>,
     that: Equal.Equal,
   ): boolean {
-    if (!isQueryResult(that)) return false;
+    if (!isQueryResult(that)) {
+      return false;
+    }
     return Match.value(this).pipe(
       Match.tag("Loading", () => isLoading(that)),
       Match.tag(
@@ -123,7 +121,7 @@ const Proto = {
       ),
       Match.exhaustive,
     );
-  },
+  }
   [Hash.symbol](this: QueryResult<unknown, unknown>): number {
     const tagHash = Hash.combine(Hash.string(TypeId))(Hash.string(this._tag));
     return Match.value(this).pipe(
@@ -136,8 +134,8 @@ const Proto = {
       ),
       Match.exhaustive,
     );
-  },
-};
+  }
+}
 
 /**
  * Creates a loading result for a Model field. It does not open or restart the
@@ -146,7 +144,7 @@ const Proto = {
  * @category Constructors
  */
 export const load = (): Loading =>
-  Object.assign(Object.create(Proto), { _tag: "Loading" });
+  Object.assign(new QueryResultProto(), { _tag: "Loading" as const });
 
 /**
  * Creates a success result that retains the supplied value unchanged.
@@ -154,8 +152,8 @@ export const load = (): Loading =>
  * @category Constructors
  */
 export const succeed = <A>(value: A): Success<A> =>
-  Object.assign(Object.create(Proto), {
-    _tag: "Success",
+  Object.assign(new QueryResultProto(), {
+    _tag: "Success" as const,
     value,
   });
 
@@ -165,8 +163,8 @@ export const succeed = <A>(value: A): Success<A> =>
  * @category Constructors
  */
 export const fail = <E>(error: E): Failure<E> =>
-  Object.assign(Object.create(Proto), {
-    _tag: "Failure",
+  Object.assign(new QueryResultProto(), {
+    _tag: "Failure" as const,
     error,
   });
 
@@ -347,10 +345,9 @@ export const match: {
       readonly onFailure: (error: E) => Z;
     },
   ): X | Y | Z =>
-    Match.value(self).pipe(
-      Match.tag("Loading", () => handlers.onLoading()),
-      Match.tag("Success", ({ value }) => handlers.onSuccess(value)),
-      Match.tag("Failure", ({ error }) => handlers.onFailure(error)),
-      Match.exhaustive,
-    ) as X | Y | Z,
+    Match.typeTags<QueryResult<A, E>, X | Y | Z>()({
+      Loading: () => handlers.onLoading(),
+      Success: ({ value }) => handlers.onSuccess(value),
+      Failure: ({ error }) => handlers.onFailure(error),
+    })(self),
 );

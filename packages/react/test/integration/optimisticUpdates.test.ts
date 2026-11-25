@@ -11,30 +11,56 @@ import * as Result from "effect/Result";
 import * as Effect from "effect/Effect";
 import * as Array from "effect/Array";
 import * as Schema from "effect/Schema";
-import { createElement, type ReactNode } from "react";
+import { createElement } from "react";
+import type { ReactNode } from "react";
 import { vi } from "vitest";
 
 const Json = Schema.fromJsonString(Schema.Unknown);
 
-class TestSocket {
+class TestSocket extends EventTarget implements WebSocket {
+  static readonly CONNECTING = 0;
+  static readonly OPEN = 1;
+  static readonly CLOSING = 2;
+  static readonly CLOSED = 3;
+  readonly CONNECTING = TestSocket.CONNECTING;
+  readonly OPEN = TestSocket.OPEN;
+  readonly CLOSING = TestSocket.CLOSING;
+  readonly CLOSED = TestSocket.CLOSED;
   static current: TestSocket | undefined;
-  onopen: (() => void) | undefined;
-  onmessage: ((event: { data: string }) => void) | undefined;
-  onclose: (() => void) | undefined;
-  send = vi.fn();
+  readonly url: string;
+  readonly bufferedAmount = 0;
+  readonly extensions = "";
+  readonly protocol = "";
+  binaryType: BinaryType = "blob";
+  readyState: WebSocket["readyState"] = TestSocket.CONNECTING;
+  onopen: WebSocket["onopen"] = null;
+  onmessage: WebSocket["onmessage"] = null;
+  onclose: WebSocket["onclose"] = null;
+  onerror: WebSocket["onerror"] = null;
+  send = vi.fn<WebSocket["send"]>();
 
-  constructor() {
+  constructor(url: string | URL) {
+    super();
+    this.url = String(url);
     TestSocket.current = this;
   }
 
+  open() {
+    this.readyState = TestSocket.OPEN;
+    this.dispatchEvent(new Event("open"));
+  }
+
   receive(message: unknown) {
-    this.onmessage?.({
-      data: Result.getOrThrow(Schema.encodeResult(Json)(message)),
-    });
+    this.dispatchEvent(
+      new MessageEvent("message", {
+        data: Result.getOrThrow(Schema.encodeResult(Json)(message)),
+      }),
+    );
   }
 
   close() {
-    this.onclose?.();
+    this.readyState = TestSocket.CLOSED;
+    this.dispatchEvent(new CloseEvent("close"));
   }
 }
 
@@ -55,12 +81,25 @@ const mutation = Ref.make(
   }),
 );
 
+const page = (ranks: Array<string>, isDone: boolean) => ({
+  page: Array.map(ranks, (rank) => ({ rank })),
+  continueCursor: isDone ? "end" : "next",
+  isDone,
+});
+const changed = (queryId: number, value: unknown) => ({
+  type: "QueryUpdated",
+  queryId,
+  value,
+  logLines: [],
+  journal: null,
+});
+
 it.effect(
   "native optimistic layers replay over new pages, roll back failures and reconcile success",
   () =>
     Effect.gen(function* () {
       const client = new ConvexReactClient("https://example.convex.cloud", {
-        webSocketConstructor: TestSocket as unknown as typeof WebSocket,
+        webSocketConstructor: TestSocket,
         unsavedChangesWarning: false,
         logger: false,
       });
@@ -77,23 +116,11 @@ it.effect(
       const unsubscribeSecond = second.onUpdate(vi.fn());
       const socket = TestSocket.current;
       assert(socket !== undefined);
-      socket.onopen?.();
+      socket.open();
       const version0 = { querySet: 0, identity: 0, ts: "AAAAAAAAAAA=" };
       const version1 = { querySet: 2, identity: 0, ts: "AQAAAAAAAAA=" };
       const version2 = { querySet: 2, identity: 0, ts: "AgAAAAAAAAA=" };
       const version3 = { querySet: 2, identity: 0, ts: "AwAAAAAAAAA=" };
-      const page = (ranks: string[], isDone: boolean) => ({
-        page: Array.map(ranks, (rank) => ({ rank })),
-        continueCursor: isDone ? "end" : "next",
-        isDone,
-      });
-      const changed = (queryId: number, value: unknown) => ({
-        type: "QueryUpdated",
-        queryId,
-        value,
-        logLines: [],
-        journal: null,
-      });
       socket.receive({
         type: "Transition",
         startVersion: version0,
@@ -127,7 +154,6 @@ it.effect(
           },
         );
         const failing = configured({ rank: 4 });
-        const rejected = expect(failing).rejects.toThrow("rejected");
         expect(first.localQueryResult()).toEqual(
           page(["11", "13", "14"], false),
         );
@@ -152,7 +178,9 @@ it.effect(
           result: "rejected",
           logLines: [],
         });
-        yield* Effect.promise(() => rejected);
+        yield* Effect.promise(() =>
+          expect(failing).rejects.toThrow("rejected"),
+        );
         expect(first.localQueryResult()).toEqual(page(["1", "3"], false));
         expect(second.localQueryResult()).toEqual(page(["5", "7"], true));
 

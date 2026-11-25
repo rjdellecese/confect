@@ -1,11 +1,22 @@
-import * as Record from "effect/Record";
-import { describe, expect, test } from "@effect/vitest";
+import { assert, describe, expect, expectTypeOf, test } from "@effect/vitest";
 import * as Lazy from "@confect/core/Lazy";
 import * as MutableRef from "effect/MutableRef";
 
 describe("Lazy.defineProperty", () => {
+  test.each(["other", "another"])(
+    "adds only statically known keys to the target type (%s)",
+    (key) => {
+      const target = {};
+      Lazy.defineProperty(target, "value", () => 7);
+      expectTypeOf(target.value).toEqualTypeOf<number>();
+      Lazy.defineProperty(target, key, () => "dynamic");
+      expectTypeOf<keyof typeof target>().toEqualTypeOf<"value">();
+      expect(target).toEqual({ value: 7, [key]: "dynamic" });
+    },
+  );
+
   test("does not run compute until the property is first accessed", () => {
-    const target = {} as { value: number };
+    const target = {};
     const calls = MutableRef.make(0);
     Lazy.defineProperty(target, "value", () => {
       MutableRef.increment(calls);
@@ -16,25 +27,27 @@ describe("Lazy.defineProperty", () => {
   });
 
   test("first access runs compute exactly once and returns its value", () => {
-    const target = {} as { value: number };
+    const target = {};
     const calls = MutableRef.make(0);
     Lazy.defineProperty(target, "value", () => {
       MutableRef.increment(calls);
       return 42;
     });
 
+    assert("value" in target);
     expect(target.value).toBe(42);
     expect(MutableRef.get(calls)).toBe(1);
   });
 
   test("second access returns the same reference without re-running compute", () => {
-    const target = {} as { value: { id: number } };
+    const target = {};
     const calls = MutableRef.make(0);
     Lazy.defineProperty(target, "value", () => {
       MutableRef.increment(calls);
       return { id: 1 };
     });
 
+    assert("value" in target);
     const first = target.value;
     const second = target.value;
 
@@ -43,19 +56,24 @@ describe("Lazy.defineProperty", () => {
   });
 
   test("computed property is enumerable after materialisation", () => {
-    const target = {} as { value: number };
+    const target = {};
     Lazy.defineProperty(target, "value", () => 7);
 
     // Force materialisation.
+    assert("value" in target);
     void target.value;
 
-    expect(Record.keys(target)).toContain("value");
+    expect(Object.getOwnPropertyDescriptor(target, "value")?.enumerable).toBe(
+      true,
+    );
   });
 
   test("property is enumerable in the unforced (getter) state too", () => {
-    const target = {} as { value: number };
+    const target = {};
     Lazy.defineProperty(target, "value", () => 7);
 
-    expect(Record.keys(target)).toContain("value");
+    expect(Object.getOwnPropertyDescriptor(target, "value")?.enumerable).toBe(
+      true,
+    );
   });
 });

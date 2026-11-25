@@ -198,7 +198,9 @@ export const CodegenError = Schema.Union([
 export type CodegenError = typeof CodegenError.Type;
 
 export const isCodegenError = (error: unknown): error is CodegenError => {
-  if (isBuildError(error)) return true;
+  if (isBuildError(error)) {
+    return true;
+  }
   return Schema.is(CodegenError)(error);
 };
 
@@ -391,7 +393,9 @@ const renderParentChildNameCollisionError = (
  * an esbuild diagnostic block.
  */
 export const renderCodegenError = (error: CodegenError): string => {
-  if (isBuildError(error)) return renderBuildError(error);
+  if (isBuildError(error)) {
+    return renderBuildError(error);
+  }
   return Match.value(error).pipe(
     Match.tag("SnapshotError", ({ reason, relativePath, pathSegments }) =>
       singleLine(
@@ -487,13 +491,16 @@ export const tapAndLog = <A, E, R>(
  * Catch any {@link CodegenError} thrown by `effect`, log it, and resolve to
  * `Option.none()`. Success resolves to `Option.some(value)`.
  */
-// oxlint-disable effecttsgo/unsafe-effect-type-assertion -- catchIf removes the error variant selected by this refinement.
 export const catchAndLog = <A, E, R>(
   effect: Effect.Effect<A, E, R>,
-): Effect.Effect<Option.Option<A>, Exclude<E, CodegenError>, R> =>
-  Effect.catchIf(
-    Effect.map(effect, Option.some<A>),
-    (error: E): error is E & CodegenError => isCodegenError(error),
-    (error: E & CodegenError) =>
-      logCodegenError(error).pipe(Effect.as(Option.none<A>())),
-  ) as Effect.Effect<Option.Option<A>, Exclude<E, CodegenError>, R>;
+): Effect.Effect<Option.Option<A>, Exclude<E, CodegenError>, R> => {
+  const optional: Effect.Effect<
+    Option.Option<A>,
+    E | CodegenError,
+    R
+  > = Effect.asSome(effect);
+  const recovered = Effect.catchIf(optional, isCodegenError, (error) =>
+    logCodegenError(error).pipe(Effect.as(Option.none<A>())),
+  );
+  return recovered;
+};

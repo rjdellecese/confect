@@ -12,16 +12,12 @@ import { usePaginatedQuery } from "@confect/react";
 vi.mock("convex", () => ({ version: "1.35.0" }));
 
 vi.mock("convex/react", () => ({
-  useQuery: vi.fn(),
-  useMutation: vi.fn(),
-  useAction: vi.fn(),
-  usePaginatedQuery: vi.fn(),
   usePaginatedQueryInternal: () => ({
     user: {
       results: [],
       status: "CanLoadMore",
       isLoading: false,
-      loadMore: vi.fn(),
+      loadMore: vi.fn<(numItems: number) => void>(),
     },
   }),
 }));

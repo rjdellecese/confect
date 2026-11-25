@@ -77,7 +77,9 @@ export const Outcome = Data.taggedEnum<Outcome>();
 export const combine = (
   outcomes: Array.NonEmptyReadonlyArray<Outcome>,
 ): Outcome => {
-  if (outcomes.length === 1) return Array.headNonEmpty(outcomes);
+  if (outcomes.length === 1) {
+    return Array.headNonEmpty(outcomes);
+  }
   const combined = Array.reduce(
     outcomes,
     {
@@ -154,9 +156,9 @@ export interface Completion {
 }
 
 type Request = Data.TaggedEnum<{
-  Idle: {};
-  Pending: {};
-  Joined: {};
+  Idle: object;
+  Pending: object;
+  Joined: object;
   Completed: { readonly completion: Completion };
 }>;
 const Request = Data.taggedEnum<Request>();
@@ -249,7 +251,7 @@ export const verifyInputs = Effect.fn("WatchBuild.verifyInputs")(function* (
  * @internal
  */
 export type State = Data.TaggedEnum<{
-  Initial: {};
+  Initial: object;
   Succeeded: {
     readonly snapshot: Snapshot;
     readonly warnings: ReadonlyArray<esbuild.Message>;
@@ -324,7 +326,7 @@ export const outputHash = (state: State): Option.Option<string> =>
   });
 
 export type Change = Data.TaggedEnum<{
-  Full: {};
+  Full: object;
   Affected: { readonly paths: HashSet.HashSet<string> };
   Recovered: { readonly paths: HashSet.HashSet<string> };
 }>;
@@ -372,8 +374,9 @@ export const diff = (
     (Array.some(sources, (file) => HashMap.has(previousFingerprints, file)) &&
       State.$is("Failed")(current)) ||
     untrackedOutput
-  )
+  ) {
     return Change.Full();
+  }
 
   const graph = Option.match(lastSuccessful(current), {
     onNone: () => HashMap.empty<string, HashSet.HashSet<string>>(),
@@ -412,29 +415,33 @@ export const parse = Effect.fn("WatchBuild.parse")(function* (
   digest: Digest.Digest["Service"],
 ) {
   const failures = capture.failures.pipe(HashMap.values, Array.fromIterable);
-  if (Array.isReadonlyArrayNonEmpty(result.errors))
+  if (Array.isReadonlyArrayNonEmpty(result.errors)) {
     failures.push(Failure.BuildFailed({ errors: result.errors }));
-  if (Array.isReadonlyArrayNonEmpty(failures))
+  }
+  if (Array.isReadonlyArrayNonEmpty(failures)) {
     return Outcome.Failed({
       fingerprints: capture.fingerprints,
       failures,
       warnings: result.warnings,
     });
-  if (result.metafile === undefined)
+  }
+  if (result.metafile === undefined) {
     return Outcome.Failed({
       fingerprints: capture.fingerprints,
       failures: [Failure.InvalidBuildResult({ missing: "metafile" })],
       warnings: result.warnings,
     });
+  }
   if (
     result.outputFiles === undefined ||
     !Array.isReadonlyArrayNonEmpty(result.outputFiles)
-  )
+  ) {
     return Outcome.Failed({
       fingerprints: capture.fingerprints,
       failures: [Failure.InvalidBuildResult({ missing: "outputFiles" })],
       warnings: result.warnings,
     });
+  }
   const hashes = yield* Effect.forEach(
     result.outputFiles,
     (file) =>

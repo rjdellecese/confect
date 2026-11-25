@@ -777,6 +777,7 @@ export const make = <Query extends Ref.AnyConfectPublicPaginatedQuery>(
     ...("error" in ref && ref.error !== undefined ? [ref.error] : []),
     ...MiddlewareSpec.errorSchemas(ref.middlewareSpecs),
   ];
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- The public Error<Query> includes FunctionError exactly when the ref or its middleware contributes an error codec below.
   const errorSchema = Schema.Union([
     PaginationError.InvalidCursor,
     Client.WebSocketClientError,
@@ -787,7 +788,7 @@ export const make = <Query extends Ref.AnyConfectPublicPaginatedQuery>(
           Schema.TaggedStruct("FunctionError", {
             error:
               functionErrorSchemas.length === 1
-                ? functionErrorSchemas[0]!
+                ? functionErrorSchemas[0]
                 : Schema.Union(functionErrorSchemas),
           }),
         ]),
@@ -864,64 +865,55 @@ export const make = <Query extends Ref.AnyConfectPublicPaginatedQuery>(
 
   const init: PaginatedQuery<Query>["init"] = (
     state: Idle,
-    argsOrOptions: UserArgs<Query> | Options,
-    options?: Options,
+    ...params: [options: Options] | [args: UserArgs<Query>, options: Options]
   ): MachineActive<Query> =>
-    Match.value(options).pipe(
+    Match.value(params).pipe(
       Match.withReturnType<MachineActive<Query>>(),
-      Match.when(undefined, () =>
-        initialState(
-          state.generation + 1,
-          {} as UserArgs<Query>,
-          argsOrOptions as Options,
-        ),
+      Match.when(
+        (p: typeof params): p is [UserArgs<Query>, Options] => p.length === 2,
+        ([args, options]) => initialState(state.generation + 1, args, options),
       ),
-      Match.when(Match.defined, (definedOptions) =>
-        initialState(
-          state.generation + 1,
-          argsOrOptions as UserArgs<Query>,
-          definedOptions,
-        ),
+      Match.orElse(([options]) =>
+        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- Only refs with no user fields expose init(idle, options).
+        initialState(state.generation + 1, {} as UserArgs<Query>, options),
       ),
-      Match.exhaustive,
     );
 
   const reinitialize: PaginatedQuery<Query>["reinitialize"] = (
     state: MachineActive<Query>,
-    argsOrOptions?: UserArgs<Query> | Options,
-    options?: Options,
-  ): MachineActive<Query> =>
-    Match.value(options).pipe(
+    ...params:
+      | [options?: Options | undefined]
+      | [args: UserArgs<Query>, options?: Options | undefined]
+  ): MachineActive<Query> => {
+    const generation = state.generation + 1;
+    return Match.value(params).pipe(
       Match.withReturnType<MachineActive<Query>>(),
-      Match.when(Match.defined, (definedOptions) =>
-        initialState(
-          state.generation + 1,
-          argsOrOptions as UserArgs<Query>,
-          definedOptions,
-        ),
+      Match.when(
+        (p: typeof params): p is [UserArgs<Query>, Options | undefined] =>
+          p.length === 2,
+        ([args, options]) =>
+          initialState(generation, args, options ?? state.options),
       ),
-      Match.when(undefined, () =>
-        Match.value(argsOrOptions).pipe(
+      Match.orElse(([single]) =>
+        Match.value(single).pipe(
           Match.withReturnType<MachineActive<Query>>(),
           Match.when(undefined, () =>
-            initialState(state.generation + 1, state.args, state.options),
+            initialState(generation, state.args, state.options),
           ),
-          Match.when(Match.defined, (definedArgsOrOptions) =>
+          Match.when(Match.defined, (provided) =>
             Match.value(hasUserArgs).pipe(
               Match.withReturnType<MachineActive<Query>>(),
               Match.when(true, () =>
                 initialState(
-                  state.generation + 1,
-                  definedArgsOrOptions as UserArgs<Query>,
+                  generation,
+                  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- For refs with user fields this argument is user args.
+                  provided as UserArgs<Query>,
                   state.options,
                 ),
               ),
               Match.when(false, () =>
-                initialState(
-                  state.generation + 1,
-                  state.args,
-                  definedArgsOrOptions as Options,
-                ),
+                // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- For refs without user fields this argument is options.
+                initialState(generation, state.args, provided as Options),
               ),
               Match.exhaustive,
             ),
@@ -929,8 +921,8 @@ export const make = <Query extends Ref.AnyConfectPublicPaginatedQuery>(
           Match.exhaustive,
         ),
       ),
-      Match.exhaustive,
     );
+  };
 
   return {
     ref,
@@ -1218,8 +1210,6 @@ const settleSuccess = <Item_, UserArgs_, Error_>(
   const shouldSplit =
     typeof splitCursor === "string" &&
     (splitSignaled || result.page.length > 2 * state.options.initialNumItems);
-  const shouldRetreat =
-    result.page.length === 0 && result.isDone && state.prevStack.length > 0;
 
   return Match.value(shouldSplit).pipe(
     Match.withReturnType<Active<Item_, UserArgs_, Error_>>(),
@@ -1243,25 +1233,29 @@ const settleSuccess = <Item_, UserArgs_, Error_>(
         phase: pendingPhase(previous, "Split"),
       };
     }),
-    Match.when(false, () =>
-      Match.value(shouldRetreat).pipe(
+    Match.when(false, () => {
+      const retreatTo =
+        result.page.length === 0 && result.isDone
+          ? state.prevStack.at(-1)
+          : undefined;
+      return Match.value(retreatTo).pipe(
         Match.withReturnType<Active<Item_, UserArgs_, Error_>>(),
-        Match.when(true, () => ({
+        Match.when(Match.defined, (previousDescriptor) => ({
           ...state,
           requestId: state.requestId + 1,
-          current: state.prevStack[state.prevStack.length - 1],
+          current: previousDescriptor,
           prevStack: state.prevStack.slice(0, -1),
           phase: pendingPhase(phaseData(state.phase), "Previous"),
         })),
-        Match.when(false, () => ({
+        Match.when(undefined, () => ({
           ...state,
           phase: Phase.Success<Item_, Error_>({
             data: pageFromResult(state, result),
           }),
         })),
         Match.exhaustive,
-      ),
-    ),
+      );
+    }),
     Match.exhaustive,
   );
 };
@@ -1690,19 +1684,18 @@ export const match: {
       readonly onStale: (stale: Stale<Item_, Error_>) => E;
       readonly onSuccess: (success: Success<Item_>) => F;
     },
-  ): A | B | C | D | E | F =>
-    Match.value(state).pipe(
-      Match.tag("Idle", handlers.onIdle),
-      Match.tag("Active", ({ phase }) =>
-        Match.value(phase).pipe(
-          Match.tag("Loading", handlers.onLoading),
-          Match.tag("Refreshing", handlers.onRefreshing),
-          Match.tag("Failure", handlers.onFailure),
-          Match.tag("Stale", handlers.onStale),
-          Match.tag("Success", handlers.onSuccess),
-          Match.exhaustive,
-        ),
-      ),
-      Match.exhaustive,
-    ) as A | B | C | D | E | F,
+  ): A | B | C | D | E | F => {
+    type Out = A | B | C | D | E | F;
+    return Match.typeTags<State<Item_, UserArgs_, Error_>, Out>()({
+      Idle: handlers.onIdle,
+      Active: ({ phase }) =>
+        Match.typeTags<Phase<Item_, Error_>, Out>()({
+          Loading: handlers.onLoading,
+          Refreshing: handlers.onRefreshing,
+          Failure: handlers.onFailure,
+          Stale: handlers.onStale,
+          Success: handlers.onSuccess,
+        })(phase),
+    })(state);
+  },
 );

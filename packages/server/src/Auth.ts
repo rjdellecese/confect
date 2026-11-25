@@ -56,7 +56,7 @@ export const layer = (auth: ConvexAuth) => Layer.succeed(Auth, make(auth));
  */
 export class NoUserIdentityFoundError extends Schema.TaggedError<
   NoUserIdentityFoundError,
-  {}
+  { readonly brand: unique symbol }
 >()("NoUserIdentityFoundError", {}) {
   /**
    * Returns a message describing the missing identity without exposing

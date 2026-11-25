@@ -9,7 +9,7 @@ import * as Schema from "effect/Schema";
 it.each([
   "notes.ts",
   "groups/notes.spec.ts",
-  "groups\\notes.impl.ts",
+  String.raw`groups\notes.impl.ts`,
   ".hidden",
   "with spaces/$notes.with.dots.ts",
   "日本語/ノート.ts",
@@ -25,13 +25,13 @@ it.each([
   "..",
   "./notes.ts",
   "groups/../notes.ts",
-  "groups\\.\\notes.ts",
+  String.raw`groups\.\notes.ts`,
   "groups//notes.ts",
-  "groups\\\\notes.ts",
+  String.raw`groups\\notes.ts`,
   "/notes.ts",
-  "\\notes.ts",
+  String.raw`\notes.ts`,
   "C:notes.ts",
-  "C:\\notes.ts",
+  String.raw`C:\notes.ts`,
   "notes\0.ts",
 ])("rejects malformed relative path %s", (input) => {
   expect(Schema.decodeOption(RelativeModulePath)(input)).toEqual(Option.none());

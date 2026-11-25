@@ -2,6 +2,7 @@
   "devDependencies": {
     "@changesets/cli": "3.0.3",
     "@changesets/config": "4.0.1",
+    "@cloudflare/oxlint-config": "0.2.0",
     "@effect/platform-bun": "4.1.0",
     "@effect/platform-node": "4.1.0",
     "@effect/tsgo": "0.73.2",

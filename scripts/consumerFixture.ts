@@ -1,6 +1,4 @@
-export const consumerFiles = (
-  profile: "react" | "foldkit",
-): Readonly<Record<string, string>> => ({
+export const consumerFiles = (profile: "react" | "foldkit") => ({
   "tsconfig.json": `${Result.getOrThrow(
     Schema.encodeResult(Schema.fromJsonString(Schema.Unknown, { space: 2 }))({
       compilerOptions: {
@@ -14,7 +12,7 @@ export const consumerFiles = (
         skipLibCheck: false,
         noEmit: true,
         types: profile === "react" ? ["node", "react"] : ["node"],
-        ...(profile === "react" ? { jsx: "react-jsx" } : {}),
+        jsx: profile === "react" ? "react-jsx" : undefined,
       },
       include: ["**/*.ts", "**/*.tsx"],
       exclude: ["node_modules"],

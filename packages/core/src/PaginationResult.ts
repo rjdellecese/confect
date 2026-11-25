@@ -14,16 +14,14 @@ import * as Schema from "effect/Schema";
  *
  * @category Schemas
  */
-export type PaginationResult<Doc extends Schema.Codec<any, any>> = ReturnType<
+export type PaginationResult<Doc extends Schema.Codec<unknown>> = ReturnType<
   typeof PaginationResult<Doc>
 >;
 
 /**
  * @internal
  */
-export const PaginationResult = <Doc extends Schema.Codec<any, any>>(
-  Doc: Doc,
-) =>
+export const PaginationResult = <Doc extends Schema.Codec<unknown>>(Doc: Doc) =>
   Schema.Struct({
     page: Doc.pipe(Schema.Array, Schema.mutable),
     isDone: Schema.Boolean,

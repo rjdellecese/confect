@@ -108,7 +108,9 @@ const makeReader = (pending?: PendingRead) => {
                   }
                 }),
               );
-              if (order === "desc") matching.reverse();
+              if (order === "desc") {
+                matching.reverse();
+              }
               let position = 0;
               const result = (): IteratorResult<Document> => {
                 run.settled++;
@@ -167,7 +169,7 @@ describe("QueryStream iterator lifecycle", () => {
     "rejects invalid %s before starting a database read",
     (field) =>
       Effect.gen(function* () {
-        for (const value of [-1, 0.5, NaN, Infinity, -Infinity]) {
+        for (const value of [-1, 0.5, Number.NaN, Infinity, -Infinity]) {
           const reader = makeReader();
           const exit = yield* QueryStream.paginate(reader.stream, {
             cursor: null,
@@ -596,7 +598,9 @@ describe("QueryStream iterator lifecycle", () => {
         const awaitResult = yield* Fiber.await(fiber);
         expect(Exit.hasInterrupts(awaitResult)).toBe(true);
         expect(reader.runs).toHaveLength(iterator + 1);
-        for (const run of reader.runs) expect(run.returned).toBe(1);
+        for (const run of reader.runs) {
+          expect(run.returned).toBe(1);
+        }
         expect(reader.runs[iterator]?.settled).toBe(0);
         expect(processed).toBe(0);
         expect(examined).toEqual(iterator === 1 ? ["b2"] : []);

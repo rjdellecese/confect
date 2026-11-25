@@ -12,7 +12,7 @@ import * as GroupPath from "@confect/cli/GroupPath";
  * Helper to create a FunctionPath from group path segments and function name.
  */
 const makeFunctionPath = (
-  groupSegments: readonly [string, ...string[]],
+  groupSegments: readonly [string, ...Array<string>],
   name: string,
 ): FunctionPath.FunctionPath =>
   FunctionPath.FunctionPath.make({

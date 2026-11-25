@@ -90,7 +90,7 @@ type TableReader<Table_ extends Table.AnyWithProps, Docs> =
  */
 export interface DatabaseReaderService<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
-  Docs = {},
+  Docs = unknown,
 > {
   /**
    * Selects a bound application or system table for lookups and queries without
@@ -142,7 +142,7 @@ export interface NativeReader<Model extends GenericDataModel> {
     Table_ extends IncludedTables<DatabaseSchema.FromConvexDataModel<Model>>,
   >(
     table: Table_ & NativeTable<Model & SystemDataModel, Table_>,
-  ) => TableReader<Table_, {}>;
+  ) => TableReader<Table_, unknown>;
 }
 
 /**
@@ -151,8 +151,10 @@ export interface NativeReader<Model extends GenericDataModel> {
 export const make = <Model extends GenericDataModel>(
   convexDatabaseReader: GenericDatabaseReader<Model>,
 ): NativeReader<Model> =>
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- The reader's public result distributes over matching table handles and exposes only indexes shared by a union; the native builder cannot express that conditional return.
   ({
     table: (table) => {
+      // oxlint-disable-next-line typescript/no-explicit-any -- The handle selects the matching application or system reader. Convex models are invariant in index ranges; treating either as GenericDataModel would admit invalid indexes.
       const reader: BaseDatabaseReader<any> = Record.has<string, unknown>(
         Table.systemTables,
         table.tableName,
@@ -178,7 +180,7 @@ export const make = <Model extends GenericDataModel>(
  */
 export type DatabaseReaderTag<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
-  Docs = {},
+  Docs = unknown,
 > = Context.Service<
   DatabaseReaderService<DatabaseSchema_>,
   DatabaseReaderService<DatabaseSchema_, Docs>
@@ -193,7 +195,7 @@ export type DatabaseReaderTag<
  */
 export const DatabaseReader = <
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
-  Docs = {},
+  Docs = unknown,
 >(): DatabaseReaderTag<DatabaseSchema_, Docs> =>
   Context.Service<
     DatabaseReaderService<DatabaseSchema_>,
@@ -221,5 +223,6 @@ export const layer = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
 ) =>
   Layer.succeed(
     DatabaseReader<DatabaseSchema_>(),
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- The generated service uses this exact schema's model; rebuilding table types from the native reader loses the schema's named document identities.
     make(convexDatabaseReader) as DatabaseReaderService<DatabaseSchema_>,
   );

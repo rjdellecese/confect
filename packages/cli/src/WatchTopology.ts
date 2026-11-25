@@ -54,7 +54,9 @@ export const make = Effect.fn("WatchTopology.make")(function* (
     reconcile: Effect.fn("WatchTopology.reconcile")(
       function* (revision: number, initial: Deferred.Deferred<void>) {
         const current = yield* Ref.get(state);
-        if (current.revision !== revision) return;
+        if (current.revision !== revision) {
+          return;
+        }
         yield* Ref.set(state, State.Observing({ revision, initial }));
         yield* notify;
       },
@@ -72,10 +74,11 @@ export const make = Effect.fn("WatchTopology.make")(function* (
               ),
             Observing: ({ initial }) =>
               Effect.gen(function* () {
-                if (yield* Deferred.isDone(initial))
+                if (yield* Deferred.isDone(initial)) {
                   return Decision.Take({
                     pending: yield* Ref.getAndSet(pending, SyncState.empty),
                   });
+                }
                 return Decision.Wait({
                   ready: Effect.raceFirst(
                     Deferred.await(notification),

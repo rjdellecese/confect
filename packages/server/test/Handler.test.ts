@@ -23,7 +23,7 @@ import type { StorageReader } from "@confect/server/StorageReader";
 import type { StorageWriter } from "@confect/server/StorageWriter";
 import type { StorageActionWriter } from "@confect/server/StorageActionWriter";
 import type { BlobNotFoundError } from "@confect/server/BlobNotFoundError";
-import type { GenericId } from "convex/values";
+import { GenericId } from "@confect/core/GenericId";
 import type schema from "./mock-backend/fixtures/confect/_generated/schema";
 import {
   internalAction,
@@ -166,7 +166,7 @@ describe("Handler", () => {
     });
 
     it("infers only the capabilities and errors required by each operation", () => {
-      const id = "storage-id" as GenericId<"_storage">;
+      const id = GenericId("_storage").make("storage-id");
       const read = Effect.gen(function* () {
         const storage = yield* Storage.Storage;
         return yield* storage.getUrl(id);

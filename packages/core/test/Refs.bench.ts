@@ -385,8 +385,10 @@ type LargeSpec = Spec.Spec<{
 
 // Baseline expression: force the Refs module types to load so module-level
 // instantiations are not counted in individual benchmarks.
+// oxlint-disable-next-line typescript/no-explicit-any -- Prime the erased Refs<any> instantiation so each probe measures only the concrete spec.
 void ({} as Refs.Refs<any>);
 
+/* oxlint-disable typescript/no-unsafe-type-assertion -- These operands measure assignability to exact ref trees and leaves. Replacing them with a generic probe changed the unfiltered medium case from 1,732 to 1,701 instantiations. */
 bench("Refs<Spec> (unfiltered)", () => ({}) as Refs.Refs<MediumSpec>).types([
   1732,
   "instantiations",
@@ -431,7 +433,10 @@ bench("small: Refs (public-filtered)", () =>
   ({}) as Refs.Refs<SmallSpec, Ref.AnyPublic>).types([320, "instantiations"]);
 
 bench("small: Refs (internal-filtered)", () =>
-  ({}) as Refs.Refs<SmallSpec, Ref.AnyInternal>).types([361, "instantiations"]);
+  ({}) satisfies Refs.Refs<SmallSpec, Ref.AnyInternal>).types([
+  361,
+  "instantiations",
+]);
 
 bench("small: Refs (resolve one leaf)", () =>
   ({}) as Refs.Refs<SmallSpec, Ref.AnyPublic>["auth"]["login"]).types([
@@ -487,3 +492,4 @@ bench("large: Refs (resolve all leaves)", () => {
     {} as PublicRefs["settings"]["update"],
   ];
 }).types([5778, "instantiations"]);
+/* oxlint-enable typescript/no-unsafe-type-assertion */

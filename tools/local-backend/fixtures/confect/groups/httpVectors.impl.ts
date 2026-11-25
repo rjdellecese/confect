@@ -16,7 +16,9 @@ export default GroupImpl.make(httpVectorsSpec).pipe(
           .table(httpVectorsTable)
           .index("by_creation_time")
           .collect();
-        for (const doc of previous) yield* table.delete(doc._id);
+        for (const doc of previous) {
+          yield* table.delete(doc._id);
+        }
         const nearest = yield* table.insert({ caseId, embedding: [1, 0, 0] });
         const orthogonal = yield* table.insert({
           caseId,

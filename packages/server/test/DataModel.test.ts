@@ -33,7 +33,7 @@ it("derives the same data model from a schema record and its table union", () =>
 });
 
 it("derives no tables from an empty record", () => {
-  type Empty = DataModel.DataModel<{}>;
+  type Empty = DataModel.DataModel<Record<never, never>>;
   expectTypeOf<DataModel.Tables<Empty>>().toBeNever();
   expectTypeOf<keyof DataModel.ToConvexDataModel<Empty>>().toBeNever();
 });

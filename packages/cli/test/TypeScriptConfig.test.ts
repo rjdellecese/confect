@@ -224,8 +224,9 @@ layer(NodeServices.layer)("TypeScriptConfig", (it) => {
           Effect.result,
         );
         expect(Result.isFailure(result)).toBe(true);
-        if (Result.isFailure(result))
+        if (Result.isFailure(result)) {
           expect(result.failure._tag).toBe("BundlerError");
+        }
       }).pipe(Effect.scoped),
   );
 });

@@ -122,7 +122,7 @@ const runGenerateForNodeGroupEffect = Effect.fnUntraced(function* ({
   );
   assert(importMatch !== null, "expected a registry import in the module");
   const resolved =
-    path.resolve(path.dirname(modulePath), importMatch[1]!) + ".ts";
+    path.resolve(path.dirname(modulePath), importMatch[1]) + ".ts";
   const resolves = yield* fs.exists(resolved);
 
   return { contents, resolves };
@@ -133,21 +133,23 @@ layer(GenerateFunctionsLayer)("generateFunctions", (it) => {
     "emits reuse only when enabled and keeps the group-local import",
     () =>
       Effect.gen(function* () {
-        for (const enabled of [undefined, false, true]) {
+        for (const options of [
+          {},
+          { experimental_reuseContext: false },
+          { experimental_reuseContext: true },
+        ]) {
           const contents = yield* render({
             functionNames: ["list", "create"],
             registeredFunctionsImportPath:
               "../confect/_generated/registeredFunctions/notes",
-            ...(enabled === undefined
-              ? {}
-              : { experimental_reuseContext: enabled }),
+            ...options,
           });
           expect(
             pipe(
               contents,
               Str.includes("export const experimental_reuseContext = true;"),
             ),
-          ).toBe(enabled === true);
+          ).toBe(options.experimental_reuseContext === true);
           expect(
             pipe(contents, Str.match(/import /g), Option.getOrThrow),
           ).toHaveLength(1);

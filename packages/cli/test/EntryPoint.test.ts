@@ -104,10 +104,11 @@ layer(NodePath.layer)("runtime services", (runtimeIt) => {
           path.join(confect, "notes.impl.ts"),
           path.join(confect, "tables", "notes.ts"),
         ]);
-        for (const entry of entries)
+        for (const entry of entries) {
           expect(entry.inputPath).toBe(
             path.resolve("/canonical", path.basename(entry.absolutePath)),
           );
+        }
         expect(files).toEqual([
           "notes.spec.ts",
           "notes.impl.ts",
@@ -228,20 +229,21 @@ layer(NodePath.layer)("runtime services", (runtimeIt) => {
   );
 });
 
-it.each(["notes.impl.ts", "groups/notes.impl.ts", "groups\\notes.impl.ts"])(
-  "parses %s into an implementation entry",
-  (relativePath) => {
-    const parsed = EntryPoint.parse(relativePath);
-    assert(parsed._tag === "Some");
-    expect(parsed.value).toEqual(
-      EntryPoint.Kind.Impl({
-        relativePath: ImplModulePath.make(relativePath),
-      }),
-    );
-  },
-);
+it.each([
+  "notes.impl.ts",
+  "groups/notes.impl.ts",
+  String.raw`groups\notes.impl.ts`,
+])("parses %s into an implementation entry", (relativePath) => {
+  const parsed = EntryPoint.parse(relativePath);
+  assert(parsed._tag === "Some");
+  expect(parsed.value).toEqual(
+    EntryPoint.Kind.Impl({
+      relativePath: ImplModulePath.make(relativePath),
+    }),
+  );
+});
 
-it.each(["tables/notes.impl.ts", "tables\\notes.impl.ts"])(
+it.each(["tables/notes.impl.ts", String.raw`tables\notes.impl.ts`])(
   "classifies %s as a table rather than an implementation",
   (relativePath) => {
     expect(EntryPoint.parse(relativePath)).toEqual(
@@ -259,7 +261,11 @@ it("keeps unrelated files out of the entry-point domain", () => {
   expect(EntryPoint.parse("notes.impl.js")).toEqual(Option.none());
 });
 
-it.each(["notes.spec.ts", "groups/notes.spec.ts", "groups\\notes.spec.ts"])(
+it.each([
+  "notes.spec.ts",
+  "groups/notes.spec.ts",
+  String.raw`groups\notes.spec.ts`,
+])(
   "uses the same parsed spec path for entry and declaration %s",
   (relativePath) => {
     const entry = EntryPoint.Kind.Spec({
@@ -274,7 +280,7 @@ it.each(["notes.spec.ts", "groups/notes.spec.ts", "groups\\notes.spec.ts"])(
 
 it.each([
   "tables/notes.ts",
-  "tables\\nested\\notes.ts",
+  String.raw`tables\nested\notes.ts`,
   "tables/notes.spec.ts",
 ])(
   "uses the same parsed table path for entry and declaration %s",

@@ -34,9 +34,9 @@ describe("GenericId", () => {
         value,
       );
     }
-    expect(() =>
-      Result.getOrThrow(Schema.decodeUnknownResult(id)(42)),
-    ).toThrow();
+    expect(() => Result.getOrThrow(Schema.decodeUnknownResult(id)(42))).toThrow(
+      Schema.SchemaError,
+    );
   });
 
   it("supports checks, annotations, and piping without losing the ID type", () => {
@@ -54,10 +54,10 @@ describe("GenericId", () => {
     >();
     expect(GenericId.tableName(id.ast)).toEqual(Option.some("users"));
     expect(id.make("candidate-id")).toBe("candidate-id");
-    expect(() => id.make("")).toThrow();
-    expect(() =>
-      Result.getOrThrow(Schema.decodeUnknownResult(id)("")),
-    ).toThrow();
+    expect(() => id.make("")).toThrow("Schema validation failed");
+    expect(() => Result.getOrThrow(Schema.decodeUnknownResult(id)(""))).toThrow(
+      Schema.SchemaError,
+    );
     expect(base.make("")).toBe("");
   });
 
@@ -77,12 +77,14 @@ describe("GenericId", () => {
     expect(Result.getOrThrow(Schema.encodeResult(counts)(decoded))).toEqual(
       value,
     );
-    expect(() => Result.getOrThrow(Schema.decodeResult(counts)({}))).toThrow();
+    expect(() => Result.getOrThrow(Schema.decodeResult(counts)({}))).toThrow(
+      Schema.SchemaError,
+    );
     expect(() =>
       Result.getOrThrow(
         Schema.decodeUnknownResult(counts)({ "candidate-id": "2" }),
       ),
-    ).toThrow();
+    ).toThrow(Schema.SchemaError);
   });
 });
 

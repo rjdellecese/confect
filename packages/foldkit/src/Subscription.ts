@@ -26,6 +26,7 @@ export type Error<Query extends Ref.AnyConfectPublicQuery> =
 const paginatedError = <Query extends Ref.AnyConfectPublicPaginatedQuery>(
   error: Error<Query>,
 ): PaginatedQuery.Error<Query> =>
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- The public settlement type excludes FunctionError for refs with no declared errors; only a decoded ref error reaches that variant.
   Match.value(error).pipe(
     Match.when(Schema.isSchemaError, (schemaError) => schemaError),
     Match.when(Match.instanceOf(Client.WebSocketClientError), (clientError) =>
@@ -225,7 +226,8 @@ export const reactiveQuery =
       modelToDependencies: (model) => ({
         args:
           modelToArgs === undefined
-            ? Option.some({} as Ref.Args<Query>)
+            ? // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- ArgsConfig requires an extractor for every ref with argument fields, so the default is always an empty record.
+              Option.some({} as Ref.Args<Query>)
             : modelToArgs(model),
       }),
       dependenciesToStream: ({ args }) =>
@@ -439,32 +441,34 @@ export const paginatedQuery =
                   paginationId,
                 );
                 const { descriptor, options } = allocatedRequest;
-                const composedArgs = composedArgsSchema.make({
-                  ...allocatedRequest.args,
-                  paginationOpts: {
-                    numItems: options.initialNumItems,
-                    cursor: descriptor.cursor,
-                    id: paginationId,
-                    ...Match.value(options.maximumRowsRead).pipe(
-                      Match.when(undefined, () => ({})),
-                      Match.when(Match.defined, (maximumRowsRead) => ({
-                        maximumRowsRead,
-                      })),
-                      Match.exhaustive,
-                    ),
-                    ...Match.value(options.maximumBytesRead).pipe(
-                      Match.when(undefined, () => ({})),
-                      Match.when(Match.defined, (maximumBytesRead) => ({
-                        maximumBytesRead,
-                      })),
-                      Match.exhaustive,
-                    ),
-                    ...Option.match(descriptor.endCursor, {
-                      onNone: () => ({}),
-                      onSome: (endCursor) => ({ endCursor }),
-                    }),
-                  },
-                });
+                // oxlint-disable-next-line typescript/no-unsafe-assignment -- make validates against this ref's actual args codec; its public structural view erases the output to avoid expanding Struct on every ref lookup.
+                const composedArgs: Ref.Args<PaginatedQueryRef> =
+                  composedArgsSchema.make({
+                    ...allocatedRequest.args,
+                    paginationOpts: {
+                      numItems: options.initialNumItems,
+                      cursor: descriptor.cursor,
+                      id: paginationId,
+                      ...Match.value(options.maximumRowsRead).pipe(
+                        Match.when(undefined, () => ({})),
+                        Match.when(Match.defined, (maximumRowsRead) => ({
+                          maximumRowsRead,
+                        })),
+                        Match.exhaustive,
+                      ),
+                      ...Match.value(options.maximumBytesRead).pipe(
+                        Match.when(undefined, () => ({})),
+                        Match.when(Match.defined, (maximumBytesRead) => ({
+                          maximumBytesRead,
+                        })),
+                        Match.exhaustive,
+                      ),
+                      ...Option.match(descriptor.endCursor, {
+                        onNone: () => ({}),
+                        onSome: (endCursor) => ({ endCursor }),
+                      }),
+                    },
+                  });
                 return client.reactiveQueryResult(ref, composedArgs).pipe(
                   Stream.map((result) =>
                     config.onSettled({

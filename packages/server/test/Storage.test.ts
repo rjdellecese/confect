@@ -5,27 +5,33 @@ import { StorageReader } from "@confect/server/StorageReader";
 import { StorageWriter } from "@confect/server/StorageWriter";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import type { StorageActionWriter as ConvexStorageActionWriter } from "convex/server";
-import type { GenericId } from "convex/values";
+import { GenericId } from "@confect/core/GenericId";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 import { vi } from "vitest";
 
-const storageId = "storage-id" as GenericId<"_storage">;
+const storageId = GenericId("_storage").make("storage-id");
 const blobUrl = "https://example.com/storage/blob";
 const uploadUrl = "https://example.com/storage/upload";
 
 const makeNativeStorage = () =>
   ({
-    getUrl: vi.fn((): Promise<string | null> => Promise.resolve(blobUrl)),
-    getMetadata: vi.fn(() => Promise.resolve(null)),
-    generateUploadUrl: vi.fn(() => Promise.resolve(uploadUrl)),
-    delete: vi.fn(() => Promise.resolve()),
-    get: vi.fn((): Promise<Blob | null> =>
+    getUrl: vi.fn<ConvexStorageActionWriter["getUrl"]>(() =>
+      Promise.resolve(blobUrl),
+    ),
+    getMetadata: vi.fn<ConvexStorageActionWriter["getMetadata"]>(() =>
+      Promise.resolve(null),
+    ),
+    generateUploadUrl: vi.fn<ConvexStorageActionWriter["generateUploadUrl"]>(
+      () => Promise.resolve(uploadUrl),
+    ),
+    delete: vi.fn<ConvexStorageActionWriter["delete"]>(() => Promise.resolve()),
+    get: vi.fn<ConvexStorageActionWriter["get"]>(() =>
       Promise.resolve(new Blob(["stored"])),
     ),
-    store: vi.fn((_blob: Blob, _options?: { sha256?: string }) =>
+    store: vi.fn<ConvexStorageActionWriter["store"]>(() =>
       Promise.resolve(storageId),
     ),
   }) satisfies ConvexStorageActionWriter;

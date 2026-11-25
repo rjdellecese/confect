@@ -1,15 +1,25 @@
 import { GenericId } from "@confect/core";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
-import {
-  defineTable,
-  type GenericTableIndexes,
-  type GenericTableSearchIndexes,
-  type GenericTableVectorIndexes,
-  type TableDefinition,
+import { defineTable } from "convex/server";
+import type {
+  GenericTableIndexes,
+  GenericTableSearchIndexes,
+  GenericTableVectorIndexes,
+  TableDefinition,
 } from "convex/server";
-import { v, type GenericValidator } from "convex/values";
+import { v } from "convex/values";
+import type { GenericValidator } from "convex/values";
 import * as Schema from "effect/Schema";
 import * as Table from "@confect/server/Table";
+
+const makeInstrumented = () => {
+  const calls = { count: 0 };
+  const lazyFields = () => {
+    calls.count += 1;
+    return Schema.Struct({ text: Schema.String });
+  };
+  return { calls, lazyFields };
+};
 
 describe("Table.tableDefinition", () => {
   it("should extend a generic Convex TableDefinition", () => {
@@ -217,15 +227,6 @@ describe("Table.tableDefinition", () => {
   });
 
   describe("lazy compilation", () => {
-    const makeInstrumented = () => {
-      const calls = { count: 0 };
-      const lazyFields = () => {
-        calls.count += 1;
-        return Schema.Struct({ text: Schema.String });
-      };
-      return { calls, lazyFields };
-    };
-
     it("is `===`-stable and materialises all chained indexes/searchIndexes/vectorIndexes", () => {
       const notes = Table.make(() =>
         Schema.Struct({

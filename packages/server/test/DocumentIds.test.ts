@@ -4,7 +4,7 @@ import * as DatabaseSchema from "@confect/server/DatabaseSchema";
 import * as DocumentIds from "@confect/server/DocumentIds";
 import * as Table from "@confect/server/Table";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
-import type { GenericId } from "convex/values";
+import { GenericId } from "@confect/core/GenericId";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
@@ -17,14 +17,15 @@ const schema = DatabaseSchema.make({
 
 const tableNames = ["notes", "users"] as const;
 
+const normalize = <Name extends string>(
+  table: Name,
+  input: string,
+): GenericId<Name> | null =>
+  input === `${table}:id` || input === "legacy"
+    ? GenericId(table).make(`${table}:id`)
+    : null;
+
 const makeNative = () => {
-  const normalize = <Name extends string>(
-    table: Name,
-    input: string,
-  ): GenericId<Name> | null =>
-    input === `${table}:id` || input === "legacy"
-      ? (`${table}:id` as GenericId<Name>)
-      : null;
   const native = {
     normalizeId: normalize,
     get: () => {
@@ -52,7 +53,9 @@ describe("DocumentIds", () => {
   it.effect(
     "keeps schemas and native calls lazy and preserves receivers",
     () => {
-      const fields = vi.fn(() => Schema.Struct({ text: Schema.String }));
+      const fields = vi.fn<() => Schema.Struct<{ text: Schema.String }>>(() =>
+        Schema.Struct({ text: Schema.String }),
+      );
       const databaseSchema = DatabaseSchema.make({
         notes: Table.make(fields)("notes"),
       });
@@ -167,15 +170,14 @@ describe("DocumentIds", () => {
           ]),
         );
 
-        const normalize = vi.fn(
-          <Name extends string>(_table: Name, input: string): GenericId<Name> =>
-            input as GenericId<Name>,
+        const matchAnyTable = vi.fn<typeof normalize>((table, input) =>
+          GenericId(table).make(input),
         );
-        vi.mocked(native.normalizeId).mockImplementation(normalize);
-        vi.mocked(native.system.normalizeId).mockImplementation(normalize);
+        vi.mocked(native.normalizeId).mockImplementation(matchAnyTable);
+        vi.mocked(native.system.normalizeId).mockImplementation(matchAnyTable);
         const identifyResult5 = yield* ids.identify("matching-id");
         expect(Option.isSome(identifyResult5)).toBe(true);
-        expect(normalize).toHaveBeenCalledTimes(1);
+        expect(matchAnyTable).toHaveBeenCalledTimes(1);
       }),
   );
 

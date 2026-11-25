@@ -30,9 +30,9 @@ export interface Any {
 /**
  * @internal
  */
-export interface AnyWithProps extends DataModel<
+export type AnyWithProps = DataModel<
   Readonly<Record<string, Table.AnyWithProps>>
-> {}
+>;
 
 /**
  * Types the generated native context and vector search tags. Import `QueryCtx`,

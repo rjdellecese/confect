@@ -5,8 +5,8 @@ import * as Cron from "effect/Cron";
 import * as DateTime from "effect/DateTime";
 import * as Duration from "effect/Duration";
 import * as Schema from "effect/Schema";
-import * as Predicate from "effect/Predicate";
-import { assert, describe, expect, test } from "@effect/vitest";
+import { describe, expect, test } from "@effect/vitest";
+import { convexDeploymentExport } from "./convexDeploymentExport";
 import * as CronJob from "@confect/server/CronJob";
 import * as CronJobs from "@confect/server/CronJobs";
 import * as CronWindow from "@confect/server/CronWindow";
@@ -373,7 +373,7 @@ describe("CronJobs.add", () => {
     for (const [identifier, schedule] of RecordEffect.toEntries(
       expectedSchedules,
     )) {
-      const exported = jobs.convexCronJobs.crons[identifier]!;
+      const exported = jobs.convexCronJobs.crons[identifier];
       expect(exported).toEqual({
         name: "tasks/nested:count",
         args: [{ count: "42" }],
@@ -383,11 +383,9 @@ describe("CronJobs.add", () => {
       expect(exported.schedule).not.toHaveProperty("hourUtc");
       expect(exported.schedule).not.toHaveProperty("_tag");
     }
-    assert(Predicate.hasProperty(jobs.convexCronJobs, "export"));
-    assert(Predicate.isFunction(jobs.convexCronJobs.export));
     expect(
-      Schema.decodeUnknownResult(Schema.fromJsonString(Schema.Unknown))(
-        jobs.convexCronJobs.export(),
+      Schema.decodeResult(Schema.fromJsonString(Schema.Unknown))(
+        convexDeploymentExport(jobs.convexCronJobs, "export"),
       ).pipe(Result.getOrThrow),
     ).toEqual(jobs.convexCronJobs.crons);
     expect(builds).toEqual({ args: 1, returns: 0, error: 0 });
@@ -395,7 +393,7 @@ describe("CronJobs.add", () => {
     expect(empty.convexCronJobs.crons).toEqual({});
     expect(RecordEffect.keys(hourly.cronJobs)).toEqual(["hourly"]);
     expect(RecordEffect.keys(hourly.convexCronJobs.crons)).toEqual(["hourly"]);
-    expect(jobs.cronJobs.weekly!.schedule).toBe(weekly);
+    expect(jobs.cronJobs.weekly.schedule).toBe(weekly);
     expect(weekly).toEqual({ _tag: "Weekly", dayOfWeek: "monday", hourUtc: 9 });
     expect(options).toEqual({ dayOfWeek: "monday", hourUtc: 9 });
     expect(args).toEqual({ count: 42 });
@@ -414,7 +412,7 @@ describe("CronJobs.add", () => {
 
     const result = CronJobs.make().add(cronJob);
 
-    expect(CronJob.isCronJob(result.cronJobs["clear sessions"]!)).toBe(true);
+    expect(CronJob.isCronJob(result.cronJobs["clear sessions"])).toBe(true);
     expect(result.convexCronJobs.crons["clear sessions"]).toEqual({
       name: "sessions:clearStale",
       args: [{}],
@@ -497,7 +495,7 @@ describe("CronJobs.add", () => {
 
     const result = CronJobs.make().add(cronJob);
 
-    expect(CronJob.isCronJob(result.cronJobs["ping"]!)).toBe(true);
+    expect(CronJob.isCronJob(result.cronJobs["ping"])).toBe(true);
     expect(result.convexCronJobs.crons["ping"]).toEqual({
       name: "health:ping",
       args: [{}],
@@ -525,11 +523,11 @@ describe("CronJobs.add", () => {
       )
       .add(CronJob.make("ping", Duration.seconds(30), ref2));
 
-    expect(result.convexCronJobs.crons["clear sessions"]!.schedule).toEqual({
+    expect(result.convexCronJobs.crons["clear sessions"].schedule).toEqual({
       type: "cron",
       cron: "0 * * * *",
     });
-    expect(result.convexCronJobs.crons["ping"]!.schedule).toEqual({
+    expect(result.convexCronJobs.crons["ping"].schedule).toEqual({
       type: "interval",
       seconds: 30,
     });

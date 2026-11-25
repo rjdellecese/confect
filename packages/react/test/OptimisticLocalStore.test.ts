@@ -16,7 +16,8 @@ import type {
 } from "convex/server";
 import type { OptimisticLocalStore as NativeStore } from "convex/browser";
 import { insertAtPosition as nativeInsertAtPosition } from "convex/react";
-import { compareValues, type Value } from "convex/values";
+import { compareValues } from "convex/values";
+import type { Value } from "convex/values";
 import * as Array from "effect/Array";
 import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
@@ -62,34 +63,35 @@ type Entry = {
 };
 
 const makeEntry = (
-  ranks: number[] | undefined,
+  ranks: Array<number> | undefined,
   cursor: string | null = null,
   isDone = false,
   id = 1,
   channel = "1",
-): Entry => ({
-  name: "notes:list",
-  args: {
-    channel,
-    filter: { archived: false },
-    paginationOpts: { cursor, numItems: 2, id },
-  },
-  value:
-    ranks === undefined
-      ? undefined
-      : {
-          page: Array.map(ranks, (rank) => ({
-            rank: String(rank),
-            at: at.toISOString(),
-          })),
-          continueCursor: cursor === null ? "next" : "end",
-          isDone,
-          splitCursor: "split",
-          pageStatus: "SplitRecommended",
-        },
-});
+) =>
+  ({
+    name: "notes:list",
+    args: {
+      channel,
+      filter: { archived: false },
+      paginationOpts: { cursor, numItems: 2, id },
+    },
+    value:
+      ranks === undefined
+        ? undefined
+        : {
+            page: Array.map(ranks, (rank) => ({
+              rank: String(rank),
+              at: at.toISOString(),
+            })),
+            continueCursor: cursor === null ? "next" : "end",
+            isDone,
+            splitCursor: "split",
+            pageStatus: "SplitRecommended",
+          },
+  }) satisfies Entry;
 
-const harness = (entries: Entry[]) => {
+const harness = (entries: Array<Entry>) => {
   const wire = {
     getAllQueries: vi
       .fn<NativeStore["getAllQueries"]>()
@@ -100,8 +102,8 @@ const harness = (entries: Entry[]) => {
             (entry) => entry.name === getFunctionName(ref),
           ) as ReturnType<NativeStore["getAllQueries"]>,
       ),
-    getQuery: vi.fn(),
-    setQuery: vi.fn(),
+    getQuery: () => undefined,
+    setQuery: vi.fn<NativeStore["setQuery"]>(),
   };
   return { store: OptimisticLocalStore.make(wire), wire };
 };
@@ -120,6 +122,14 @@ const writtenRanks = (wire: ReturnType<typeof harness>["wire"]) =>
       ).page,
       (item) => item.rank,
     ),
+  );
+
+const NumericPage = Schema.Struct({ page: Schema.Array(Schema.Finite) });
+const writtenNumberPages = (wire: ReturnType<typeof harness>["wire"]) =>
+  Array.map(
+    wire.setQuery.mock.calls,
+    ([, , value]) =>
+      Result.getOrThrow(Schema.decodeUnknownResult(NumericPage)(value)).page,
   );
 
 describe("optimisticallyUpdateValueInPaginatedQuery", () => {
@@ -174,7 +184,7 @@ describe("optimisticallyUpdateValueInPaginatedQuery", () => {
         item: () => Schema.Finite,
       }),
     );
-    const entries: Entry[] = [
+    const entries: Array<Entry> = [
       {
         name: "optional:list",
         args: { filter: {}, paginationOpts: { cursor: null, numItems: 2 } },
@@ -202,9 +212,7 @@ describe("optimisticallyUpdateValueInPaginatedQuery", () => {
       sortOrder: "asc",
       sortKeyFromItem: (item) => item,
     });
-    expect(
-      Array.map(wire.setQuery.mock.calls, ([, , value]) => value.page),
-    ).toEqual([
+    expect(writtenNumberPages(wire)).toEqual([
       [2, 4],
       [2, 1, 3],
       [1, 3, 2],
@@ -264,9 +272,7 @@ describe("optimisticallyUpdateValueInPaginatedQuery", () => {
       sortOrder: "asc",
       sortKeyFromItem: (item) => item,
     });
-    expect(
-      Array.map(wire.setQuery.mock.calls, ([, , value]) => value.page),
-    ).toEqual([
+    expect(writtenNumberPages(wire)).toEqual([
       [2, 4],
       [0, 1, 3],
       [1, 3, 4],
@@ -284,7 +290,11 @@ describe("optimisticallyUpdateValueInPaginatedQuery", () => {
     ];
     const before = structuredClone(entries);
     const { store, wire } = harness(entries);
-    const update = vi.fn((value: PaginatedQueryItem<typeof query>) => ({
+    const update = vi.fn<
+      (
+        value: PaginatedQueryItem<typeof query>,
+      ) => PaginatedQueryItem<typeof query>
+    >((value) => ({
       ...value,
       rank: value.rank + 10,
     }));
@@ -298,7 +308,7 @@ describe("optimisticallyUpdateValueInPaginatedQuery", () => {
       Ref.getFunctionReference(query),
       entries[0]?.args,
       {
-        ...(entries[0]?.value as object),
+        ...entries[0]?.value,
         page: [
           { rank: "11", at: at.toISOString() },
           { rank: "12", at: at.toISOString() },
@@ -582,7 +592,7 @@ describe("insertAtPosition", () => {
   );
 
   test.each([
-    { entries: [] as Entry[], rank: 2, expected: [] },
+    { entries: [] as Array<Entry>, rank: 2, expected: [] },
     { entries: [makeEntry([], null, true)], rank: 2, expected: [] },
     { entries: [makeEntry(undefined)], rank: 2, expected: [] },
     { entries: [makeEntry([3], "next", true)], rank: 2, expected: [] },
@@ -630,7 +640,16 @@ describe("insertAtPosition", () => {
   });
 
   test("sorts Convex values, rather than JavaScript strings or tuple coercions", () => {
-    const values: Value[] = [
+    const keySchema = Schema.Union([
+      Schema.Null,
+      Schema.BigInt,
+      Schema.Finite,
+      Schema.String,
+      Schema.instanceOf(ArrayBuffer),
+      Schema.Finite.pipe(Schema.Array, Schema.mutable),
+      Schema.Struct({ a: Schema.Finite }),
+    ]);
+    const values: Array<typeof keySchema.Type> = [
       null,
       2n,
       2,
@@ -645,7 +664,7 @@ describe("insertAtPosition", () => {
         "values",
         FunctionSpec.publicPaginatedQuery({
           name: "list",
-          item: () => Schema.Struct({ key: Schema.Unknown }),
+          item: () => Schema.Struct({ key: keySchema }),
         }),
       );
       const nativeEntries = [
@@ -660,17 +679,21 @@ describe("insertAtPosition", () => {
         },
       ];
       const { store, wire } = harness(nativeEntries);
-      const key: Value = [1, 9];
+      const key = [1, 9];
       insertAtPosition({
         paginatedQuery: valueQuery,
         localQueryStore: store,
         item: { key },
         sortOrder,
-        sortKeyFromItem: (item) => item.key as Value,
+        sortKeyFromItem: (item) => item.key,
       });
-      const output = wire.setQuery.mock.calls[0]?.[2].page as Array<{
-        key: Value;
-      }>;
+      const output = Result.getOrThrow(
+        Schema.decodeUnknownResult(
+          Schema.Struct({
+            page: Schema.Array(Schema.Struct({ key: keySchema })),
+          }),
+        )(wire.setQuery.mock.calls[0]?.[2]),
+      ).page;
       expect(output).toHaveLength(8);
       for (let i = 1; i < output.length; i++) {
         const before = output[i - 1];
@@ -684,19 +707,19 @@ describe("insertAtPosition", () => {
   });
 });
 
+const generic = <Query extends Ref.AnyPublicPaginatedQuery>(
+  store: OptimisticLocalStore.OptimisticLocalStore,
+  ref: Query,
+  item: PaginatedQueryItem<Query>,
+  argsToMatch: Partial<PaginatedQueryArgs<Query>>,
+) =>
+  insertAtTop({
+    paginatedQuery: ref,
+    localQueryStore: store,
+    item,
+    argsToMatch,
+  });
 test("preserves generic refs, decoded return types, and optional argument modifiers", () => {
-  const generic = <Query extends Ref.AnyPublicPaginatedQuery>(
-    store: OptimisticLocalStore.OptimisticLocalStore,
-    ref: Query,
-    item: PaginatedQueryItem<Query>,
-    argsToMatch: Partial<PaginatedQueryArgs<Query>>,
-  ) =>
-    insertAtTop({
-      paginatedQuery: ref,
-      localQueryStore: store,
-      item,
-      argsToMatch,
-    });
   expectTypeOf(generic<typeof query>).returns.toEqualTypeOf<void>();
   const check = (store: OptimisticLocalStore.OptimisticLocalStore) => {
     const result = optimisticallyUpdateValueInPaginatedQuery(

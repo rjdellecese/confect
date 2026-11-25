@@ -45,9 +45,10 @@ const constantValue = (
       variable.references,
       (reference) => reference.isWrite() && !reference.init,
     )
-  )
+  ) {
     return undefined;
-  const declaration = variable.defs[0]!.node;
+  }
+  const declaration = variable.defs[0].node;
   return declaration.type === "VariableDeclarator" &&
     declaration.id.type === "Identifier" &&
     declaration.parent.type === "VariableDeclaration" &&
@@ -61,7 +62,9 @@ const resolveApi = (
   node: ESTree.Node,
   seen: ReadonlyArray<ESTree.Node> = [],
 ): Api | undefined => {
-  if (Array.contains(seen, node)) return undefined;
+  if (Array.contains(seen, node)) {
+    return undefined;
+  }
   if (
     node.type === "MemberExpression" &&
     !node.computed &&
@@ -69,7 +72,9 @@ const resolveApi = (
     node.property.type === "Identifier"
   ) {
     const base = resolveApi(source, node.object, [...seen, node]);
-    if (base === undefined || base.member !== undefined) return undefined;
+    if (base === undefined || base.member !== undefined) {
+      return undefined;
+    }
     if (base.module === "effect") {
       const name = node.property.name;
       return name === "Schema" || name === "Result" || name === "Function"
@@ -80,7 +85,9 @@ const resolveApi = (
     }
     return { module: base.module, member: node.property.name };
   }
-  if (node.type !== "Identifier") return undefined;
+  if (node.type !== "Identifier") {
+    return undefined;
+  }
   const variable = variableAt(source, node);
   if (
     variable === undefined ||
@@ -89,16 +96,18 @@ const resolveApi = (
       variable.references,
       (reference) => reference.isWrite() && !reference.init,
     )
-  )
+  ) {
     return undefined;
-  const declaration = variable.defs[0]!.node;
+  }
+  const declaration = variable.defs[0].node;
   if (
     declaration.type === "ImportSpecifier" ||
     declaration.type === "ImportNamespaceSpecifier"
   ) {
     const parent = declaration.parent;
-    if (parent.type !== "ImportDeclaration" || parent.importKind === "type")
+    if (parent.type !== "ImportDeclaration" || parent.importKind === "type") {
       return undefined;
+    }
     const module =
       parent.source.value === "effect"
         ? "effect"
@@ -109,9 +118,15 @@ const resolveApi = (
             : parent.source.value === "effect/Function"
               ? "Function"
               : undefined;
-    if (module === undefined) return undefined;
-    if (declaration.type === "ImportNamespaceSpecifier") return { module };
-    if (declaration.importKind === "type") return undefined;
+    if (module === undefined) {
+      return undefined;
+    }
+    if (declaration.type === "ImportNamespaceSpecifier") {
+      return { module };
+    }
+    if (declaration.importKind === "type") {
+      return undefined;
+    }
     const name =
       declaration.imported.type === "Identifier"
         ? declaration.imported.name
@@ -136,7 +151,9 @@ const codecFactory = (
   node: ESTree.Node,
   seen: ReadonlyArray<ESTree.Node> = [],
 ): Codec | undefined => {
-  if (Array.contains(seen, node)) return undefined;
+  if (Array.contains(seen, node)) {
+    return undefined;
+  }
   if (node.type === "Identifier") {
     const value = constantValue(variableAt(source, node));
     return value === undefined
@@ -147,15 +164,17 @@ const codecFactory = (
     node.type !== "CallExpression" ||
     node.optional ||
     Array.some(node.arguments, (argument) => argument.type === "SpreadElement")
-  )
+  ) {
     return undefined;
+  }
   if (
     node.callee.type === "MemberExpression" &&
     (node.callee.computed ||
       node.callee.property.type !== "Identifier" ||
       !codecMethod.test(node.callee.property.name))
-  )
+  ) {
     return undefined;
+  }
   const api = resolveApi(source, node.callee);
   return api?.module === "Schema" &&
     api.member !== undefined &&
@@ -182,18 +201,20 @@ const codecCall = (
     node.type !== "CallExpression" ||
     node.optional ||
     Array.some(node.arguments, (argument) => argument.type === "SpreadElement")
-  )
+  ) {
     return undefined;
+  }
   const factory = codecFactory(source, node.callee);
-  if (factory !== undefined)
+  if (factory !== undefined) {
     return { ...factory, arguments: [...factory.arguments, ...node.arguments] };
+  }
   if (
     isApi(source, node.callee, "Function", "pipe") &&
     (node.arguments.length === 2 ||
       (node.arguments.length === 3 &&
-        isApi(source, node.arguments[2]!, "Result", "getOrThrow")))
+        isApi(source, node.arguments[2], "Result", "getOrThrow")))
   ) {
-    const pipedFactory = codecFactory(source, node.arguments[1]!);
+    const pipedFactory = codecFactory(source, node.arguments[1]);
     if (
       pipedFactory !== undefined &&
       (node.arguments.length === 2 ||
@@ -201,7 +222,7 @@ const codecCall = (
     ) {
       return {
         ...pipedFactory,
-        arguments: [...pipedFactory.arguments, node.arguments[0]!],
+        arguments: [...pipedFactory.arguments, node.arguments[0]],
       };
     }
   }
@@ -213,23 +234,27 @@ const wrappedCodec = (
   node: ESTree.Node,
 ): Codec | undefined => {
   const direct = codecCall(source, node);
-  if (direct !== undefined) return direct;
-  if (node.type !== "CallExpression" || node.optional) return undefined;
+  if (direct !== undefined) {
+    return direct;
+  }
+  if (node.type !== "CallExpression" || node.optional) {
+    return undefined;
+  }
   const unwrapped =
     node.arguments.length === 1 &&
     isApi(source, node.callee, "Result", "getOrThrow")
-      ? codecCall(source, node.arguments[0]!)
+      ? codecCall(source, node.arguments[0])
       : node.arguments.length === 2 &&
           isApi(source, node.callee, "Function", "pipe") &&
-          isApi(source, node.arguments[1]!, "Result", "getOrThrow")
-        ? codecCall(source, node.arguments[0]!)
+          isApi(source, node.arguments[1], "Result", "getOrThrow")
+        ? codecCall(source, node.arguments[0])
         : node.callee.type === "MemberExpression" &&
             !node.callee.computed &&
             !node.callee.optional &&
             node.callee.property.type === "Identifier" &&
             node.callee.property.name === "pipe" &&
             node.arguments.length === 1 &&
-            isApi(source, node.arguments[0]!, "Result", "getOrThrow")
+            isApi(source, node.arguments[0], "Result", "getOrThrow")
           ? codecCall(source, node.callee.object)
           : undefined;
   return unwrapped !== undefined && String.endsWith("Result")(unwrapped.method)
@@ -244,16 +269,20 @@ export const noSchemaCodecWrappers = Rule.define({
     description:
       "Use Schema decoding and encoding APIs directly instead of forwarding functions or stored codec functions.",
   }),
-  create: function* () {
+  *create() {
     const ctx = yield* RuleContext;
     const checkBinding = (
       node: ESTree.VariableDeclarator | ESTree.ExportDefaultDeclaration,
     ) => {
       const value =
         node.type === "VariableDeclarator" ? node.init : node.declaration;
-      if (value == null) return Effect.void;
+      if (value === null || value === undefined) {
+        return Effect.void;
+      }
       const codec = codecFactory(ctx.sourceCode, value);
-      if (codec === undefined) return Effect.void;
+      if (codec === undefined) {
+        return Effect.void;
+      }
       return ctx.report(
         Diagnostic.make({
           node,
@@ -266,8 +295,9 @@ export const noSchemaCodecWrappers = Rule.define({
         node.type !== "ArrowFunctionExpression" &&
         node.type !== "FunctionExpression" &&
         node.type !== "FunctionDeclaration"
-      )
+      ) {
         return Effect.void;
+      }
       if (
         node.type !== "FunctionDeclaration" &&
         !(
@@ -279,15 +309,18 @@ export const noSchemaCodecWrappers = Rule.define({
           node.parent.type === "ExportDefaultDeclaration" &&
           node.parent.declaration === node
         )
-      )
+      ) {
         return Effect.void;
+      }
       if (
         node.async ||
         (node.type !== "ArrowFunctionExpression" && node.generator) ||
-        node.body == null ||
+        node.body === null ||
+        node.body === undefined ||
         node.params.length === 0
-      )
+      ) {
         return Effect.void;
+      }
       const expression =
         node.body.type !== "BlockStatement"
           ? node.body
@@ -295,21 +328,26 @@ export const noSchemaCodecWrappers = Rule.define({
               node.body.body[0]?.type === "ReturnStatement"
             ? node.body.body[0].argument
             : undefined;
-      if (expression == null) return Effect.void;
+      if (expression === null || expression === undefined) {
+        return Effect.void;
+      }
       const codec = wrappedCodec(ctx.sourceCode, expression);
       if (
         codec === undefined ||
         !Array.every(node.params, (parameter) => {
-          if (parameter.type !== "Identifier") return false;
+          if (parameter.type !== "Identifier") {
+            return false;
+          }
           const variable = variableAt(ctx.sourceCode, parameter);
           return (
             variable !== undefined &&
             variable.references.length === 1 &&
-            Array.contains(codec.arguments, variable.references[0]!.identifier)
+            Array.contains(codec.arguments, variable.references[0].identifier)
           );
         })
-      )
+      ) {
         return Effect.void;
+      }
       return ctx.report(
         Diagnostic.make({
           node,

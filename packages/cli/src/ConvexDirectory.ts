@@ -13,7 +13,10 @@ export class ConvexDirectory extends Context.Service<
   ConvexDirectory,
   { readonly get: Effect.Effect<string> }
 >()("@confect/cli/ConvexDirectory") {
-  static readonly get = ConvexDirectory.use((service) => service.get);
+  static readonly get = Effect.flatMap(
+    ConvexDirectory,
+    (service) => service.get,
+  );
 }
 
 export class ConvexDirectoryNotFoundError extends Schema.TaggedError<

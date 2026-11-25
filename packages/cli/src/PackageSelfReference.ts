@@ -38,7 +38,9 @@ export const discover = Effect.fnUntraced(
     const nearest = yield* Effect.findFirst(directories, (current) =>
       fs.exists(path.join(current, "package.json")),
     );
-    if (Option.isNone(nearest)) return Option.none<PackageSelfReference>();
+    if (Option.isNone(nearest)) {
+      return Option.none<PackageSelfReference>();
+    }
     const contents = yield* fs.readFileString(
       path.join(nearest.value, "package.json"),
     );

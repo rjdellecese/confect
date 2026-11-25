@@ -9,18 +9,24 @@ import * as MutableRef from "effect/MutableRef";
 import { assert, beforeEach, describe, expect, test } from "@effect/vitest";
 import { vi } from "vitest";
 import { useStreamPaginatedQuery } from "@confect/react";
+import type { StreamPagination } from "@confect/react";
 
-const useQueriesMock = vi.fn();
+type PageRequests = Record<
+  string,
+  { args: { paginationOpts: StreamPagination.PageRequest } }
+>;
+const { useQueriesMock } = vi.hoisted(() => ({
+  useQueriesMock: vi.fn<(queries: PageRequests) => StreamPagination.Results>(),
+}));
 
 vi.mock("convex/react", () => ({
-  useQuery: vi.fn(),
-  useMutation: vi.fn(),
-  useAction: vi.fn(),
   usePaginatedQuery: () => {
     throw new Error("unexpected call to the public usePaginatedQuery");
   },
-  usePaginatedQueryInternal: vi.fn(),
-  useQueries: (...args: unknown[]) => useQueriesMock(...args),
+  usePaginatedQueryInternal: () => {
+    throw new Error("unexpected call to usePaginatedQueryInternal");
+  },
+  useQueries: useQueriesMock,
 }));
 
 const Item = Schema.Struct({ value: Schema.FiniteFromString });
@@ -63,28 +69,34 @@ const listOrFail = Ref.make(
  * `paginationOpts`—so tests observe exactly which page ranges the hook
  * subscribes, and control when each loads.
  */
-const responses = MutableRef.make(new Map<string, unknown>());
+const responses = MutableRef.make(
+  new Map<string, StreamPagination.PageResult | Error>(),
+);
 
 const encodeJson = Schema.Unknown.pipe(
   Schema.fromJsonString,
   Schema.encodeResult,
 );
 
-const respond = (paginationOpts: object, result: unknown) => {
+const respond = (
+  paginationOpts: StreamPagination.PageRequest,
+  result: StreamPagination.PageResult | Error,
+) => {
   MutableRef.get(responses).set(
     encodeJson(paginationOpts).pipe(Result.getOrThrow),
     result,
   );
 };
 
+const latestRequests = () => {
+  const call = useQueriesMock.mock.lastCall;
+  assert(call !== undefined);
+  return call[0];
+};
+
 const subscribedOpts = () =>
   Array.map(
-    Rec.values(
-      useQueriesMock.mock.lastCall![0] as Record<
-        string,
-        { args: { paginationOpts: object } }
-      >,
-    ),
+    Rec.values(latestRequests()),
     (request) => request.args.paginationOpts,
   );
 
@@ -98,13 +110,12 @@ const current = <A>(result: { readonly current: A }): A => result.current;
 beforeEach(() => {
   MutableRef.set(responses, new Map());
   useQueriesMock.mockReset();
-  useQueriesMock.mockImplementation(
-    (queries: Record<string, { args: { paginationOpts: unknown } }>) =>
-      Rec.map(queries, (request) =>
-        MutableRef.get(responses).get(
-          encodeJson(request.args.paginationOpts).pipe(Result.getOrThrow),
-        ),
+  useQueriesMock.mockImplementation((queries) =>
+    Rec.map(queries, (request) =>
+      MutableRef.get(responses).get(
+        encodeJson(request.args.paginationOpts).pipe(Result.getOrThrow),
       ),
+    ),
   );
 });
 
@@ -112,7 +123,7 @@ beforeEach(() => {
  * Respond to the initial growing page and its pinned twin so the hook settles
  * at one pinned first page (the state every loaded page reaches).
  */
-const respondFirstPage = (result: object) => {
+const respondFirstPage = (result: StreamPagination.PageResult) => {
   respond({ numItems: 2, cursor: null }, result);
   respond({ numItems: 2, cursor: null, endCursor: "c0" }, result);
 };
@@ -162,19 +173,26 @@ describe("useStreamPaginatedQuery", () => {
   });
 
   test("encodes user args into every page subscription", () => {
-    renderHook(() =>
-      useStreamPaginatedQuery(
-        listWithArgs,
-        { count: 42 },
-        { initialNumItems: 2 },
-      ),
+    const { rerender } = renderHook(
+      ({ count }) =>
+        useStreamPaginatedQuery(
+          listWithArgs,
+          { count },
+          { initialNumItems: 2 },
+        ),
+      { initialProps: { count: 42 } },
     );
-
-    const request = Rec.values(
-      useQueriesMock.mock.lastCall![0] as Record<string, { args: object }>,
-    )[0]!;
+    const requests = latestRequests();
+    const request = Rec.values(requests)[0];
     expect(request.args).toEqual({
       count: "42",
+      paginationOpts: { numItems: 2, cursor: null },
+    });
+    rerender({ count: 42 });
+    expect(latestRequests()).toBe(requests);
+    rerender({ count: 43 });
+    expect(Rec.values(latestRequests())[0].args).toEqual({
+      count: "43",
       paginationOpts: { numItems: 2, cursor: null },
     });
   });
@@ -210,6 +228,7 @@ describe("useStreamPaginatedQuery", () => {
       const canLoadMore = current(result);
       assert(canLoadMore._tag === "CanLoadMore");
       canLoadMore.loadMore(2);
+      canLoadMore.loadMore(4);
     });
 
     // The last page is already pinned, so loading more just appends a new

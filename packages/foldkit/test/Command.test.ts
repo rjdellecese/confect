@@ -1,5 +1,12 @@
 import { FunctionSpec, Ref } from "@confect/core";
-import { describe, expect, expectTypeOf, layer, test } from "@effect/vitest";
+import {
+  assert,
+  describe,
+  expect,
+  expectTypeOf,
+  layer,
+  test,
+} from "@effect/vitest";
 import type * as CompilerOptions from "confect-test-types/CompilerOptions";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
@@ -179,10 +186,8 @@ layer(TestClient.layer, { buildPerTest: true })("Command", (it) => {
 
         const message = yield* DeleteNote({ id: "abc", scope: "notes" }).effect;
 
-        expect(message._tag).toBe("FailedSaveNote");
-        expect((message as typeof FailedSaveNote.Type).error).toBeInstanceOf(
-          NotFound,
-        );
+        assert(message._tag === "FailedSaveNote");
+        expect(message.error).toBeInstanceOf(NotFound);
       }),
     );
 
@@ -203,10 +208,8 @@ layer(TestClient.layer, { buildPerTest: true })("Command", (it) => {
 
         const message = yield* SaveNote({ text: "hello" }).effect;
 
-        expect(message._tag).toBe("FailedSaveNote");
-        expect((message as typeof FailedSaveNote.Type).error).toBeInstanceOf(
-          Client.WebSocketClientError,
-        );
+        assert(message._tag === "FailedSaveNote");
+        expect(message.error).toBeInstanceOf(Client.WebSocketClientError);
       }),
     );
 
@@ -220,7 +223,7 @@ layer(TestClient.layer, { buildPerTest: true })("Command", (it) => {
         name: "SaveNote",
         ref: typeof insertMutationRef,
         config: typeof saveNoteConfig & { interrupt: undefined },
-      ) => unknown
+      ) => void
         ? true
         : false;
 
@@ -405,11 +408,16 @@ type ResolvableCommandDefinition<Name extends string, ResultMessage> =
       Effect.Effect<ResultMessage, any, any>
     >;
 
-describe("Foldkit test-tooling compatibility", () => {
-  const asResolvable = <Name extends string, ResultMessage>(
-    definition: ResolvableCommandDefinition<Name, ResultMessage>,
-  ): ResolvableCommandDefinition<Name, ResultMessage> => definition;
+const asResolvable = <Name extends string, ResultMessage>(
+  definition: ResolvableCommandDefinition<Name, ResultMessage>,
+): ResolvableCommandDefinition<Name, ResultMessage> => definition;
 
+const resolve = <Name extends string, ResultMessage>(
+  _definition: ResolvableCommandDefinition<Name, ResultMessage>,
+  resultMessage: ResultMessage,
+): ResultMessage => resultMessage;
+
+describe("Foldkit test-tooling compatibility", () => {
   test("factory definitions satisfy the Story/Scene resolve constraint", () => {
     const SaveNote = Command.mutation(
       "SaveNote",
@@ -444,11 +452,6 @@ describe("Foldkit test-tooling compatibility", () => {
       insertMutationRef,
       saveNoteConfig,
     );
-
-    const resolve = <Name extends string, ResultMessage>(
-      _definition: ResolvableCommandDefinition<Name, ResultMessage>,
-      resultMessage: ResultMessage,
-    ): ResultMessage => resultMessage;
 
     const resolved = resolve(SaveNote, SucceededSaveNote({ note: null }));
     expectTypeOf(resolved).toEqualTypeOf<Message>();

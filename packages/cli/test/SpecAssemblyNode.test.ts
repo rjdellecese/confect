@@ -5,22 +5,35 @@ import * as NodePath from "@effect/platform-node/NodePath";
 import { describe, expect, it, layer } from "@effect/vitest";
 import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
-import {
-  specImportPathFromGenerated,
-  type LeafModule,
-} from "@confect/cli/LeafModule";
+import { specImportPathFromGenerated } from "@confect/cli/LeafModule";
+import type { LeafModule } from "@confect/cli/LeafModule";
 import { assemblyNodesFromLeaves, render } from "@confect/cli/SpecAssemblyNode";
 
 const leaf = (
   relativePath: string,
-  pathSegments: [string, ...string[]],
+  pathSegments: [string, ...Array<string>],
 ): LeafModule => ({
   relativePath,
   pathSegments,
   groupPathDot: Array.join(pathSegments, "."),
-  exportName: pathSegments[pathSegments.length - 1]!,
+  exportName: pathSegments.at(-1)!,
   specImportPath: `../${pipe(relativePath, Str.slice(0, -".ts".length))}`,
 });
+
+const discovered = (
+  relativePath: string,
+  pathSegments: [string, ...Array<string>],
+) =>
+  Effect.map(
+    specImportPathFromGenerated(relativePath),
+    (specImportPath): LeafModule => ({
+      relativePath,
+      pathSegments,
+      groupPathDot: Array.join(pathSegments, "."),
+      exportName: pathSegments.at(-1)!,
+      specImportPath,
+    }),
+  );
 
 describe("SpecAssemblyNode", () => {
   it.effect("assembledSpec builds nested imports from leaf modules", () =>
@@ -287,21 +300,6 @@ for (const { name, pathLayer, sep } of [
   layer(pathLayer)(`SpecAssemblyNode, discovered as ${name}`, (test) => {
     test.effect("assembledSpec emits POSIX import specifiers", () =>
       Effect.gen(function* () {
-        const discovered = (
-          relativePath: string,
-          pathSegments: [string, ...string[]],
-        ) =>
-          Effect.map(
-            specImportPathFromGenerated(relativePath),
-            (specImportPath): LeafModule => ({
-              relativePath,
-              pathSegments,
-              groupPathDot: Array.join(pathSegments, "."),
-              exportName: pathSegments[pathSegments.length - 1]!,
-              specImportPath,
-            }),
-          );
-
         const nodes = assemblyNodesFromLeaves([
           yield* discovered(`notesAndRandom${sep}notes.spec.ts`, [
             "notesAndRandom",

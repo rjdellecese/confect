@@ -134,8 +134,9 @@ it("reconciles recovered observations without losing required generation or fail
   for (const phase of [
     SyncState.Phase.Bootstrapping(),
     SyncState.Phase.NeedsFullSync(),
-  ])
+  ]) {
     expect(SyncState.plan(phase, pending)._tag).toBe("Generate");
+  }
   const snapshot = Result.getOrThrow(GenerationSnapshot.fromLoadedLeaves([]));
   const phase = SyncState.Phase.Incremental({
     snapshot,

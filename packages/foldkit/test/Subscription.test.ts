@@ -12,6 +12,7 @@ import * as FoldkitSubscription from "foldkit/subscription";
 import * as Client from "@confect/foldkit/Client";
 import * as PaginatedQuery from "@confect/foldkit/PaginatedQuery";
 import * as Subscription from "@confect/foldkit/Subscription";
+import { settleActive } from "./settleActive";
 import * as TestClient from "./TestClient";
 
 const getQueryRef = Ref.make(
@@ -60,6 +61,18 @@ const makeNoteEntry = () =>
     onSuccess: (note) => SucceededGetNote({ note }),
     onError: (error) => FailedGetNote({ error }),
   });
+
+const makeConvexEntry = () =>
+  // @ts-expect-error—only Confect-provenance refs are supported
+  Subscription.reactiveQuery<Model>()(convexGetQueryRef, noteHandlers);
+
+const makeConvexStream = () =>
+  // @ts-expect-error—only Confect-provenance refs are supported
+  Subscription.reactiveQueryStream(convexGetQueryRef, noteHandlers);
+
+const requiresArgs = () =>
+  // @ts-expect-error—declared args require an extractor
+  Subscription.reactiveQuery<Model>()(getQueryRef, noteHandlers);
 
 layer(TestClient.layer, { buildPerTest: true })("Subscription", (it) => {
   describe("reactiveQuery", () => {
@@ -155,17 +168,10 @@ layer(TestClient.layer, { buildPerTest: true })("Subscription", (it) => {
     });
 
     it("rejects Convex-provenance refs at the type level", () => {
-      const makeConvexEntry = () =>
-        // @ts-expect-error—only Confect-provenance refs are supported
-        Subscription.reactiveQuery<Model>()(convexGetQueryRef, noteHandlers);
-
       expect(typeof makeConvexEntry).toBe("function");
     });
 
     it("requires args and is accepted by Foldkit Subscription.make", () => {
-      const requiresArgs = () =>
-        // @ts-expect-error—declared args require an extractor
-        Subscription.reactiveQuery<Model>()(getQueryRef, noteHandlers);
       const subscriptions = FoldkitSubscription.make<
         Model,
         Message,
@@ -205,10 +211,6 @@ layer(TestClient.layer, { buildPerTest: true })("Subscription", (it) => {
     );
 
     it("rejects Convex-provenance refs at the type level", () => {
-      const makeConvexStream = () =>
-        // @ts-expect-error—only Confect-provenance refs are supported
-        Subscription.reactiveQueryStream(convexGetQueryRef, noteHandlers);
-
       expect(typeof makeConvexStream).toBe("function");
     });
   });
@@ -278,7 +280,7 @@ const initialMachine = (): PaginatedActive =>
     {
       initialNumItems: 2,
       maximumRowsRead: 100,
-      maximumBytesRead: 1_000,
+      maximumBytesRead: 1000,
     },
   );
 
@@ -295,7 +297,7 @@ const settlePage = (
   state: PaginatedActive,
   overrides: Partial<PaginatedQuery.PageResult<{ readonly text: string }>> = {},
 ): PaginatedActive =>
-  PaginatedQuery.settle(state, {
+  settleActive(state, {
     request: allocatedRequest(state),
     result: Result.succeed({
       page: [{ text: "a" }],
@@ -303,7 +305,7 @@ const settlePage = (
       continueCursor: "c1",
       ...overrides,
     }),
-  }) as PaginatedActive;
+  });
 
 const failPage = (
   state: PaginatedActive,
@@ -311,10 +313,10 @@ const failPage = (
     typeof paginateRef
   > = Client.WebSocketClientError.make({ cause: "offline" }),
 ): PaginatedActive =>
-  PaginatedQuery.settle(state, {
+  settleActive(state, {
     request: allocatedRequest(state),
     result: Result.fail(error),
-  }) as PaginatedActive;
+  });
 
 const streamFor = (
   entry: ReturnType<typeof makePaginatedEntry>,
@@ -381,7 +383,7 @@ layer(TestClient.layer, { buildPerTest: true })(
             );
 
             expect(messages).toHaveLength(1);
-            const message = messages[0]!;
+            const message = messages[0];
             const paginationId = message.settlement.request.paginationId;
             expect(message.settlement.result).toEqual(
               Result.succeed({
@@ -402,7 +404,7 @@ layer(TestClient.layer, { buildPerTest: true })(
                     cursor: null,
                     id: paginationId,
                     maximumRowsRead: 100,
-                    maximumBytesRead: 1_000,
+                    maximumBytesRead: 1000,
                   },
                 },
               },
@@ -429,9 +431,9 @@ layer(TestClient.layer, { buildPerTest: true })(
             streamFor(entry, logicalRequest),
           );
 
-          expect(messages[0]!.settlement.request.paginationId).toBe(42);
+          expect(messages[0].settlement.request.paginationId).toBe(42);
           const calls = yield* testClient.calls;
-          expect(calls[0]!.args).toEqual({
+          expect(calls[0].args).toEqual({
             channel: "general",
             paginationOpts: {
               numItems: 2,
@@ -439,7 +441,7 @@ layer(TestClient.layer, { buildPerTest: true })(
               endCursor: "s",
               id: 42,
               maximumRowsRead: 100,
-              maximumBytesRead: 1_000,
+              maximumBytesRead: 1000,
             },
           });
         }),
@@ -471,10 +473,10 @@ layer(TestClient.layer, { buildPerTest: true })(
               ),
             );
 
-            expect(restoredMessages[0]!.settlement.request.paginationId).toBe(
+            expect(restoredMessages[0].settlement.request.paginationId).toBe(
               42_000,
             );
-            expect(freshMessages[0]!.settlement.request.paginationId).toBe(
+            expect(freshMessages[0].settlement.request.paginationId).toBe(
               42_001,
             );
           }),
@@ -506,10 +508,10 @@ layer(TestClient.layer, { buildPerTest: true })(
             );
 
             expect(messages).toHaveLength(2);
-            expect(messages[0]!.settlement.result).toEqual(
+            expect(messages[0].settlement.result).toEqual(
               Result.fail(PaginatedQuery.FunctionError({ error })),
             );
-            expect(messages[1]!.settlement.result).toEqual(
+            expect(messages[1].settlement.result).toEqual(
               Result.succeed({
                 page: [{ text: "now visible" }],
                 isDone: true,
@@ -553,13 +555,13 @@ layer(TestClient.layer, { buildPerTest: true })(
               ),
             );
 
-            expect(messages[0]!.settlement.result).toEqual(
+            expect(messages[0].settlement.result).toEqual(
               Result.fail(PaginationError.InvalidCursor.make({ cause })),
             );
-            expect(messages[1]!.settlement.result).toEqual(
+            expect(messages[1].settlement.result).toEqual(
               Result.fail(transportError),
             );
-            expect(messages[2]!.settlement.result).toEqual(
+            expect(messages[2].settlement.result).toEqual(
               Result.fail(decoded.failure),
             );
           }),
@@ -596,7 +598,7 @@ layer(TestClient.layer, { buildPerTest: true })(
                 () => ({ request: Option.some(request) }),
               ),
             );
-            const settlement = settlements[0]!;
+            const settlement = settlements[0];
 
             expect(settlement.result).toEqual(
               Result.fail(

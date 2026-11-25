@@ -22,16 +22,16 @@ import notes from "./mock-backend/fixtures/confect/groups/notes.impl";
 describe("Registered functions", () => {
   it("types public Query functions as RegisteredQuery<public, ...>", () => {
     expectTypeOf(registeredFunctions.list).toExtend<
-      RegisteredQuery<"public", Record<string, unknown>, unknown>
+      RegisteredQuery<"public", Record<never, never>, unknown>
     >();
     expectTypeOf(registeredFunctions.getFirst).toExtend<
-      RegisteredQuery<"public", Record<string, unknown>, unknown>
+      RegisteredQuery<"public", Record<never, never>, unknown>
     >();
   });
 
   it("types internal Query functions as RegisteredQuery<internal, ...>", () => {
     expectTypeOf(registeredFunctions.internalGetFirst).toExtend<
-      RegisteredQuery<"internal", Record<string, unknown>, unknown>
+      RegisteredQuery<"internal", Record<never, never>, unknown>
     >();
   });
 });

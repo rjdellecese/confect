@@ -3,16 +3,15 @@ import type {
   GenericDatabaseWriter,
   GenericDataModel,
   TableNamesInDataModel,
-  WithOptionalSystemFields,
   WithoutSystemFields,
 } from "convex/server";
 import type { GenericId } from "convex/values";
-import type { BaseDatabaseReader } from "@confect/core/Types";
 import { pipe } from "effect/Function";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Record from "effect/Record";
+import type * as Schema from "effect/Schema";
 import type * as DatabaseSchema from "./DatabaseSchema";
 import type * as DataModel from "./DataModel";
 import type { DocumentByName as DocumentByName_ } from "./DataModel";
@@ -157,7 +156,7 @@ export interface DatabaseWriterTableAccessor<
  */
 export interface DatabaseWriterService<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
-  Docs = {},
+  Docs = unknown,
 > {
   /**
    * Selects an application table for writes without reading or changing any
@@ -204,7 +203,7 @@ export interface DatabaseWriterService<
  */
 export type DatabaseWriterTag<
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
-  Docs = {},
+  Docs = unknown,
 > = Context.Service<
   DatabaseWriterService<DatabaseSchema_>,
   DatabaseWriterService<DatabaseSchema_, Docs>
@@ -216,12 +215,16 @@ export type DatabaseWriterTag<
 export const make = <Model extends GenericDataModel>(
   convexDatabaseWriter: GenericDatabaseWriter<Model>,
 ): DatabaseWriterService<DatabaseSchema.FromConvexDataModel<Model>> => {
-  const reader: BaseDatabaseReader<any> = convexDatabaseWriter;
   const table = <TableName extends TableNamesInDataModel<Model>>(
-    tableDef: Table.AnyWithProps & { readonly tableName: TableName },
+    tableDef: Omit<Table.AnyWithProps, "tableName" | "Fields"> & {
+      readonly tableName: TableName;
+      readonly Fields: Schema.Codec<
+        Record<string, unknown>,
+        WithoutSystemFields<DocumentByName<Model, TableName>>
+      >;
+    },
   ) => {
     const tableName = tableDef.tableName;
-    type Encoded = DocumentByName<Model, TableName>;
 
     const insert = Effect.fn("DatabaseWriter.insert")(function* (
       document: Record<string, unknown>,
@@ -229,10 +232,7 @@ export const make = <Model extends GenericDataModel>(
       const encodedDocument = yield* Document.encode(document, tableDef);
 
       const id = yield* Effect.promise(() =>
-        convexDatabaseWriter.insert(
-          tableName,
-          encodedDocument as WithoutSystemFields<Encoded>,
-        ),
+        convexDatabaseWriter.insert(tableName, encodedDocument),
       );
 
       return id;
@@ -242,13 +242,11 @@ export const make = <Model extends GenericDataModel>(
       id: GenericId<TableName>,
       patchedValues: Record<string, unknown>,
     ) {
-      const originalDecodedDoc = yield* QueryInitializer.getById<
-        Table.AnyWithProps,
-        TableName
-      >(
-        reader,
-        tableDef,
-      )(id);
+      const originalDecodedDoc: Record<string, unknown> =
+        yield* QueryInitializer.getById<typeof tableDef, TableName>(
+          convexDatabaseWriter,
+          tableDef,
+        )(id);
 
       const updatedEncodedDoc = yield* pipe(
         patchedValues,
@@ -261,10 +259,7 @@ export const make = <Model extends GenericDataModel>(
       );
 
       yield* Effect.promise(() =>
-        convexDatabaseWriter.replace(
-          id,
-          updatedEncodedDoc as WithOptionalSystemFields<Encoded>,
-        ),
+        convexDatabaseWriter.replace(id, updatedEncodedDoc),
       );
     });
 
@@ -275,10 +270,7 @@ export const make = <Model extends GenericDataModel>(
       const updatedEncodedDoc = yield* Document.encode(value, tableDef);
 
       yield* Effect.promise(() =>
-        convexDatabaseWriter.replace(
-          id,
-          updatedEncodedDoc as WithOptionalSystemFields<Encoded>,
-        ),
+        convexDatabaseWriter.replace(id, updatedEncodedDoc),
       );
     });
 
@@ -293,6 +285,7 @@ export const make = <Model extends GenericDataModel>(
     };
   };
 
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- The generated writer distributes over table handles and derives document types from each one's codec; the native table implementation shares one runtime body.
   return {
     table,
   } as DatabaseWriterService<DatabaseSchema.FromConvexDataModel<Model>>;
@@ -307,7 +300,7 @@ export const make = <Model extends GenericDataModel>(
  */
 export const DatabaseWriter = <
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
-  Docs = {},
+  Docs = unknown,
 >(): DatabaseWriterTag<DatabaseSchema_, Docs> =>
   Context.Service<
     DatabaseWriterService<DatabaseSchema_>,

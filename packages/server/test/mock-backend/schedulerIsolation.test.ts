@@ -15,6 +15,7 @@
  * window is the handler fiber under test.
  */
 
+import { vi } from "vitest";
 import { Ref } from "@confect/core";
 import { convexTest } from "convex-test";
 import { describe, expect, it } from "@effect/vitest";
@@ -31,6 +32,12 @@ const modules = import.meta.glob([
 // The fixtures sum 1..5000.
 const expectedSum = (5000 * 5001) / 2;
 
+const ban = (name: string) => () => {
+  throw new Error(
+    `Can't use ${name} in queries and mutations. Please consider using an action.`,
+  );
+};
+
 /**
  * Simulate the Convex query/mutation isolate for the duration of `run`:
  * `setTimeout` throws Convex's error, and `setImmediate` (absent in the
@@ -40,18 +47,15 @@ const expectedSum = (5000 * 5001) / 2;
  * intercepts it.
  */
 const withConvexIsolateTimers = <A>(run: () => Promise<A>): Promise<A> => {
-  const originalSetTimeout = globalThis.setTimeout;
-  const originalSetImmediate = globalThis.setImmediate;
-  const ban = (name: string) => () => {
-    throw new Error(
-      `Can't use ${name} in queries and mutations. Please consider using an action.`,
-    );
-  };
-  globalThis.setTimeout = ban("setTimeout") as never;
-  globalThis.setImmediate = ban("setImmediate") as never;
+  const timeout = vi
+    .spyOn(globalThis, "setTimeout")
+    .mockImplementation(ban("setTimeout"));
+  const immediate = vi
+    .spyOn(globalThis, "setImmediate")
+    .mockImplementation(ban("setImmediate"));
   return run().finally(() => {
-    globalThis.setTimeout = originalSetTimeout;
-    globalThis.setImmediate = originalSetImmediate;
+    timeout.mockRestore();
+    immediate.mockRestore();
   });
 };
 

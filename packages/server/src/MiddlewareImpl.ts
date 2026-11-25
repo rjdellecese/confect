@@ -288,6 +288,30 @@ export interface Builders<DatabaseSchema_ extends DatabaseSchema.AnyWithProps> {
   ) => Layer.Layer<MiddlewareImpl<MiddlewareSpec.Key<MiddlewareSpec_>>>;
 }
 
+const sharedLayer = <Spec extends MiddlewareSpec.AnyMiddlewareSpec, R>(
+  middlewareSpec: Spec,
+  impl: MiddlewareSpec.MiddlewareImpl<
+    MiddlewareSpec.Provides<Spec>,
+    MiddlewareSpec.Error<Spec>,
+    R,
+    MiddlewareSpec.Options<Spec>
+  >,
+) =>
+  layerFromImpls(
+    middlewareSpec,
+    Record.fromEntries(
+      Array.map(
+        Array.filter(
+          MiddlewareSpec.allFunctionTypes,
+          (functionType) => middlewareSpec.functionTypes[functionType],
+        ),
+        (functionType) =>
+          // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- make checks this spec's exact options and services before registration; resolve pairs the erased wrapper with the same spec and validated options.
+          [functionType, impl as MiddlewareSpec.AnyMiddlewareImpl] as const,
+      ),
+    ),
+  );
+
 /**
  * Binds the application's database type without loading its tables. Use
  * `MiddlewareImpl.make`, `MiddlewareImpl.makeByFunctionType`, or
@@ -298,34 +322,18 @@ export interface Builders<DatabaseSchema_ extends DatabaseSchema.AnyWithProps> {
  */
 export const forSchema = <
   DatabaseSchema_ extends DatabaseSchema.AnyWithProps,
->(): Builders<DatabaseSchema_> => {
-  const make: Builders<DatabaseSchema_>["make"] = (middlewareSpec, impl) =>
+>(): Builders<DatabaseSchema_> => ({
+  make: sharedLayer,
+  makeByFunctionType: (middlewareSpec, impls) =>
     layerFromImpls(
       middlewareSpec,
-      Record.fromEntries(
-        Array.map(
-          Array.filter(
-            MiddlewareSpec.allFunctionTypes,
-            (functionType) => middlewareSpec.functionTypes[functionType],
-          ),
-          (functionType) =>
-            [functionType, impl as MiddlewareSpec.AnyMiddlewareImpl] as const,
-        ),
-      ),
-    );
-
-  return {
-    make,
-    makeByFunctionType: (middlewareSpec, impls) =>
-      layerFromImpls(
-        middlewareSpec,
-        impls as MiddlewareRegistryItem.MiddlewareRegistryItem["impls"],
-      ),
-    provides: (middlewareSpec, tag, effect) =>
-      make(middlewareSpec, ((handlerEffect: Effect.Effect<any>) =>
-        Effect.provideServiceEffect(handlerEffect, tag, effect)) as any),
-  };
-};
+      impls as MiddlewareRegistryItem.MiddlewareRegistryItem["impls"],
+    ),
+  provides: (middlewareSpec, tag, effect) =>
+    sharedLayer(middlewareSpec, (handlerEffect) =>
+      Effect.provideServiceEffect(handlerEffect, tag, effect),
+    ),
+});
 
 export const {
   /**

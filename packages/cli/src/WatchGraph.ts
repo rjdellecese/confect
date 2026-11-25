@@ -14,7 +14,9 @@ export const make = (
   for (const [file, input] of Record.toEntries(metafile.inputs)) {
     const importer = resolve(file);
     for (const dependency of input.imports) {
-      if (dependency.external === true) continue;
+      if (dependency.external === true) {
+        continue;
+      }
       const imported = resolve(dependency.path);
       const parents = Option.getOrElse(HashMap.get(importers, imported), () =>
         HashSet.empty<string>(),
@@ -37,11 +39,15 @@ export const affected = (
   const pending = [...changed];
   while (pending.length > 0) {
     const file = pending.pop();
-    if (file === undefined) break;
+    if (file === undefined) {
+      break;
+    }
     for (const importer of Option.getOrElse(HashMap.get(graph, file), () =>
       HashSet.empty<string>(),
     )) {
-      if (HashSet.has(visited, importer)) continue;
+      if (HashSet.has(visited, importer)) {
+        continue;
+      }
       visited = HashSet.add(visited, importer);
       pending.push(importer);
     }

@@ -6,9 +6,9 @@ import { vi } from "vitest";
 describe("Confect", () => {
   it("keeps schema callbacks lazy and preserves exact schema types", () => {
     const fields = { count: Schema.FiniteFromString };
-    const args = vi.fn(() => fields);
-    const returns = vi.fn(() => Schema.String);
-    const error = vi.fn(() => Schema.Boolean);
+    const args = vi.fn<() => typeof fields>(() => fields);
+    const returns = vi.fn<() => typeof Schema.String>(() => Schema.String);
+    const error = vi.fn<() => typeof Schema.Boolean>(() => Schema.Boolean);
     const provenance = FunctionProvenance.Confect(args, returns, error);
 
     expectTypeOf(provenance).toEqualTypeOf<
@@ -36,14 +36,15 @@ describe("Confect", () => {
   });
 
   it("does not install an error getter when no error callback is supplied", () => {
+    const fields = {};
     const provenance = FunctionProvenance.Confect(
-      () => ({}),
+      () => fields,
       () => Schema.String,
     );
 
     expectTypeOf(provenance).toEqualTypeOf<
       FunctionProvenance.Confect<
-        {},
+        typeof fields,
         typeof Schema.String,
         never,
         FunctionProvenance.Standard
@@ -56,9 +57,11 @@ describe("Confect", () => {
 describe("ConfectPaginated", () => {
   it("keeps schema callbacks and composed schemas lazy and memoized", () => {
     const fields = { count: Schema.FiniteFromString };
-    const userArgs = vi.fn(() => fields);
-    const item = vi.fn(() => Schema.FiniteFromString);
-    const error = vi.fn(() => Schema.Boolean);
+    const userArgs = vi.fn<() => typeof fields>(() => fields);
+    const item = vi.fn<() => typeof Schema.FiniteFromString>(
+      () => Schema.FiniteFromString,
+    );
+    const error = vi.fn<() => typeof Schema.Boolean>(() => Schema.Boolean);
     const provenance = FunctionProvenance.ConfectPaginated(
       userArgs,
       item,
@@ -90,13 +93,14 @@ describe("ConfectPaginated", () => {
   });
 
   it("preserves the no-error type and absent error property", () => {
+    const fields = {};
     const provenance = FunctionProvenance.ConfectPaginated(
-      () => ({}),
+      () => fields,
       () => Schema.String,
     );
 
     expectTypeOf(provenance).toEqualTypeOf<
-      FunctionProvenance.ConfectPaginated<{}, typeof Schema.String>
+      FunctionProvenance.ConfectPaginated<typeof fields, typeof Schema.String>
     >();
     expect("error" in provenance).toBe(false);
   });

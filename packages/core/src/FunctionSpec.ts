@@ -169,74 +169,74 @@ export interface Any {
 /**
  * @internal
  */
-export interface AnyWithProps extends FunctionSpec<
+export type AnyWithProps = FunctionSpec<
   RuntimeAndFunctionType.RuntimeAndFunctionType,
   FunctionVisibility,
   string,
   FunctionProvenance.FunctionProvenance,
   MiddlewareSpec.AnyMiddlewareSpec
-> {}
+>;
 
 /**
  * @internal
  */
-export interface AnyConfect extends FunctionSpec<
+export type AnyConfect = FunctionSpec<
   RuntimeAndFunctionType.RuntimeAndFunctionType,
   FunctionVisibility,
   string,
   FunctionProvenance.AnyConfect,
   MiddlewareSpec.AnyMiddlewareSpec
-> {}
+>;
 
 /**
  * @internal
  */
-export interface AnyConvex extends FunctionSpec<
+export type AnyConvex = FunctionSpec<
   RuntimeAndFunctionType.RuntimeAndFunctionType,
   FunctionVisibility,
   string,
   FunctionProvenance.AnyConvex,
   MiddlewareSpec.AnyMiddlewareSpec
-> {}
+>;
 
 /**
  * @internal
  */
-export interface AnyWithPropsWithRuntime<
+export type AnyWithPropsWithRuntime<
   Runtime extends RuntimeAndFunctionType.Runtime,
-> extends FunctionSpec<
+> = FunctionSpec<
   RuntimeAndFunctionType.WithRuntime<Runtime>,
   FunctionVisibility,
   string,
   FunctionProvenance.FunctionProvenance,
   MiddlewareSpec.AnyMiddlewareSpec
-> {}
+>;
 
 /**
  * @internal
  */
-export interface AnyWithPropsWithFunctionType<
+export type AnyWithPropsWithFunctionType<
   RuntimeAndFunctionType_ extends RuntimeAndFunctionType.RuntimeAndFunctionType,
-> extends FunctionSpec<
+> = FunctionSpec<
   RuntimeAndFunctionType_,
   FunctionVisibility,
   string,
   FunctionProvenance.FunctionProvenance,
   MiddlewareSpec.AnyMiddlewareSpec
-> {}
+>;
 
 /**
  * @internal
  */
-export interface AnyWithPropsWithFunctionProvenance<
+export type AnyWithPropsWithFunctionProvenance<
   FunctionProvenance_ extends FunctionProvenance.FunctionProvenance,
-> extends FunctionSpec<
+> = FunctionSpec<
   RuntimeAndFunctionType.RuntimeAndFunctionType,
   FunctionVisibility,
   string,
   FunctionProvenance_,
   MiddlewareSpec.AnyMiddlewareSpec
-> {}
+>;
 
 /**
  * @internal
@@ -318,7 +318,7 @@ export type ReturnsSchema<FunctionSpec_ extends AnyWithProps> =
   FunctionSpec_ extends {
     readonly functionProvenance: {
       readonly _tag: "Confect";
-      readonly returns: infer ReturnsSchema_ extends Schema.Codec<any, any>;
+      readonly returns: infer ReturnsSchema_ extends Schema.Codec<unknown>;
     };
   }
     ? ReturnsSchema_
@@ -334,7 +334,7 @@ export type ErrorSchema<FunctionSpec_ extends AnyWithProps> =
       readonly error?: infer ErrorSchema_;
     };
   }
-    ? Extract<ErrorSchema_, Schema.Codec<any, any>>
+    ? Extract<ErrorSchema_, Schema.Codec<unknown>>
     : never;
 
 /**
@@ -346,7 +346,7 @@ export type Args<FunctionSpec_ extends AnyWithProps> = FunctionSpec_ extends {
   ? ArgsSchema<FunctionSpec_>["Type"]
   : GetFunctionProvenance<FunctionSpec_> extends FunctionProvenance.Convex<
         infer Args_,
-        any
+        unknown
       >
     ? Args_
     : never;
@@ -360,7 +360,7 @@ export type Returns<FunctionSpec_ extends AnyWithProps> =
   }
     ? ReturnsSchema<FunctionSpec_>["Type"]
     : GetFunctionProvenance<FunctionSpec_> extends FunctionProvenance.Convex<
-          any,
+          DefaultFunctionArgs,
           infer Returns_
         >
       ? Awaited<Returns_>
@@ -376,7 +376,7 @@ export type EncodedArgs<FunctionSpec_ extends AnyWithProps> =
     ? ArgsSchema<FunctionSpec_>["Encoded"]
     : GetFunctionProvenance<FunctionSpec_> extends FunctionProvenance.Convex<
           infer Args_,
-          any
+          unknown
         >
       ? Args_
       : never;
@@ -390,7 +390,7 @@ export type EncodedReturns<FunctionSpec_ extends AnyWithProps> =
   }
     ? ReturnsSchema<FunctionSpec_>["Encoded"]
     : GetFunctionProvenance<FunctionSpec_> extends FunctionProvenance.Convex<
-          any,
+          DefaultFunctionArgs,
           infer Returns_
         >
       ? Returns_
@@ -492,7 +492,7 @@ const Proto = {
       );
     }
 
-    return Object.assign(Object.create(Proto), {
+    return makeBuilder({
       runtimeAndFunctionType: this.runtimeAndFunctionType,
       functionVisibility: this.functionVisibility,
       name: this.name,
@@ -503,13 +503,47 @@ const Proto = {
       ],
     });
   },
-} satisfies ThisType<AnyWithProps>;
+} satisfies ThisType<AnyWithProps> &
+  Pick<
+    Builder<
+      RuntimeAndFunctionType.RuntimeAndFunctionType,
+      FunctionVisibility,
+      string,
+      FunctionProvenance.FunctionProvenance,
+      MiddlewareSpec.AnyMiddlewareSpec
+    >,
+    typeof TypeId | "middleware" | "middlewareSpecs"
+  >;
+
+const makeBuilder = <
+  Runtime extends RuntimeAndFunctionType.RuntimeAndFunctionType,
+  Visibility extends FunctionVisibility,
+  Name_ extends string,
+  Provenance extends FunctionProvenance.FunctionProvenance,
+  Middleware extends MiddlewareSpec.AnyMiddlewareSpec = never,
+>(
+  fields: Pick<
+    FunctionSpec<Runtime, Visibility, Name_, Provenance, Middleware>,
+    | "runtimeAndFunctionType"
+    | "functionVisibility"
+    | "name"
+    | "functionProvenance"
+    | "middlewareAttachments"
+  >,
+): Builder<Runtime, Visibility, Name_, Provenance, Middleware> =>
+  // oxlint-disable-next-line typescript/no-unsafe-return -- Object.create erases the shared prototype supplying the builder's middleware method, getter, and TypeId; the own fields retain their spec types.
+  Object.assign(Object.create(Proto), fields);
+
+// oxlint-disable-next-line typescript/no-empty-object-type -- This is the inferred type of the empty fields literal; using ReturnType<typeof emptyArgs> in ref projections raised the small unfiltered probe from 307 to 442 instantiations.
+type EmptyArgsFields = {};
+
+const emptyArgs = (): EmptyArgsFields => ({});
 
 interface Options {
   readonly name: string;
   readonly args?: () => FunctionProvenance.ArgsFields;
-  readonly returns: () => Schema.Codec<any, any>;
-  readonly error?: () => Schema.Codec<any, any>;
+  readonly returns: () => Schema.Codec<unknown>;
+  readonly error?: () => Schema.Codec<unknown>;
 }
 
 const make = <
@@ -522,8 +556,8 @@ const make = <
   function makeSpec<
     const Name_ extends string,
     const ArgsFields_ extends FunctionProvenance.ArgsFields,
-    Returns_ extends Schema.Codec<any, any>,
-    Error_ extends Schema.Codec<any, any> = never,
+    Returns_ extends Schema.Codec<unknown>,
+    Error_ extends Schema.Codec<unknown> = never,
   >(options: {
     name: Name_;
     args: () => ArgsFields_;
@@ -537,8 +571,8 @@ const make = <
   >;
   function makeSpec<
     const Name_ extends string,
-    Returns_ extends Schema.Codec<any, any>,
-    Error_ extends Schema.Codec<any, any> = never,
+    Returns_ extends Schema.Codec<unknown>,
+    Error_ extends Schema.Codec<unknown> = never,
   >(options: {
     name: Name_;
     args?: never;
@@ -548,19 +582,20 @@ const make = <
     RuntimeAndFunctionType_,
     FunctionVisibility_,
     Name_,
-    FunctionProvenance.Confect<{}, Returns_, Error_>
+    FunctionProvenance.Confect<EmptyArgsFields, Returns_, Error_>
   >;
   function makeSpec({ name, args, returns, error }: Options) {
     validateConfectFunctionIdentifier(name);
 
-    return Object.assign(Object.create(Proto), {
+    return makeBuilder({
       runtimeAndFunctionType,
       functionVisibility,
       name,
-      functionProvenance:
-        args === undefined
-          ? FunctionProvenance.Confect(() => ({}), returns, error)
-          : FunctionProvenance.Confect(args, returns, error),
+      functionProvenance: FunctionProvenance.Confect(
+        args ?? emptyArgs,
+        returns,
+        error,
+      ),
       middlewareAttachments: [],
     });
   }
@@ -583,8 +618,8 @@ type ForbidPaginationOpts<
 interface PaginatedOptions {
   readonly name: string;
   readonly args?: () => FunctionProvenance.ArgsFields;
-  readonly item: () => Schema.Codec<any, any>;
-  readonly error?: () => Schema.Codec<any, any>;
+  readonly item: () => Schema.Codec<unknown>;
+  readonly error?: () => Schema.Codec<unknown>;
 }
 
 const makePaginated = <
@@ -597,8 +632,8 @@ const makePaginated = <
   function makeSpec<
     const Name_ extends string,
     const UserArgsFields_ extends FunctionProvenance.ArgsFields,
-    Item_ extends Schema.Codec<any, any>,
-    Error_ extends Schema.Codec<any, any> = never,
+    Item_ extends Schema.Codec<unknown>,
+    Error_ extends Schema.Codec<unknown> = never,
   >(options: {
     name: Name_;
     args: () => UserArgsFields_ & ForbidPaginationOpts<UserArgsFields_>;
@@ -612,8 +647,8 @@ const makePaginated = <
   >;
   function makeSpec<
     const Name_ extends string,
-    Item_ extends Schema.Codec<any, any>,
-    Error_ extends Schema.Codec<any, any> = never,
+    Item_ extends Schema.Codec<unknown>,
+    Error_ extends Schema.Codec<unknown> = never,
   >(options: {
     name: Name_;
     args?: never;
@@ -623,19 +658,20 @@ const makePaginated = <
     RuntimeAndFunctionType_,
     FunctionVisibility_,
     Name_,
-    FunctionProvenance.ConfectPaginated<{}, Item_, Error_>
+    FunctionProvenance.ConfectPaginated<EmptyArgsFields, Item_, Error_>
   >;
   function makeSpec({ name, args, item, error }: PaginatedOptions) {
     validateConfectFunctionIdentifier(name);
 
-    return Object.assign(Object.create(Proto), {
+    return makeBuilder({
       runtimeAndFunctionType,
       functionVisibility,
       name,
-      functionProvenance:
-        args === undefined
-          ? FunctionProvenance.ConfectPaginated(() => ({}), item, error)
-          : FunctionProvenance.ConfectPaginated(args, item, error),
+      functionProvenance: FunctionProvenance.ConfectPaginated(
+        args ?? emptyArgs,
+        item,
+        error,
+      ),
       middlewareAttachments: [],
     });
   }
@@ -931,36 +967,40 @@ type MatchingRegisteredFunction<
   FunctionVisibility_ extends FunctionVisibility,
 > =
   RuntimeAndFunctionType.GetFunctionType<RuntimeAndFunctionType_> extends "query"
-    ? RegisteredQuery<FunctionVisibility_, any, any>
+    ? RegisteredQuery<FunctionVisibility_, never, unknown>
     : RuntimeAndFunctionType.GetFunctionType<RuntimeAndFunctionType_> extends "mutation"
-      ? RegisteredMutation<FunctionVisibility_, any, any>
+      ? RegisteredMutation<FunctionVisibility_, never, unknown>
       : RuntimeAndFunctionType.GetFunctionType<RuntimeAndFunctionType_> extends "action"
-        ? RegisteredAction<FunctionVisibility_, any, any>
+        ? RegisteredAction<FunctionVisibility_, never, unknown>
         : never;
 
 type ExtractArgs<F> =
-  F extends RegisteredQuery<any, infer A extends DefaultFunctionArgs, any>
+  F extends RegisteredQuery<
+    FunctionVisibility,
+    infer A extends DefaultFunctionArgs,
+    unknown
+  >
     ? A
     : F extends RegisteredMutation<
-          any,
+          FunctionVisibility,
           infer A extends DefaultFunctionArgs,
-          any
+          unknown
         >
       ? A
       : F extends RegisteredAction<
-            any,
+            FunctionVisibility,
             infer A extends DefaultFunctionArgs,
-            any
+            unknown
           >
         ? A
         : never;
 
 type ExtractReturns<F> =
-  F extends RegisteredQuery<any, any, infer R>
+  F extends RegisteredQuery<FunctionVisibility, never, infer R>
     ? R
-    : F extends RegisteredMutation<any, any, infer R>
+    : F extends RegisteredMutation<FunctionVisibility, never, infer R>
       ? R
-      : F extends RegisteredAction<any, any, infer R>
+      : F extends RegisteredAction<FunctionVisibility, never, infer R>
         ? R
         : never;
 
@@ -989,7 +1029,7 @@ const makeConvex =
   > => {
     validateConfectFunctionIdentifier(name);
 
-    return Object.assign(Object.create(Proto), {
+    return makeBuilder({
       runtimeAndFunctionType,
       functionVisibility,
       name,
@@ -998,7 +1038,7 @@ const makeConvex =
         ExtractReturns<F>
       >(),
       middlewareAttachments: [],
-    }) as any;
+    });
   };
 
 /**

@@ -1,3 +1,8 @@
+import type {
+  GenericDataModel,
+  GenericActionCtx,
+  DefaultFunctionArgs,
+} from "convex/server";
 import * as Layer from "effect/Layer";
 import { FunctionSpec, Ref } from "@confect/core";
 import * as ActionRunner from "@confect/server/ActionRunner";
@@ -6,6 +11,11 @@ import { ConvexError } from "convex/values";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import { vi } from "vitest";
+
+type NativeCall = (
+  ref: Parameters<GenericActionCtx<GenericDataModel>["runAction"]>[0],
+  args?: DefaultFunctionArgs,
+) => Promise<string>;
 
 class NotFound extends Schema.TaggedError<
   NotFound,
@@ -33,7 +43,7 @@ describe("ActionRunner", () => {
   it.effect(
     "encodes arguments and decodes results lazily on each execution",
     () => {
-      const native = vi.fn().mockResolvedValue("2");
+      const native = vi.fn<NativeCall>().mockResolvedValue("2");
       return Effect.gen(function* () {
         const services = yield* Layer.build(ActionRunner.layer(native));
         return yield* Effect.gen(function* () {
@@ -61,7 +71,7 @@ describe("ActionRunner", () => {
   it.effect(
     "allows omitted arguments only for empty-argument references",
     () => {
-      const native = vi.fn().mockResolvedValue("ok");
+      const native = vi.fn<NativeCall>().mockResolvedValue("ok");
       return Effect.gen(function* () {
         const services = yield* Layer.build(ActionRunner.layer(native));
         return yield* Effect.gen(function* () {
@@ -100,7 +110,7 @@ describe("ActionRunner", () => {
     () => {
       const failure = new Error("offline");
       const native = vi
-        .fn()
+        .fn<NativeCall>()
         .mockRejectedValueOnce(new ConvexError({ _tag: "NotFound", id: "abc" }))
         .mockResolvedValueOnce("not a number")
         .mockRejectedValueOnce(failure);

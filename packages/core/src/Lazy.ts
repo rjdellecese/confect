@@ -1,3 +1,9 @@
+type DefinedProperty<K extends PropertyKey, V> = K extends PropertyKey
+  ? Record<never, never> extends Record<K, V>
+    ? unknown
+    : Readonly<Record<K, V>>
+  : never;
+
 /**
  * Install a lazy memoised property on `target`. The first access runs
  * `compute()` and replaces the getter with a plain, non-writable data property
@@ -17,11 +23,15 @@
  *
  * @internal
  */
-export const defineProperty = <T extends object, K extends PropertyKey>(
+export function defineProperty<
+  T extends object,
+  const K extends PropertyKey,
+  V,
+>(
   target: T,
   key: K,
-  compute: () => unknown,
-): void => {
+  compute: () => V,
+): asserts target is T & DefinedProperty<K, V> {
   Object.defineProperty(target, key, {
     configurable: true,
     enumerable: true,
@@ -36,4 +46,4 @@ export const defineProperty = <T extends object, K extends PropertyKey>(
       return value;
     },
   });
-};
+}

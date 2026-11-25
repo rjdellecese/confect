@@ -13,17 +13,18 @@ import {
 } from "@confect/core/SchemaToValidator";
 import {
   actionGeneric,
-  type DefaultFunctionArgs,
-  type FunctionVisibility,
-  type GenericMutationCtx,
-  type GenericQueryCtx,
   internalActionGeneric,
   internalMutationGeneric,
   internalQueryGeneric,
   mutationGeneric,
   queryGeneric,
 } from "convex/server";
-import type { Value } from "convex/values";
+import type {
+  DefaultFunctionArgs,
+  FunctionVisibility,
+  GenericMutationCtx,
+  GenericQueryCtx,
+} from "convex/server";
 import { pipe } from "effect/Function";
 import * as Clock from "effect/Clock";
 import * as Data from "effect/Data";
@@ -234,7 +235,7 @@ const queryFunction = <
   functionVisibility: FunctionVisibility;
   args: Schema.Codec<Args, ConvexArgs>;
   returns: Schema.Codec<Returns, ConvexReturns>;
-  error: Schema.Codec<Error, Value> | undefined;
+  error: Schema.Codec<unknown> | undefined;
   handler: (
     a: Args,
   ) => Effect.Effect<Returns, E, Handler.QueryServices<DatabaseSchema_>>;
@@ -360,7 +361,7 @@ const mutationFunction = <
   functionVisibility: FunctionVisibility;
   args: Schema.Codec<Args, ConvexArgs>;
   returns: Schema.Codec<Returns, ConvexReturns>;
-  error: Schema.Codec<Error, Value> | undefined;
+  error: Schema.Codec<unknown> | undefined;
   handler: (
     a: Args,
   ) => Effect.Effect<Returns, E, Handler.MutationServices<DatabaseSchema_>>;
@@ -426,7 +427,7 @@ const convexActionFunction = <
   functionVisibility: FunctionVisibility;
   args: Schema.Codec<Args, ConvexArgs>;
   returns: Schema.Codec<Returns, ConvexReturns>;
-  error: Schema.Codec<any, any> | undefined;
+  error: Schema.Codec<unknown> | undefined;
   handler: (
     a: Args,
   ) => Effect.Effect<

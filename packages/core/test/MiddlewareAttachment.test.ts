@@ -78,7 +78,7 @@ describe("validateAll", () => {
     );
     const invalid: MiddlewareAttachment.MiddlewareAttachment<typeof Limit> = {
       spec: Limit,
-      // @ts-expect-error
+      // @ts-expect-error - limit must be a decoded number
       options: { limit: "5" },
     };
     const result = MiddlewareAttachment.validateAll([invalid], "test chain");

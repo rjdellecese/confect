@@ -12,7 +12,7 @@ import * as String from "effect/String";
 import * as ChildProcess from "effect/process/ChildProcess";
 import { ChildProcessSpawner } from "effect/process/ChildProcessSpawner";
 import * as Stream from "effect/Stream";
-import config from "../.oxlintrc.json" with { type: "json" };
+import config from "../oxlint.config";
 import effectPolicy from "../tsconfig.effect.json" with { type: "json" };
 
 test("enables every installed Effect rule except the explicit policy opt-outs", () => {
@@ -111,7 +111,7 @@ void HttpClientRequest.put("https://example.com");
         "--tsrs-lint",
         "oxlint",
         "--config",
-        path.join(repository, ".oxlintrc.json"),
+        path.join(repository, "oxlint.config.ts"),
         "--format",
         "json",
         fixture,

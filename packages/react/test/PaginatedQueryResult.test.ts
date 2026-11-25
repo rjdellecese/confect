@@ -32,12 +32,14 @@ describe("constructors", () => {
   });
 
   test("canLoadMore carries results and loadMore", () => {
-    const loadMore = (_numItems: number) => {};
-    const r = PaginatedQueryResult.canLoadMore({ results: [1], loadMore });
+    const r = PaginatedQueryResult.canLoadMore({
+      results: [1],
+      loadMore: noop,
+    });
 
     expect(r._tag).toBe("CanLoadMore");
     expect(r.isLoading).toBe(false);
-    expect(r.loadMore).toBe(loadMore);
+    expect(r.loadMore).toBe(noop);
     expect(PaginatedQueryResult.isCanLoadMore(r)).toBe(true);
     expect(PaginatedQueryResult.isLoading(r)).toBe(false);
   });

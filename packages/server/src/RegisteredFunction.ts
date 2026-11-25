@@ -7,15 +7,15 @@ import {
   compileArgsSchema,
   compileReturnsSchema,
 } from "@confect/core/SchemaToValidator";
-import {
-  type DefaultFunctionArgs,
-  type FunctionVisibility,
-  type GenericActionCtx,
-  type RegisteredAction,
-  type RegisteredMutation,
-  type RegisteredQuery,
+import type {
+  DefaultFunctionArgs,
+  FunctionVisibility,
+  GenericActionCtx,
+  RegisteredAction,
+  RegisteredMutation,
+  RegisteredQuery,
 } from "convex/server";
-import type { PropertyValidators, Validator, Value } from "convex/values";
+import type { GenericValidator, PropertyValidators } from "convex/values";
 import { ConvexError } from "convex/values";
 import { pipe } from "effect/Function";
 import * as Console from "effect/Console";
@@ -46,9 +46,9 @@ import * as VectorSearch from "./VectorSearch";
  * @internal
  */
 export type Any =
-  | RegisteredQuery<FunctionVisibility, DefaultFunctionArgs, any>
-  | RegisteredMutation<FunctionVisibility, DefaultFunctionArgs, any>
-  | RegisteredAction<FunctionVisibility, DefaultFunctionArgs, any>;
+  | RegisteredQuery<FunctionVisibility, DefaultFunctionArgs, unknown>
+  | RegisteredMutation<FunctionVisibility, DefaultFunctionArgs, unknown>
+  | RegisteredAction<FunctionVisibility, DefaultFunctionArgs, unknown>;
 
 type ConfectRegisteredFunction<
   FunctionSpec_ extends FunctionSpec.AnyWithProps,
@@ -138,22 +138,28 @@ export type RegisteredFunction<
       ? ConfectRegisteredFunction<FunctionSpec_>
       : never;
 
+interface ConvexDefinition<Args, Returns, Handler_> {
+  args: Args;
+  returns: Returns;
+  handler: Handler_;
+}
+
 /**
  * @internal
  */
 export const toConvexDefinition = <
   Args extends PropertyValidators,
-  Returns extends Validator<any, any, any>,
+  Returns extends GenericValidator,
   Handler_,
 >(prepared: {
   readonly args: () => Args;
   readonly returns: () => Returns;
   readonly handler: Handler_;
-}): { args: Args; returns: Returns; handler: Handler_ } => {
+}): ConvexDefinition<Args, Returns, Handler_> => {
   const definition = { handler: prepared.handler };
   Lazy.defineProperty(definition, "args", prepared.args);
   Lazy.defineProperty(definition, "returns", prepared.returns);
-  return definition as { args: Args; returns: Returns; handler: Handler_ };
+  return definition;
 };
 
 /**
@@ -171,19 +177,21 @@ export const applyMiddleware = <A, E, R>(
   effect: Effect.Effect<A, E, R>,
   resolvedMiddlewares: ReadonlyArray<ResolvedMiddleware.ResolvedMiddleware>,
   invocation: MiddlewareSpec.MiddlewareOptions["invocation"],
-): Effect.Effect<A, any, R> =>
-  Array.reduceRight(
-    resolvedMiddlewares,
-    effect,
-    (wrapped: Effect.Effect<any, any, any>, middleware) => {
-      const context =
-        "options" in middleware.middlewareSpec
-          ? { options: middleware.options, invocation }
-          : { invocation };
-      // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- Resolved middleware is type-erased after its public implementation boundary; its error and service channels are restored by the surrounding function contract.
-      return middleware.middlewareImpl(wrapped, context);
-    },
-  );
+): Effect.Effect<A, unknown, R> =>
+  // oxlint-disable-next-line typescript/no-unsafe-return -- MiddlewareImpl's opaque success contract preserves the handler's A across the chain; a heterogeneous array no longer carries that witness.
+  Array.reduceRight<
+    ResolvedMiddleware.ResolvedMiddleware,
+    // oxlint-disable-next-line typescript/no-explicit-any -- SuccessValue hides A from each user wrapper. This accumulator must carry the original A into and back out of those opaque wrappers.
+    Effect.Effect<any, unknown, R>
+    // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- Each wrapper can add its spec's own error; the heterogeneous chain has no narrower error type until the combined error codec validates it.
+  >(resolvedMiddlewares, effect, (wrapped, middleware) => {
+    const context =
+      "options" in middleware.middlewareSpec
+        ? { options: middleware.options, invocation }
+        : { invocation };
+    // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context, typescript/no-unsafe-return, typescript/no-unsafe-argument -- The public wrapper signature preserves the opaque success and its spec controls service provisioning; registration erases those types before composition.
+    return middleware.middlewareImpl(wrapped, context);
+  });
 
 /**
  * The error-schema allowlist for a function with middleware: the function's own
@@ -194,9 +202,9 @@ export const applyMiddleware = <A, E, R>(
  * @internal
  */
 export const combineErrorSchemas = (
-  error: Schema.Codec<any, any> | undefined,
+  error: Schema.Codec<unknown> | undefined,
   resolvedMiddlewares: ReadonlyArray<ResolvedMiddleware.ResolvedMiddleware>,
-): Schema.Codec<any, any> | undefined => {
+): Schema.Codec<unknown> | undefined => {
   const schemas = [
     ...(error !== undefined ? [error] : []),
     ...MiddlewareSpec.errorSchemas(
@@ -240,7 +248,8 @@ export const combineErrorSchemas = (
  */
 export const runHandlerPromise =
   (
-    errorSchema: Schema.Codec<any, any> | undefined,
+    // oxlint-disable-next-line typescript/no-explicit-any -- Function specs permit arbitrary error codecs, including readonly encoded arrays that Convex serializes but its mutable Value type cannot describe.
+    errorSchema: Schema.Codec<unknown, any> | undefined,
     runOptions?: {
       readonly scheduler?: Scheduler_.Scheduler | undefined;
     },
@@ -249,7 +258,7 @@ export const runHandlerPromise =
     // A `ConvexError` defect escapes into the (escaped) failure channel so
     // the `throw` below rethrows it with its identity intact.
     const rethrowConvexErrorDefects = Effect.catchDefect(
-      (defect: unknown): Effect.Effect<never, ConvexError<any>> =>
+      (defect: unknown): Effect.Effect<never, Error> =>
         defect instanceof ConvexError
           ? Effect.fail(defect)
           : Effect.die(defect),
@@ -312,7 +321,7 @@ export const actionFunctionBase = <
   functionVisibility: FunctionVisibility;
   args: Schema.Codec<Args, ConvexArgs>;
   returns: Schema.Codec<Returns, ConvexReturns>;
-  error: Schema.Codec<Error, Value> | undefined;
+  error: Schema.Codec<unknown> | undefined;
   handler: (a: Args) => Effect.Effect<Returns, E, R>;
   resolvedMiddlewares?: ReadonlyArray<ResolvedMiddleware.ResolvedMiddleware>;
   createLayer: (

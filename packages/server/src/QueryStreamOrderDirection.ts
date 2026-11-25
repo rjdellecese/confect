@@ -24,6 +24,11 @@ export type QueryStreamOrderDirection = "asc" | "desc";
 export type Flip<OrderDirection extends QueryStreamOrderDirection> =
   OrderDirection extends "asc" ? "desc" : "asc";
 
+type OppositeDirections = {
+  readonly [Direction in QueryStreamOrderDirection]: Flip<Direction>;
+};
+const opposite: OppositeDirections = { asc: "desc", desc: "asc" };
+
 /**
  * @experimental
  *
@@ -31,5 +36,4 @@ export type Flip<OrderDirection extends QueryStreamOrderDirection> =
  */
 export const flip = <OrderDirection extends QueryStreamOrderDirection>(
   orderDirection: OrderDirection,
-): Flip<OrderDirection> =>
-  (orderDirection === "asc" ? "desc" : "asc") as Flip<OrderDirection>;
+): Flip<OrderDirection> => opposite[orderDirection];

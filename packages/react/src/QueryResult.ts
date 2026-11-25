@@ -149,36 +149,38 @@ export interface Failure<A, E = never> extends QueryResult.Proto<A, E> {
 export const isQueryResult = (u: unknown): u is QueryResult<unknown, unknown> =>
   Predicate.hasProperty(u, TypeId);
 
-const QueryResultProto = {
-  [TypeId]: TypeId,
-  pipe(this: QueryResult<any, any>, ...args: ReadonlyArray<unknown>) {
-    return Pipeable.pipeArguments(
-      this,
-      args as unknown as Parameters<typeof Pipeable.pipeArguments>[1],
-    );
-  },
+class QueryResultProto<A, E>
+  extends Pipeable.Class
+  implements QueryResult.Proto<A, E>
+{
+  declare readonly "~A": A;
+  declare readonly "~E": E;
+  get [TypeId](): TypeId {
+    return TypeId;
+  }
   [Equal.symbol](
-    this: QueryResult<any, any>,
-    that: QueryResult<any, any>,
+    this: QueryResult<unknown, unknown>,
+    that: QueryResult<unknown, unknown>,
   ): boolean {
-    if (this._tag !== that._tag) {
-      return false;
-    }
     return Match.value(this).pipe(
       Match.tag(
         "Loading",
-        (self) => self.skipped === (that as Loading<any, any>).skipped,
+        (self) => that._tag === "Loading" && self.skipped === that.skipped,
       ),
-      Match.tag("Success", (self) =>
-        Equal.equals(self.value, (that as Success<any, any>).value),
+      Match.tag(
+        "Success",
+        (self) =>
+          that._tag === "Success" && Equal.equals(self.value, that.value),
       ),
-      Match.tag("Failure", (self) =>
-        Equal.equals(self.error, (that as Failure<any, any>).error),
+      Match.tag(
+        "Failure",
+        (self) =>
+          that._tag === "Failure" && Equal.equals(self.error, that.error),
       ),
       Match.exhaustive,
     );
-  },
-  [Hash.symbol](this: QueryResult<any, any>): number {
+  }
+  [Hash.symbol](this: QueryResult<unknown, unknown>): number {
     const tagHash = Hash.string(this._tag);
     return Match.value(this).pipe(
       Match.tag("Loading", (self) =>
@@ -192,14 +194,14 @@ const QueryResultProto = {
       ),
       Match.exhaustive,
     );
-  },
-};
+  }
+}
 
 /**
  * @internal
  */
 export const load = <A = never, E = never>(skipped: boolean): Loading<A, E> =>
-  Object.assign(Object.create(QueryResultProto), {
+  Object.assign(new QueryResultProto<A, E>(), {
     _tag: "Loading" as const,
     skipped,
   });
@@ -208,7 +210,7 @@ export const load = <A = never, E = never>(skipped: boolean): Loading<A, E> =>
  * @internal
  */
 export const succeed = <A, E = never>(value: A): Success<A, E> =>
-  Object.assign(Object.create(QueryResultProto), {
+  Object.assign(new QueryResultProto<A, E>(), {
     _tag: "Success" as const,
     value,
   });
@@ -217,7 +219,7 @@ export const succeed = <A, E = never>(value: A): Success<A, E> =>
  * @internal
  */
 export const fail = <E, A = never>(error: E): Failure<A, E> =>
-  Object.assign(Object.create(QueryResultProto), {
+  Object.assign(new QueryResultProto<A, E>(), {
     _tag: "Failure" as const,
     error,
   });
@@ -266,7 +268,7 @@ type MatchOptions<A, E, X, Y, Z> = {
    */
   readonly onSuccess: (value: A) => Y;
 } & ([E] extends [never]
-  ? {}
+  ? object
   : {
       /**
        * Handles the decoded declared error; required when the error type is not
@@ -324,6 +326,7 @@ export const match: {
     self: QueryResult<A, E>,
     options: MatchOptions<A, E, X, Y, Z>,
   ): MatchReturns<E, X, Y, Z> =>
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- match excludes Z when E is never: only a Failure can invoke onFailure, and its error must be an E.
     Match.value(self).pipe(
       Match.tag("Loading", (loading) => options.onLoading(loading.skipped)),
       Match.tag("Success", (success) => options.onSuccess(success.value)),

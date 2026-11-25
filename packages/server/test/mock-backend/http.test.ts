@@ -1,10 +1,10 @@
-import { describe, expect, it } from "@effect/vitest";
+import { assert, describe, expect, expectTypeOf, it } from "@effect/vitest";
 import { assertEquals } from "@effect/vitest/utils";
 import { HttpRouter as HttpRouter_ } from "@confect/server";
 import * as Storage from "@confect/server/Storage";
 import { StorageReader } from "@confect/server/StorageReader";
 import { convexTest } from "convex-test";
-import type { GenericActionCtx, GenericDataModel } from "convex/server";
+import * as Convex from "convex/server";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
@@ -26,9 +26,37 @@ import { NotesApi } from "./fixtures/confect/http";
 import * as TestConfect from "./TestConfect";
 import convexSchema from "./fixtures/confect/_generated/convexSchema";
 
+vi.mock("convex/server", (importOriginal) =>
+  importOriginal<typeof Convex>().then((original) => ({
+    ...original,
+    httpActionGeneric: vi.fn<typeof original.httpActionGeneric>(
+      original.httpActionGeneric,
+    ),
+  })),
+);
+
 it.layer(TestConfect.layer, { buildPerTest: true })("HttpRouter", (test) => {
   test.effect("binds vector search to each request's native context", () =>
     Effect.gen(function* () {
+      const register = vi.mocked(Convex.httpActionGeneric);
+      const original = register.getMockImplementation();
+      assert(original);
+      const calls: Array<string> = [];
+      register.mockImplementationOnce((handler) =>
+        original((ctx, request) => {
+          const actionCtx: typeof ctx = {
+            ...ctx,
+            vectorSearch(table, index, query) {
+              expect(this).toBe(actionCtx);
+              const requestId = request.headers.get("x-request-id");
+              assert(requestId !== null);
+              calls.push(requestId);
+              return ctx.vectorSearch(table, index, query);
+            },
+          };
+          return handler(actionCtx, request);
+        }),
+      );
       const http = HttpRouter_.make(
         HttpRouter.add(
           "GET",
@@ -42,51 +70,25 @@ it.layer(TestConfect.layer, { buildPerTest: true })("HttpRouter", (test) => {
           }),
         ),
       );
-      const endpoint = http.lookup("/search", "GET");
-      expect(endpoint).not.toBeNull();
-      if (endpoint === null) return;
-      const action = endpoint[0] as (typeof endpoint)[0] & {
-        _handler: <Model extends GenericDataModel>(
-          ctx: GenericActionCtx<Model>,
-          request: Request,
-        ) => Promise<Response>;
-      };
-      const t = convexTest(
-        convexSchema,
-        import.meta.glob("./fixtures/convex/_generated/*.js"),
-      );
-      const calls: number[] = [];
-      const services = yield* Effect.context<never>();
+      const t = convexTest(convexSchema, {
+        ...import.meta.glob("./fixtures/convex/_generated/*.js"),
+        "./fixtures/convex/http.ts": () => Promise.resolve({ default: http }),
+      });
       yield* Effect.forEach(
-        [1, 2],
+        ["first", "second"],
         (requestId) =>
-          Effect.promise(() =>
-            t.action((ctx) =>
-              Effect.gen(function* () {
-                const actionCtx: typeof ctx = {
-                  ...ctx,
-                  vectorSearch(table, index, query) {
-                    expect(this).toBe(actionCtx);
-                    calls.push(requestId);
-                    return ctx.vectorSearch(table, index, query);
-                  },
-                };
-                const response = yield* Effect.promise(() =>
-                  action._handler(
-                    actionCtx,
-                    new Request("https://example.test/search"),
-                  ),
-                );
-                expect(response.status).toBe(200);
-                const matches = yield* Effect.promise(() => response.json());
-                expect(matches).toEqual([]);
-              }).pipe(Effect.runPromiseWith(services)),
-            ),
-          ),
+          Effect.gen(function* () {
+            const response = yield* Effect.promise(() =>
+              t.fetch("/search", { headers: { "x-request-id": requestId } }),
+            );
+            expect(response.status).toBe(200);
+            const matches = yield* Effect.promise(() => response.json());
+            expect(matches).toEqual([]);
+          }),
         { concurrency: "unbounded" },
       );
       expect(calls).toHaveLength(2);
-      expect(calls).toEqual(expect.arrayContaining([1, 2]));
+      expect(calls).toEqual(expect.arrayContaining(["first", "second"]));
     }),
   );
 
@@ -249,8 +251,16 @@ it.layer(TestConfect.layer, { buildPerTest: true })("HttpRouter", (test) => {
       Effect.gen(function* () {
         const c = yield* TestConfect.TestConfect;
         const original = globalThis.console;
-        const first = { ...original, warn: vi.fn(), log: vi.fn() };
-        const second = { ...original, warn: vi.fn(), log: vi.fn() };
+        const first = {
+          ...original,
+          warn: vi.fn<typeof console.warn>(),
+          log: vi.fn<typeof console.log>(),
+        };
+        const second = {
+          ...original,
+          warn: vi.fn<typeof console.warn>(),
+          log: vi.fn<typeof console.log>(),
+        };
         yield* Effect.gen(function* () {
           globalThis.console = first;
           expect((yield* c.fetch("/logging")).status).toBe(200);
@@ -293,9 +303,10 @@ it.layer(TestConfect.layer, { buildPerTest: true })("HttpRouter", (test) => {
         const response = yield* c.fetch("/api/notes");
         assertEquals(response.status, 200);
 
-        const body = (yield* Effect.promise(() => response.json())) as Array<{
-          text: string;
-        }>;
+        const json: unknown = yield* Effect.promise(() => response.json());
+        const body = yield* Schema.decodeUnknownEffect(
+          Schema.Array(Schema.Struct({ text: Schema.String })),
+        )(json);
         assertEquals(body.length, 1);
         assertEquals(body[0]?.text, text);
       }),
@@ -369,14 +380,7 @@ it.layer(TestConfect.layer, { buildPerTest: true })("HttpRouter", (test) => {
 
 describe("HttpRouter.make type-level guarantees", () => {
   it("rejects a routes layer whose group handlers are not provided", () => {
-    // HttpApiBuilder.layer(NotesApi) still requires the NotesApi group handler
-    // services; without Layer.provide(NotesApiLive) the layer does not satisfy
-    // Routes.
-    const _missingGroupLayerIsRejected = () =>
-      // @ts-expect-error
-      // @effect-diagnostics-next-line missingLayerContext:off
-      HttpRouter_.make(HttpApiBuilder.layer(NotesApi));
-
-    expect(_missingGroupLayerIsRejected).toBeDefined();
+    const routes = HttpApiBuilder.layer(NotesApi);
+    expectTypeOf(routes).not.toExtend<Parameters<typeof HttpRouter_.make>[0]>();
   });
 });

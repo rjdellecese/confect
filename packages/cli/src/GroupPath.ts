@@ -1,4 +1,5 @@
-import { type GroupSpec, Spec } from "@confect/core";
+import { Spec } from "@confect/core";
+import type { GroupSpec } from "@confect/core";
 import * as Path from "effect/Path";
 import { pipe } from "effect/Function";
 import * as Array from "effect/Array";
@@ -11,15 +12,16 @@ import * as String from "effect/String";
 /**
  * The path to a group in the Confect API.
  */
-export class GroupPath extends Schema.Class<GroupPath, {}>("GroupPath")({
+export class GroupPath extends Schema.Class<GroupPath, unknown>("GroupPath")({
   pathSegments: Schema.NonEmptyArray(Schema.NonEmptyString),
 }) {}
 
 /**
  * Create a GroupPath from path segments.
  */
-export const make = (pathSegments: readonly [string, ...string[]]): GroupPath =>
-  GroupPath.make({ pathSegments });
+export const make = (
+  pathSegments: readonly [string, ...Array<string>],
+): GroupPath => GroupPath.make({ pathSegments });
 
 /**
  * Append a group name to a GroupPath to create a new GroupPath.

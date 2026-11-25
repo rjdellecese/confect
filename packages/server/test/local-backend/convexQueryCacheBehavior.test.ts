@@ -21,18 +21,14 @@ class ConvexQueryError extends Schema.TaggedError<
   { readonly brand: unique symbol }
 >()("ConvexQueryError", { message: Schema.String }) {}
 
-/**
- * Run a Confect query once over HTTP. Accepts a Confect `Ref` so the return
- * type is inferred at the call site via `Ref.Returns<R>`.
- */
-const queryOnce = <R extends Ref.AnyPublicQuery>(
-  client: ConvexHttpClient,
-  ref: R,
-  ...args: Ref.OptionalArgs<R>
-): Effect.Effect<Ref.Returns<R>, ConvexQueryError> =>
+type CacheRefs = typeof refs.public.groups;
+type CacheQuery =
+  | CacheRefs["cacheControl"][keyof CacheRefs["cacheControl"]]
+  | CacheRefs["cacheStubbed"][keyof CacheRefs["cacheStubbed"]];
+
+const queryOnce = (client: ConvexHttpClient, ref: CacheQuery) =>
   Effect.tryPromise({
-    try: () =>
-      client.query(Ref.getFunctionReference(ref), (args[0] ?? {}) as never),
+    try: () => client.query(Ref.getFunctionReference(ref), {}),
     catch: (error) =>
       ConvexQueryError.make({ message: `query failed: ${String(error)}` }),
   });
@@ -43,13 +39,13 @@ const SLEEP_PAST_CACHE = Duration.sum(
   Duration.seconds(1),
 );
 
-const captureAcrossEvictionWindow = Effect.fnUntraced(function* <
-  PublicQueryRef extends Ref.AnyPublicQuery,
->(ref: PublicQueryRef, ...args: Ref.OptionalArgs<PublicQueryRef>) {
+const captureAcrossEvictionWindow = Effect.fnUntraced(function* (
+  ref: CacheQuery,
+) {
   const { client } = yield* LocalBackend.LocalBackend;
-  const initial = yield* queryOnce(client, ref, ...args);
+  const initial = yield* queryOnce(client, ref);
   yield* Effect.sleep(SLEEP_PAST_CACHE);
-  const afterMaxCacheAge = yield* queryOnce(client, ref, ...args);
+  const afterMaxCacheAge = yield* queryOnce(client, ref);
   return { initial, afterMaxCacheAge };
 });
 

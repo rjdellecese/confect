@@ -162,8 +162,10 @@ export type MiddlewareOptions<Options_ = never> = {
  */
 export interface AnyMiddlewareImpl {
   (
+    // oxlint-disable-next-line typescript/no-explicit-any -- The registry accepts wrappers with different downstream errors and required services, checked for each MiddlewareImpl at registration.
     effect: Effect.Effect<SuccessValue, any, any>,
     context: MiddlewareOptions | MiddlewareOptions<unknown>,
+    // oxlint-disable-next-line typescript/no-explicit-any -- This erased wrapper may add or provide services and fail with the spec’s declared error; only the enclosing function knows those channels.
   ): Effect.Effect<SuccessValue, any, any>;
 }
 
@@ -186,9 +188,9 @@ export interface MiddlewareSpec<
   Key_ extends string,
   Provides_,
   Requires_,
-  ErrorSchema_ extends Schema.Codec<any, any>,
+  ErrorSchema_ extends Schema.Codec<unknown>,
   FunctionTypes_ extends FunctionType,
-  OptionsSchema_ extends Schema.Schema<any> = never,
+  OptionsSchema_ extends Schema.Schema<unknown> = never,
 > {
   /**
    * The subclass identity used in type parameters; do not instantiate
@@ -289,13 +291,13 @@ export interface AnyMiddlewareSpec {
   readonly [TypeId]: TypeId;
   readonly key: string;
   readonly functionTypes: SupportedFunctionTypes;
-  readonly error?: Schema.Codec<any, any>;
-  readonly options?: Schema.Schema<any>;
-  readonly "~Provides": any;
-  readonly "~Requires": any;
-  readonly "~Error": any;
+  readonly error?: Schema.Codec<unknown>;
+  readonly options?: Schema.Schema<unknown>;
+  readonly "~Provides": unknown;
+  readonly "~Requires": unknown;
+  readonly "~Error": Schema.Codec<unknown>;
   readonly "~FunctionTypes": FunctionType;
-  readonly "~Options": any;
+  readonly "~Options": Schema.Schema<unknown>;
 }
 
 /**
@@ -426,12 +428,18 @@ export type FunctionTypes<MiddlewareSpec_ extends AnyMiddlewareSpec> =
  * @throws If no function kind is enabled.
  */
 export const MiddlewareSpec =
-  <Self, Config extends { provides?: any; requires?: any } = {}>() =>
+  <
+    Self,
+    Config extends { provides?: unknown; requires?: unknown } = Record<
+      never,
+      never
+    >,
+  >() =>
   <
     const Key_ extends string,
     const FunctionTypesConfig_ extends SupportedFunctionTypes,
-    ErrorSchema_ extends Schema.Codec<any, any> = never,
-    OptionsSchema_ extends Schema.Schema<any> = never,
+    ErrorSchema_ extends Schema.Codec<unknown> = never,
+    OptionsSchema_ extends Schema.Schema<unknown> = never,
   >(
     key: Key_,
     options: {
@@ -456,22 +464,32 @@ export const MiddlewareSpec =
       );
     }
 
-    function MiddlewareSpecClass() {}
-    const class_ = MiddlewareSpecClass as any;
-    class_[TypeId] = TypeId;
-    class_.key = key;
-    class_.functionTypes = {
-      query,
-      mutation,
-      action,
-    } satisfies SupportedFunctionTypes;
+    class MiddlewareSpecClass {
+      static readonly [TypeId]: TypeId = TypeId;
+      static readonly key = key;
+      static readonly functionTypes = { query, mutation, action };
+      declare static readonly error?: ErrorSchema_;
+      declare static readonly options?: OptionsSchema_;
+      declare static readonly "~Provides": "provides" extends keyof Config
+        ? Config["provides"]
+        : never;
+      declare static readonly "~Requires": "requires" extends keyof Config
+        ? Config["requires"]
+        : never;
+      declare static readonly "~Error": ErrorSchema_;
+      declare static readonly "~FunctionTypes": FunctionTypesFromConfig<FunctionTypesConfig_>;
+      declare static readonly "~Self": Self;
+      declare static readonly "~Options": OptionsSchema_;
+      declare readonly [TypeId]: TypeId;
+      declare readonly key: Key_;
+    }
     if (options.error !== undefined) {
-      Lazy.defineProperty(class_, "error", options.error);
+      Lazy.defineProperty(MiddlewareSpecClass, "error", options.error);
     }
     if (options.options !== undefined) {
-      Lazy.defineProperty(class_, "options", options.options);
+      Lazy.defineProperty(MiddlewareSpecClass, "options", options.options);
     }
-    return class_;
+    return MiddlewareSpecClass;
   };
 
 type FunctionTypesFromConfig<Config extends SupportedFunctionTypes> = {
@@ -495,7 +513,7 @@ type ValidateFunctionTypesConfig<Config extends SupportedFunctionTypes> =
  */
 export const errorSchemas = (
   middlewareSpecs: ReadonlyArray<AnyMiddlewareSpec>,
-): ReadonlyArray<Schema.Codec<any, any>> =>
+): ReadonlyArray<Schema.Codec<unknown>> =>
   Array.flatMap(middlewareSpecs, (middlewareSpec) =>
     "error" in middlewareSpec && middlewareSpec.error !== undefined
       ? [middlewareSpec.error]
@@ -528,8 +546,8 @@ type ValidationResult<Errors> = [Errors] extends [never] ? unknown : Errors;
 export type ValidateFunction<
   FunctionSpec_ extends FunctionSpec.AnyWithProps,
   MiddlewareSpec_ extends AnyMiddlewareSpec,
-> = FunctionSpec_ extends any
-  ? MiddlewareSpec_ extends any
+> = FunctionSpec_ extends unknown
+  ? MiddlewareSpec_ extends unknown
     ? FunctionSpec_ extends {
         readonly functionProvenance: { readonly _tag: "Convex" };
       }
@@ -619,7 +637,7 @@ export type ValidateImplRequires<
   Functions_ extends FunctionSpec.AnyWithProps,
   GroupMiddlewareSpecs_ extends AnyMiddlewareSpec,
 > = ValidationResult<
-  Functions_ extends any
+  Functions_ extends unknown
     ? [
         Exclude<
           Requires<FunctionSpec.MiddlewareSpecs<Functions_>>,

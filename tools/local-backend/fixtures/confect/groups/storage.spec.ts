@@ -1,10 +1,10 @@
 import { FunctionSpec, GenericId, GroupSpec } from "@confect/core";
 import * as Schema from "effect/Schema";
 
-export class StorageRollback extends Schema.TaggedError<StorageRollback, {}>()(
-  "StorageRollback",
-  { storageId: GenericId.GenericId("_storage") },
-) {}
+export class StorageRollback extends Schema.TaggedError<
+  StorageRollback,
+  { readonly brand: unique symbol }
+>()("StorageRollback", { storageId: GenericId.GenericId("_storage") }) {}
 
 const blobResult = () =>
   Schema.Struct({

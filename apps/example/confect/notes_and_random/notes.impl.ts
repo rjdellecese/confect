@@ -46,11 +46,13 @@ const insertAuthored = FunctionImpl.make(
     Effect.gen(function* () {
       const writer = yield* DatabaseWriter;
 
-      return yield* writer.table(notesTable).insert({
+      const note = {
         text,
         author: { role, name: role === "admin" ? "Ada" : "Uma" },
-        ...(hidden === true ? { tag: "hidden" } : {}),
-      });
+      };
+      return yield* writer
+        .table(notesTable)
+        .insert(hidden === true ? { ...note, tag: "hidden" } : note);
     }).pipe(Effect.orDie),
 );
 

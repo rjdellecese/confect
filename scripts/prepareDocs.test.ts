@@ -15,7 +15,7 @@ const { join, resolve } = Effect.runSync(
 );
 
 const script = resolve(import.meta.dir, "prepareDocs.sh");
-const directories: string[] = [];
+const directories: Array<string> = [];
 
 afterEach(() =>
   Effect.runPromise(
@@ -33,7 +33,7 @@ const fixture = Effect.gen(function* () {
   const source = join(directory, "source");
   const destination = join(directory, "release");
   yield* fs.makeDirectory(source);
-  const git = (...args: string[]) => {
+  const git = (...args: Array<string>) => {
     const result = Bun.spawnSync(["git", "-C", source, ...args]);
     expect(result.exitCode).toBe(0);
     return Str.trim(result.stdout.toString());

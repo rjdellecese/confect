@@ -69,8 +69,8 @@ interface ConfiguredEntry {
 }
 
 type WatcherLifecycle = Data.TaggedEnum<{
-  Uninitialized: {};
-  Empty: {};
+  Uninitialized: object;
+  Empty: object;
   Active: {
     readonly initial: Deferred.Deferred<void>;
     readonly key: string;
@@ -89,7 +89,7 @@ interface State {
 }
 
 type RefreshOutcome = Data.TaggedEnum<{
-  Empty: {};
+  Empty: object;
   Observed: { readonly outcome: WatchBuild.Outcome };
 }>;
 const RefreshOutcome = Data.taggedEnum<RefreshOutcome>();
@@ -205,7 +205,9 @@ const drainUntilQuiescent = Effect.fnUntraced(function* (
   const loop: Effect.Effect<void> = Effect.gen(function* () {
     yield* Effect.sleep(quiescence);
     const drained = yield* Queue.clear(signal);
-    if (drained.length === 0) return;
+    if (drained.length === 0) {
+      return;
+    }
     const now = yield* Clock.currentTimeMillis;
     if (now - start < maxMillis) {
       yield* loop;
@@ -541,7 +543,9 @@ const entryPointsWatcher = Effect.fnUntraced(function* (
             context,
             identifyRequest: (promise) => {
               const existing = requestIds.get(promise);
-              if (existing !== undefined) return existing;
+              if (existing !== undefined) {
+                return existing;
+              }
               const id = WatchBuild.makeRequestId();
               requestIds.set(promise, id);
               return id;
@@ -618,8 +622,9 @@ const refresh = Effect.fnUntraced(function* (watcher: State) {
                   }),
                 { concurrency: 1 },
               );
-              if (!Array.every(unchanged, (matches) => matches))
+              if (!Array.every(unchanged, (matches) => matches)) {
                 return Option.none<RefreshOutcome>();
+              }
             }
             return Option.some(
               RefreshOutcome.Observed({
@@ -666,20 +671,25 @@ const refreshGroup = Effect.fnUntraced(function* ({
       const rejected = Schema.decodeUnknownOption(ReportedBuildFailure)(
         built.failure.cause,
       );
-      if (Option.isNone(rejected)) return yield* built.failure;
-      if (WatchBuild.joinedWithoutCompletion(currentProgress))
+      if (Option.isNone(rejected)) {
+        return yield* built.failure;
+      }
+      if (WatchBuild.joinedWithoutCompletion(currentProgress)) {
         return Option.none<WatchBuild.Completion>();
+      }
       if (
         Option.isNone(completed) ||
         !WatchBuild.Outcome.$is("Failed")(completed.value.outcome)
-      )
+      ) {
         return yield* OperationError.make({
           operation: "rebuild",
           cause: rejected.value.errors,
         });
+      }
     }
-    if (WatchBuild.joinedWithoutCompletion(currentProgress))
+    if (WatchBuild.joinedWithoutCompletion(currentProgress)) {
       return Option.none<WatchBuild.Completion>();
+    }
     const observed = yield* Effect.fromOption(completed).pipe(
       Effect.mapError(() =>
         OperationError.make({
@@ -697,7 +707,9 @@ const refreshGroup = Effect.fnUntraced(function* ({
           OperationError.make({ operation: "refresh", cause }),
         ),
       );
-      if (!unchanged) return Option.none<WatchBuild.Completion>();
+      if (!unchanged) {
+        return Option.none<WatchBuild.Completion>();
+      }
     }
     return Option.some(observed);
   }).pipe(Effect.ensuring(Ref.update(progress, WatchBuild.endRequest)));
@@ -750,15 +762,18 @@ const confectStructureWatcher = Effect.fnUntraced(function* (
           const removed = Schema.decodeUnknownOption(removedDirectory)(
             error.reason.cause,
           );
-          if (Option.isNone(removed)) return false;
+          if (Option.isNone(removed)) {
+            return false;
+          }
           const relative = path.relative(confectDirectory, removed.value.path);
           if (
             relative === "" ||
             relative === ".." ||
             String.startsWith(`..${path.sep}`)(relative) ||
             path.isAbsolute(relative)
-          )
+          ) {
             return false;
+          }
           if (
             !(yield* fs
               .exists(confectDirectory)
@@ -791,8 +806,11 @@ const convexConfigStructureWatcher = Effect.fnUntraced(function* (
   yield* pipe(
     fs.watch(convexDirectory),
     Stream.runForEach((event) => {
-      if (path.relative(convexDirectory, event.path) !== CONVEX_CONFIG_FILENAME)
+      if (
+        path.relative(convexDirectory, event.path) !== CONVEX_CONFIG_FILENAME
+      ) {
         return Effect.void;
+      }
       return Match.value(event).pipe(
         Match.tag("Update", () => Effect.void),
         Match.tag("Create", "Remove", () => restart),

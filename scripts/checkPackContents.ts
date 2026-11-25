@@ -31,7 +31,7 @@ const PackProblem = Schema.Struct({
 
 export class InvalidPackContents extends Schema.TaggedError<
   InvalidPackContents,
-  {}
+  { readonly brand: unique symbol }
 >()("InvalidPackContents", {
   packages: Schema.Array(
     Schema.Struct({
@@ -61,10 +61,14 @@ export class InvalidPackContents extends Schema.TaggedError<
   }
 }
 
-export class NpmPackError extends Schema.TaggedError<NpmPackError, {}>()(
-  "NpmPackError",
-  { directory: Schema.String, exitCode: Schema.Finite, stderr: Schema.String },
-) {
+export class NpmPackError extends Schema.TaggedError<
+  NpmPackError,
+  { readonly brand: unique symbol }
+>()("NpmPackError", {
+  directory: Schema.String,
+  exitCode: Schema.Finite,
+  stderr: Schema.String,
+}) {
   override get message() {
     return `npm pack failed for ${this.directory} (exit ${this.exitCode}): ${Str.trim(this.stderr)}`;
   }
@@ -72,7 +76,7 @@ export class NpmPackError extends Schema.TaggedError<NpmPackError, {}>()(
 
 export class InvalidPackOutput extends Schema.TaggedError<
   InvalidPackOutput,
-  {}
+  { readonly brand: unique symbol }
 >()("InvalidPackOutput", { directory: Schema.String, cause: Schema.Unknown }) {
   override get message() {
     return `Invalid npm pack JSON for ${this.directory}`;
@@ -83,16 +87,19 @@ export const packProblems = (
   files: ReadonlyArray<string>,
 ): ReadonlyArray<typeof PackProblem.Type> => {
   const problems: Array<typeof PackProblem.Type> = [];
-  if (!Array.some(files, (path) => Str.startsWith("dist/")(path)))
+  if (!Array.some(files, (path) => Str.startsWith("dist/")(path))) {
     problems.push({
       path: "dist/",
       reason: "no build output packed—did this run before `pnpm build`?",
     });
+  }
   for (const path of files) {
     const denial = Option.getOrUndefined(
       Array.findFirst(DENIED, ([pattern]) => pattern.test(path)),
     );
-    if (denial !== undefined) problems.push({ path, reason: denial[1] });
+    if (denial !== undefined) {
+      problems.push({ path, reason: denial[1] });
+    }
   }
   return problems;
 };
@@ -101,13 +108,15 @@ export const packProblems = (
  * @internal
  */
 export const publishedPackages = Effect.fn("PackContents.publishedPackages")(
-  function* (packagesDirectory = "packages") {
+  function* (packagesDirectory: string = "packages") {
     const fs = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
     const directories: Array<string> = [];
     for (const name of yield* fs.readDirectory(packagesDirectory)) {
       const directory = path.join(packagesDirectory, name);
-      if ((yield* fs.stat(directory)).type !== "Directory") continue;
+      if ((yield* fs.stat(directory)).type !== "Directory") {
+        continue;
+      }
       const manifest = yield* fs
         .readFileString(path.join(directory, "package.json"))
         .pipe(
@@ -120,8 +129,9 @@ export const publishedPackages = Effect.fn("PackContents.publishedPackages")(
           ),
           Effect.option,
         );
-      if (manifest._tag === "Some" && manifest.value.private !== true)
+      if (manifest._tag === "Some" && manifest.value.private !== true) {
         directories.push(directory);
+      }
     }
     return directories;
   },
@@ -165,12 +175,13 @@ export const packedFiles = Effect.fn("PackContents.packedFiles")(function* (
     },
     { concurrency: "unbounded" },
   );
-  if (result.exitCode !== 0)
+  if (result.exitCode !== 0) {
     return yield* NpmPackError.make({
       directory,
       exitCode: result.exitCode,
       stderr: result.stderr,
     });
+  }
   return yield* decodePackedFiles(directory, result.stdout);
 }, Effect.scoped);
 
@@ -178,7 +189,7 @@ export const packedFiles = Effect.fn("PackContents.packedFiles")(function* (
  * @internal
  */
 export const checkPackContents = Effect.fn("PackContents.check")(function* (
-  packagesDirectory = "packages",
+  packagesDirectory: string = "packages",
 ) {
   const failures: Array<
     (typeof InvalidPackContents.prototype.packages)[number]
@@ -192,8 +203,9 @@ export const checkPackContents = Effect.fn("PackContents.check")(function* (
       failures.push({ directory, problems });
     }
   }
-  if (failures.length > 0)
+  if (failures.length > 0) {
     return yield* InvalidPackContents.make({ packages: failures });
+  }
 });
 
 if (import.meta.main) {

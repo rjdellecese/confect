@@ -13,7 +13,7 @@ import type { KeyValue } from "@confect/server/QueryStreamKeyValues";
 import * as Result from "effect/Result";
 import * as Key from "@confect/server/QueryStreamKey";
 import * as Layout from "@confect/server/QueryStreamKeyLayout";
-import type { GenericId } from "convex/values";
+import { GenericId } from "@confect/core/GenericId";
 
 const fromBounds = (
   ...args: Parameters<typeof QueryStreamIndexRange.fromBounds>
@@ -103,7 +103,7 @@ describe("QueryStreamIndexRange.builder", () => {
     expect(bounded).not.toHaveProperty("lt");
     const allPinned = pinned
       .eq("score", 2)
-      .eq("_id", "item" as GenericId<"items">);
+      .eq("_id", GenericId("items").make("item"));
     expectTypeOf<QueryStreamIndexRange.Remaining<typeof root>>().toEqualTypeOf<
       ["category", "score", "_id"]
     >();
@@ -176,11 +176,10 @@ describe("QueryStreamIndexRange.apply", () => {
     }
   }
 
-  // Convex exports IndexRange only as a type; the recording fixture supplies
-  // its behavior without access to the SDK's private nominal marker.
   const recordingBuilder = () =>
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- The Convex IndexRange returned by this builder carries a private marker; the recording fixture must expose the same public chaining contract.
     new RecordingBuilder() as RecordingBuilder &
-      ConvexIndexRangeBuilder<GenericDocument, string[]>;
+      ConvexIndexRangeBuilder<GenericDocument, Array<string>>;
 
   it.each(["eq", "gt", "gte", "lt", "lte"] as const)(
     "applies %s with its receiver and preserves missing field values",
@@ -195,7 +194,9 @@ describe("QueryStreamIndexRange.apply", () => {
         expectTypeOf(result).toEqualTypeOf<ConvexIndexRange>();
         expectTypeOf(QueryStreamIndexRange.apply)
           .parameter(1)
-          .toEqualTypeOf<ConvexIndexRangeBuilder<GenericDocument, string[]>>();
+          .toEqualTypeOf<
+            ConvexIndexRangeBuilder<GenericDocument, Array<string>>
+          >();
         expect(result).toHaveProperty("calls", [[tag, "text", value]]);
         expect(result).not.toBe(receiver);
         expect(receiver.calls).toEqual([]);
@@ -211,8 +212,8 @@ describe("QueryStreamIndexRange.apply", () => {
       builder()
         .eq("category", "a")
         .eq("score", 1)
-        .gt("_id", "first" as GenericId<"items">)
-        .lte("_id", "last" as GenericId<"items">),
+        .gt("_id", GenericId("items").make("first"))
+        .lte("_id", GenericId("items").make("last")),
       target,
     );
     expect(result).toEqual(
@@ -378,7 +379,7 @@ describe("QueryStreamIndexRange.fromBounds", () => {
           );
         };
       };
-      for (const lower of endpoints)
+      for (const lower of endpoints) {
         for (const upper of endpoints) {
           const bounds = { lower, upper };
           const ranges = fromBounds(["a", "b"], order, bounds);
@@ -391,6 +392,7 @@ describe("QueryStreamIndexRange.fromBounds", () => {
             ),
           ).toEqual(Array.filter(ordered, admits(bounds)));
         }
+      }
     },
   );
 

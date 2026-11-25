@@ -2,17 +2,20 @@ import * as Layer from "effect/Layer";
 import * as Scheduler from "@confect/server/Scheduler";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import type { Scheduler as ConvexScheduler } from "convex/server";
-import type { GenericId } from "convex/values";
+import { GenericId } from "@confect/core/GenericId";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import { vi } from "vitest";
 
-const scheduledFunctionId =
-  "scheduled-function-id" as GenericId<"_scheduled_functions">;
+const scheduledFunctionId = GenericId("_scheduled_functions").make(
+  "scheduled-function-id",
+);
 
 describe("Scheduler", () => {
   it.effect("cancel delegates lazily with the scheduled function ID", () => {
-    const cancel = vi.fn(() => Promise.resolve());
+    const cancel = vi
+      .fn<ConvexScheduler["cancel"]>()
+      .mockResolvedValue(undefined);
     const convexScheduler = {
       runAfter: () => Promise.resolve(scheduledFunctionId),
       runAt: () => Promise.resolve(scheduledFunctionId),

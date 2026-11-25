@@ -34,7 +34,7 @@ import * as Project from "./integration/Project";
 vi.mock("esbuild", (importOriginal) =>
   importOriginal<typeof esbuild>().then((original) => ({
     ...original,
-    context: vi.fn(original.context),
+    context: vi.fn<typeof original.context>(original.context),
   })),
 );
 
@@ -57,18 +57,23 @@ const controlledWatcher = Effect.fnUntraced(function* (
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
   const project = yield* Project.make;
-  if (options.files !== undefined)
-    for (const file of ["notes.spec.ts", "notes.impl.ts", "tables/notes.ts"])
-      if (!options.files.includes(file))
+  if (options.files !== undefined) {
+    for (const file of ["notes.spec.ts", "notes.impl.ts", "tables/notes.ts"]) {
+      if (!options.files.includes(file)) {
         yield* fs.remove(path.join(project.root, "confect", file));
+      }
+    }
+  }
   for (const file of options.files ?? [
     "notes.spec.ts",
     "notes.impl.ts",
     "tables/notes.ts",
-  ])
+  ]) {
     yield* project.write(`confect/${file}`, "export const value = 1;");
-  for (const [file, contents] of Record.toEntries(options.contents ?? {}))
+  }
+  for (const [file, contents] of Record.toEntries(options.contents ?? {})) {
     yield* project.write(file, contents);
+  }
 
   const events = yield* Queue.unbounded<FileSystem.WatchEvent>();
   const configEvents = yield* Queue.unbounded<FileSystem.WatchEvent>();
@@ -617,11 +622,12 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           const fs = yield* FileSystem.FileSystem;
           const removed = `${project.root}/confect/notes.spec.ts`;
           yield* fs.remove(removed);
-          if (initialOutcome === "failure")
+          if (initialOutcome === "failure") {
             yield* project.write(
               "confect/notes.impl.ts",
               "export const value = ;",
             );
+          }
           const oldBuild = yield* Effect.promise(() =>
             first.actual.rebuild(),
           ).pipe(Effect.exit, Effect.forkScoped);
@@ -658,7 +664,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           expect((yield* watcher.next).work._tag).toBe("Impls");
           expect((yield* watcher.pending).work._tag).toBe("None");
         }).pipe(Effect.scoped, Effect.timeout("10 seconds")),
-      { timeout: 15000 },
+      { timeout: 15_000 },
     );
 
     test.effect(
@@ -703,7 +709,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           expect((yield* Fiber.join(consumer)).work._tag).toBe("Full");
           expect((yield* watcher.pending).work._tag).toBe("None");
         }).pipe(Effect.scoped, Effect.timeout("10 seconds")),
-      { timeout: 15000 },
+      { timeout: 15_000 },
     );
 
     test.effect.each([
@@ -744,7 +750,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           });
           expect((yield* watcher.next).work._tag).toBe("Full");
         }).pipe(Effect.scoped, Effect.timeout("10 seconds")),
-      { timeout: 15000 },
+      { timeout: 15_000 },
     );
 
     test.effect(
@@ -769,7 +775,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           expect(actual25).toEqual(Option.none());
           expect((yield* watcher.pending).work._tag).toBe("None");
         }).pipe(Effect.scoped, Effect.timeout("10 seconds")),
-      { timeout: 15000 },
+      { timeout: 15_000 },
     );
 
     test.effect(
@@ -812,7 +818,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           expect(HashSet.has(created.optional, "Http")).toBe(true);
           expect((yield* watcher.pending).work._tag).toBe("None");
         }).pipe(Effect.scoped, Effect.timeout("10 seconds")),
-      { timeout: 15000 },
+      { timeout: 15_000 },
     );
   },
 );
@@ -869,11 +875,12 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           expect(Watcher.isRefreshSuccessful(actual29)).toBe(false);
           expect((yield* watcher.pending).work._tag).toBe("None");
           yield* Ref.set(broken, false);
-          if (editSource)
+          if (editSource) {
             yield* project.write(
               "confect/notes.spec.ts",
               'export { value } from "./_generated/binding"; export const changed = true;',
             );
+          }
           const actual30 = yield* watcher.refresh;
           expect(Watcher.isRefreshSuccessful(actual30)).toBe(true);
           expect((yield* watcher.next).work._tag).toBe(
@@ -962,11 +969,13 @@ layer(NodeServices.layer, { excludeTestServices: true })(
                     requests,
                     (count) => count + 1,
                   );
-                  if (requestCount === 3)
+                  if (requestCount === 3) {
                     yield* Deferred.succeed(joinedFresh, undefined);
+                  }
                   const built = actual.rebuild();
-                  if (requestCount !== 2)
+                  if (requestCount !== 2) {
                     return yield* Effect.promise(() => built);
+                  }
                   yield* Deferred.succeed(joinedStale, undefined);
                   const stale = yield* Effect.promise(() => built);
                   const advanced = actual.rebuild();
@@ -1011,7 +1020,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           expect(current11).toBe(3);
           expect((yield* watcher.pending).work._tag).toBe("Declarations");
         }).pipe(Effect.scoped, Effect.timeout("10 seconds")),
-      { timeout: 15000 },
+      { timeout: 15_000 },
     );
   },
 );
@@ -1110,15 +1119,18 @@ layer(NodeServices.layer, { excludeTestServices: true })(
                 Ref.updateAndGet(requests, (count) => count + 1),
               );
               const built = actual.rebuild();
-              if (requestCount === 2) Deferred.doneUnsafe(joined, Effect.void);
+              if (requestCount === 2) {
+                Deferred.doneUnsafe(joined, Effect.void);
+              }
               return built;
             },
           });
-          if (previous === "failure")
+          if (previous === "failure") {
             yield* project.write(
               "confect/notes.spec.ts",
               "export const value = ;",
             );
+          }
           const canceled = yield* watcher.refresh.pipe(Effect.forkScoped);
           yield* Deferred.await(blocked);
           yield* Fiber.interrupt(canceled);
@@ -1139,7 +1151,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           const current14 = yield* Ref.get(first.rebuilds);
           expect(current14).toBe(3);
         }).pipe(Effect.scoped, Effect.timeout("10 seconds")),
-      { timeout: 15000 },
+      { timeout: 15_000 },
     );
 
     test.effect(
@@ -1189,7 +1201,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           const current15 = yield* Ref.get(first.rebuilds);
           expect(current15).toBe(3);
         }).pipe(Effect.scoped, Effect.timeout("10 seconds")),
-      { timeout: 15000 },
+      { timeout: 15_000 },
     );
 
     test.effect(
@@ -1252,7 +1264,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           const current16 = yield* Ref.get(first.rebuilds);
           expect(current16).toBe(2);
         }).pipe(Effect.scoped, Effect.timeout("10 seconds")),
-      { timeout: 15000 },
+      { timeout: 15_000 },
     );
 
     test.effect.each(["reported", "metadata"] as const)(
@@ -1268,8 +1280,9 @@ layer(NodeServices.layer, { excludeTestServices: true })(
                 name: "inject-missing-metadata",
                 setup(build) {
                   build.onEnd((result) => {
-                    if (Ref.get(broken).pipe(runSync) && kind === "metadata")
+                    if (Ref.get(broken).pipe(runSync) && kind === "metadata") {
                       result.metafile = undefined;
+                    }
                   });
                 },
               },
@@ -1277,11 +1290,12 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           });
           yield* watcher.refresh;
           yield* Ref.set(broken, true);
-          if (kind === "reported")
+          if (kind === "reported") {
             yield* project.write(
               "confect/notes.spec.ts",
               "export const value = ;",
             );
+          }
           const refreshed = yield* watcher.refresh;
           expect(Watcher.isRefreshSuccessful(refreshed)).toBe(false);
           assert(
@@ -1325,17 +1339,23 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           const reportedFailure = { errors: [{ text: "rebuild rejected" }] };
           const { watcher, first, project } = yield* controlledWatcher({
             rebuild: (actual) => {
-              if (!Ref.get(broken).pipe(runSync)) return actual.rebuild();
+              if (!Ref.get(broken).pipe(runSync)) {
+                return actual.rebuild();
+              }
               switch (kind) {
                 case "operation":
                   return actual.rebuild().then(
-                    () => Promise.reject(operationFailure),
-                    () => Promise.reject(operationFailure),
+                    () => {
+                      throw operationFailure;
+                    },
+                    () => {
+                      throw operationFailure;
+                    },
                   );
                 case "reported-with-success":
-                  return actual
-                    .rebuild()
-                    .then(() => Promise.reject(reportedFailure));
+                  return actual.rebuild().then(() => {
+                    throw reportedFailure;
+                  });
                 case "unobserved-reported":
                   return Promise.reject(reportedFailure);
                 case "unobserved-success":
@@ -1356,11 +1376,12 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           const actual47 = yield* watcher.refresh;
           expect(Watcher.isRefreshSuccessful(actual47)).toBe(false);
           yield* Ref.set(broken, true);
-          if (kind === "reported-with-success")
+          if (kind === "reported-with-success") {
             yield* project.write(
               "confect/notes.spec.ts",
               "export const value = 2;",
             );
+          }
           const refreshed = yield* watcher.refresh.pipe(Effect.result);
           assert(refreshed._tag === "Failure");
           expect(refreshed.failure).toMatchObject({
@@ -1455,7 +1476,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           expect(current22).toBe(3);
           expect((yield* watcher.pending).work._tag).toBe("Full");
         }).pipe(Effect.scoped, Effect.timeout("10 seconds")),
-      { timeout: 15000 },
+      { timeout: 15_000 },
     );
 
     test.effect(
@@ -1512,7 +1533,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           const current24 = yield* Ref.get(first.rebuilds);
           expect(current24).toBe(3);
         }).pipe(Effect.scoped, Effect.timeout("10 seconds")),
-      { timeout: 15000 },
+      { timeout: 15_000 },
     );
   },
 );
@@ -1532,8 +1553,9 @@ layer(NodeServices.layer, { excludeTestServices: true })(
             "notes.spec.ts",
             "notes.impl.ts",
             "tables/notes.ts",
-          ])
+          ]) {
             yield* fs.remove(path.join(confect, file));
+          }
           const error = PlatformError.systemError({
             _tag: "Unknown",
             module: "FileSystem",
@@ -1588,7 +1610,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           const current25 = yield* Ref.get(subscriptions);
           expect(current25).toBe(2);
         }).pipe(Effect.scoped, Effect.timeout("10 seconds")),
-      { timeout: 15000 },
+      { timeout: 15_000 },
     );
 
     test.effect.each([
@@ -1678,7 +1700,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
             expect(current27).toBe(1);
           }
         }).pipe(Effect.scoped),
-      { timeout: 15000 },
+      { timeout: 15_000 },
     );
   },
 );

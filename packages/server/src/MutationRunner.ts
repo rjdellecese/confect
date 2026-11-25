@@ -1,5 +1,5 @@
 import * as Ref from "@confect/core/Ref";
-import type { GenericActionCtx } from "convex/server";
+import type { GenericActionCtx, GenericDataModel } from "convex/server";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -23,7 +23,9 @@ const run = Effect.fn("MutationRunner.runMutation")(
   <A, E, R>(effect: Effect.Effect<A, E, R>): Effect.Effect<A, E, R> => effect,
 );
 
-const make = (nativeRunMutation: GenericActionCtx<any>["runMutation"]) => {
+const make = (
+  nativeRunMutation: GenericActionCtx<GenericDataModel>["runMutation"],
+) => {
   /**
    * Runs a mutation with decoded arguments and no transaction overrides,
    * including from an action or HTTP handler.
@@ -78,6 +80,7 @@ const make = (nativeRunMutation: GenericActionCtx<any>["runMutation"]) => {
   > {
     return run(
       Effect.gen(function* () {
+        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- The public overload permits omitted args only for a keyless ref. Its conditional tuple is no longer available beside the transaction options here.
         const actualArgs = (args ?? {}) as Ref.Args<Mutation>;
         if (options !== undefined) {
           const controls =
@@ -138,5 +141,6 @@ export type MutationRunner = typeof MutationRunner.Identifier;
 /**
  * @internal
  */
-export const layer = (runMutation: GenericActionCtx<any>["runMutation"]) =>
-  Layer.succeed(MutationRunner, make(runMutation));
+export const layer = (
+  runMutation: GenericActionCtx<GenericDataModel>["runMutation"],
+) => Layer.succeed(MutationRunner, make(runMutation));

@@ -11,7 +11,10 @@ export class ConfectDirectory extends Context.Service<
   ConfectDirectory,
   { readonly get: Effect.Effect<string> }
 >()("@confect/cli/ConfectDirectory") {
-  static readonly get = ConfectDirectory.use((service) => service.get);
+  static readonly get = Effect.flatMap(
+    ConfectDirectory,
+    (service) => service.get,
+  );
 }
 
 export class ConfectDirectoryNotFoundError extends Schema.TaggedError<

@@ -22,15 +22,15 @@ import * as Project from "./integration/Project";
 vi.mock("esbuild", (importOriginal) =>
   importOriginal<typeof esbuild>().then((original) => ({
     ...original,
-    context: vi.fn(original.context),
+    context: vi.fn<typeof original.context>(original.context),
   })),
 );
 
 vi.mock("effect/Console", (importOriginal) =>
   importOriginal<typeof Console>().then((original) => ({
     ...original,
-    log: vi.fn(original.log),
-    error: vi.fn(original.error),
+    log: vi.fn<typeof original.log>(original.log),
+    error: vi.fn<typeof original.error>(original.error),
   })),
 );
 
@@ -143,7 +143,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           yield* Queue.take(ready);
           expect(readyCount).toBe(2);
         }).pipe(Effect.scoped, Effect.timeout("20 seconds")),
-      { timeout: 25000 },
+      { timeout: 25_000 },
     );
 
     it.effect.each(["operation", "metadata"] as const)(
@@ -194,8 +194,9 @@ layer(NodeServices.layer, { excludeTestServices: true })(
                         typeof arg === "string" &&
                         pipe(arg, Str.includes(message)),
                     )
-                  )
+                  ) {
                     Deferred.doneUnsafe(failure, Effect.void);
+                  }
                 }),
               ),
             ),
@@ -217,8 +218,9 @@ layer(NodeServices.layer, { excludeTestServices: true })(
                         name: "inject-watcher-failure",
                         setup(build) {
                           build.onEnd((built) => {
-                            if (broken && failureKind === "metadata")
+                            if (broken && failureKind === "metadata") {
                               built.metafile = undefined;
+                            }
                           });
                         },
                       },
@@ -261,7 +263,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           yield* Deferred.await(ready).pipe(Effect.timeout("15 seconds"));
           expect(readyCount).toBe(1);
         }).pipe(Effect.scoped),
-      { timeout: 30000 },
+      { timeout: 30_000 },
     );
 
     it.effect.each(["confect/name.ts", "name.ts"])(
@@ -331,7 +333,9 @@ export default GroupImpl.make(notesSpec).pipe(Layer.provide(FunctionImpl.make(no
                   name: "edit-before-first-watch-snapshot",
                   setup(build) {
                     build.onStart(() => {
-                      if (edited) return;
+                      if (edited) {
+                        return;
+                      }
                       edited = true;
                       return runPromise(
                         project.write(
@@ -368,7 +372,7 @@ export default GroupImpl.make(notesSpec).pipe(Layer.provide(FunctionImpl.make(no
           expect(generated).toContain("export const second =");
           expect(generated).not.toContain("export const first =");
         }).pipe(Effect.scoped),
-      { timeout: 30000 },
+      { timeout: 30_000 },
     );
 
     it.effect.each([1, 8])(
@@ -433,8 +437,9 @@ export default GroupImpl.make(notesSpec).pipe(Layer.provide(FunctionImpl.make(no
                           ),
                         );
                       }
-                      if (unseen.size === 0)
+                      if (unseen.size === 0) {
                         Deferred.doneUnsafe(ready, Effect.void);
+                      }
                     });
                   },
                 },
@@ -459,7 +464,7 @@ export default GroupImpl.make(notesSpec).pipe(Layer.provide(FunctionImpl.make(no
           yield* Deferred.await(ready).pipe(Effect.timeout("15 seconds"));
           expect(context.mock.calls.length).toBeLessThanOrEqual(4);
         }).pipe(Effect.scoped),
-      { timeout: 30000 },
+      { timeout: 30_000 },
     );
   },
 );

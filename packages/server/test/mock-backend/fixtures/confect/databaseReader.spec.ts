@@ -5,7 +5,7 @@ import notesTable from "./_generated/tables/notes";
 
 export class PaginationDenied extends Schema.TaggedError<
   PaginationDenied,
-  {}
+  { readonly brand: unique symbol }
 >()("PaginationDenied", { reason: Schema.String }) {}
 
 export default GroupSpec.make()

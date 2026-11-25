@@ -1,3 +1,4 @@
+import { fromPrototype } from "./internal/fromPrototype";
 import type { Ref } from "@confect/core";
 import type { Cron, Duration } from "effect";
 import * as Predicate from "effect/Predicate";
@@ -50,6 +51,7 @@ export interface CronJob {
    *
    * @category Models
    */
+  // oxlint-disable-next-line quality/no-unsafe-dictionary-type -- Jobs expose decoded arguments, which may contain arbitrary application types. Their own ref encodes them only when CronJobs.add registers the job.
   readonly args: Record<string, unknown>;
 }
 
@@ -61,20 +63,7 @@ export const isCronJob = (u: unknown): u is CronJob =>
 
 const Proto = {
   [TypeId]: TypeId,
-};
-
-const makeProto = (
-  identifier: string,
-  schedule: Cron.Cron | Duration.Duration | CronWindow.CronWindow,
-  ref: Ref.AnyMutation | Ref.AnyAction,
-  args: Record<string, unknown>,
-): CronJob =>
-  Object.assign(Object.create(Proto), {
-    identifier,
-    schedule,
-    ref,
-    args,
-  });
+} satisfies Pick<CronJob, TypeId>;
 
 /**
  * Creates a description of a recurring mutation or action without registering
@@ -102,4 +91,10 @@ export const make = <R extends Ref.AnyMutation | Ref.AnyAction>(
   schedule: Cron.Cron | Duration.Duration | CronWindow.CronWindow,
   ref: R,
   ...args: Ref.OptionalArgs<R>
-): CronJob => makeProto(identifier, schedule, ref, args[0] ?? {});
+): CronJob =>
+  Object.assign(fromPrototype(Proto), {
+    identifier,
+    schedule,
+    ref,
+    args: args[0] ?? {},
+  });

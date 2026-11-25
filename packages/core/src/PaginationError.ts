@@ -13,17 +13,17 @@ import * as Schema from "effect/Schema";
  *
  * @category Errors
  */
-export class InvalidCursor extends Schema.TaggedError<InvalidCursor, {}>()(
-  "InvalidCursor",
-  {
-    /**
-     * The original Convex failure or error data, retained for diagnosis.
-     *
-     * @category Errors
-     */
-    cause: Schema.Defect(),
-  },
-) {}
+export class InvalidCursor extends Schema.TaggedError<
+  InvalidCursor,
+  { readonly brand: unique symbol }
+>()("InvalidCursor", {
+  /**
+   * The original Convex failure or error data, retained for diagnosis.
+   *
+   * @category Errors
+   */
+  cause: Schema.Defect(),
+}) {}
 
 interface InvalidCursorData {
   readonly isConvexSystemError: true;

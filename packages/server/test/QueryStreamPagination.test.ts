@@ -59,7 +59,7 @@ describe("QueryStreamPagination", () => {
     }>().not.toExtend<Pagination.Start>();
   });
 
-  it.each([-1, 1.5, NaN, Infinity])(
+  it.each([-1, 1.5, Number.NaN, Infinity])(
     "rejects invalid page size %s",
     (numItems) => {
       const parsed = Pagination.parseRequest(
@@ -67,9 +67,9 @@ describe("QueryStreamPagination", () => {
         Pagination.Start.Beginning(),
         Pagination.Range.Unpinned(),
       );
-      expect(Result.isFailure(parsed)).toBe(true);
-      if (Result.isFailure(parsed))
-        expect(parsed.failure).toBeInstanceOf(Pagination.InvalidPageSizeError);
+      expect(parsed.pipe(Result.flip, Result.getOrThrow)).toBeInstanceOf(
+        Pagination.InvalidPageSizeError,
+      );
     },
   );
 
@@ -88,9 +88,9 @@ describe("QueryStreamPagination", () => {
       Pagination.Start.Beginning(),
       Pagination.Range.Unpinned(),
     );
-    expect(Result.isFailure(initial)).toBe(true);
-    if (Result.isFailure(initial))
-      expect(initial.failure).toBeInstanceOf(Pagination.EmptyInitialPageError);
+    expect(initial.pipe(Result.flip, Result.getOrThrow)).toBeInstanceOf(
+      Pagination.EmptyInitialPageError,
+    );
   });
 
   it("distinguishes item-limit progress from exhaustion", () => {
@@ -130,14 +130,14 @@ describe("QueryStreamPagination", () => {
   it("requires safe progress and an interior split when a budget stops a page", () => {
     const req = request();
     const empty = Pagination.finish(req, Pagination.initial(), true);
-    expect(Result.isFailure(empty)).toBe(true);
-    if (Result.isFailure(empty))
-      expect(empty.failure.reason).toBe("NoProgress");
+    expect(empty.pipe(Result.flip, Result.getOrThrow).reason).toBe(
+      "NoProgress",
+    );
     const pinned = request(2, Pagination.Range.ThroughKey({ key: key(1) }));
     const boundary = Pagination.finish(pinned, scan(pinned, 1), true);
-    expect(Result.isFailure(boundary)).toBe(true);
-    if (Result.isFailure(boundary))
-      expect(boundary.failure.reason).toBe("NoInteriorSplit");
+    expect(boundary.pipe(Result.flip, Result.getOrThrow).reason).toBe(
+      "NoInteriorSplit",
+    );
     expect(
       Result.getOrThrow(Pagination.finish(req, scan(req, 1, true), true)),
     ).toEqual({

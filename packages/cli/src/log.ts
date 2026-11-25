@@ -6,6 +6,9 @@ import * as Match from "effect/Match";
 import * as Option from "effect/Option";
 import * as Path from "effect/Path";
 import * as Predicate from "effect/Predicate";
+import * as Record from "effect/Record";
+import * as Schema from "effect/Schema";
+import * as Result from "effect/Result";
 import * as String from "effect/String";
 import * as esbuild from "esbuild";
 import type {
@@ -120,7 +123,7 @@ const withGutterBlock =
 const withErrorGutterBlock = withGutterBlock(errorGutter);
 
 const formatBuildMessage = (
-  error: esbuild.Message | undefined,
+  error: esbuild.PartialMessage | undefined,
   formattedMessage: string,
 ): string => {
   const lines = String.split(formattedMessage, "\n");
@@ -137,8 +140,8 @@ const formatBuildMessage = (
  * Render a list of esbuild messages into a styled, gutter-prefixed block.
  */
 export const formatEsbuildMessages = (
-  errors: readonly esbuild.Message[],
-  formattedMessages: readonly string[],
+  errors: ReadonlyArray<esbuild.PartialMessage>,
+  formattedMessages: ReadonlyArray<string>,
 ): string =>
   pipe(
     formattedMessages,
@@ -165,6 +168,53 @@ const renderImportFailedError = (error: ImportFailedError): string => {
   )}: ${oneLineCause}; check the file's top-level imports and side effects.`;
 };
 
+const DiagnosticString = Schema.String.pipe(
+  Schema.withDecodingDefault(Effect.succeed("")),
+);
+const DiagnosticOffset = Schema.Finite.check(Schema.isInt32()).pipe(
+  Schema.withDecodingDefault(Effect.succeed(0)),
+);
+const diagnosticStruct = <Fields extends Schema.Struct.Fields>(
+  fields: Fields,
+) =>
+  Schema.ObjectKeyword.check(
+    Schema.makeFilter((input) => {
+      for (const key in input) {
+        if (!Record.has(fields, key)) {
+          return false;
+        }
+      }
+      return true;
+    }),
+  ).pipe(Schema.decodeTo(Schema.Struct(fields)));
+
+const DiagnosticLocation = diagnosticStruct({
+  file: DiagnosticString,
+  namespace: DiagnosticString,
+  line: DiagnosticOffset,
+  column: DiagnosticOffset,
+  length: DiagnosticOffset,
+  lineText: DiagnosticString,
+  suggestion: DiagnosticString,
+}).pipe(Schema.NullOr, Schema.withDecodingDefault(Effect.succeed(null)));
+const diagnosticNoteFields = {
+  text: DiagnosticString,
+  location: DiagnosticLocation,
+};
+const DiagnosticMessages = Schema.Array(
+  diagnosticStruct({
+    ...diagnosticNoteFields,
+    id: DiagnosticString,
+    pluginName: DiagnosticString,
+    notes: diagnosticStruct(diagnosticNoteFields).pipe(
+      Schema.Array,
+      Schema.mutable,
+      Schema.withDecodingDefault(Effect.succeed([])),
+    ),
+    detail: Schema.optional(Schema.Unknown),
+  }),
+);
+
 /**
  * Render a {@link BundleFailedError} as a multi-line, ANSI-styled string: a
  * one-line `✘ <file>: build errors` header followed by the gutter-prefixed
@@ -172,13 +222,17 @@ const renderImportFailedError = (error: ImportFailedError): string => {
  * `BundleFailedError` carries an array of distinct esbuild messages.
  */
 const renderBundleFailedError = (error: BundleFailedError): string => {
-  const messages = error.errors as readonly esbuild.Message[];
-  const formatted = esbuild.formatMessagesSync(messages as esbuild.Message[], {
+  const header = `${cross} ${formatPath(error.file)}: build errors`;
+  const decoded = Schema.decodeUnknownResult(DiagnosticMessages)(error.errors);
+  if (Result.isFailure(decoded)) {
+    return `${header}\n${withErrorGutterBlock("The module reported malformed esbuild diagnostics.")}`;
+  }
+  const messages = decoded.success;
+  const formatted = esbuild.formatMessagesSync([...messages], {
     kind: "error",
     color: true,
     terminalWidth: 80,
   });
-  const header = `${cross} ${formatPath(error.file)}: build errors`;
   return `${header}\n${formatEsbuildMessages(messages, formatted)}`;
 };
 
@@ -202,9 +256,9 @@ export const logBuildError = (error: BuildError) =>
  * `✘ Build errors` header.
  */
 const renderCoalescedBuildErrors = (
-  messages: readonly esbuild.Message[],
+  messages: ReadonlyArray<esbuild.Message>,
 ): string => {
-  const formatted = esbuild.formatMessagesSync(messages as esbuild.Message[], {
+  const formatted = esbuild.formatMessagesSync([...messages], {
     kind: "error",
     color: true,
     terminalWidth: 80,
@@ -213,15 +267,17 @@ const renderCoalescedBuildErrors = (
   return `${header}\n${formatEsbuildMessages(messages, formatted)}`;
 };
 
-export const logCoalescedBuildErrors = (messages: readonly esbuild.Message[]) =>
+export const logCoalescedBuildErrors = (
+  messages: ReadonlyArray<esbuild.Message>,
+) =>
   messages.length === 0
     ? Effect.void
     : Console.error(renderCoalescedBuildErrors(messages));
 
 const renderCoalescedBuildWarnings = (
-  messages: readonly esbuild.Message[],
+  messages: ReadonlyArray<esbuild.Message>,
 ): string => {
-  const formatted = esbuild.formatMessagesSync(messages as esbuild.Message[], {
+  const formatted = esbuild.formatMessagesSync([...messages], {
     kind: "warning",
     color: true,
     terminalWidth: 80,
@@ -237,7 +293,7 @@ const renderCoalescedBuildWarnings = (
 };
 
 export const logCoalescedBuildWarnings = (
-  messages: readonly esbuild.Message[],
+  messages: ReadonlyArray<esbuild.Message>,
 ) =>
   messages.length === 0
     ? Effect.void

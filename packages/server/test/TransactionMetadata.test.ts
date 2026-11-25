@@ -41,7 +41,9 @@ describe("TransactionMetadata", () => {
         fileReadBytes: { used: 150, remaining: 850 },
       };
       let current = before;
-      const getTransactionMetrics = vi.fn(() => Promise.resolve(current));
+      const getTransactionMetrics = vi.fn<QueryMeta["getTransactionMetrics"]>(
+        () => Promise.resolve(current),
+      );
       const meta = {
         getTransactionMetrics,
         getSnapshotTs: () => 1n,
@@ -97,7 +99,7 @@ describe("TransactionMetadata", () => {
     "reads exact bigint snapshot timestamps lazily on every execution",
     () => {
       const first = 1_800_000_000_000_000_001n;
-      const getSnapshotTs = vi.fn(() => first);
+      const getSnapshotTs = vi.fn<QueryMeta["getSnapshotTs"]>(() => first);
       const getTransactionMetrics = vi.fn<QueryMeta["getTransactionMetrics"]>();
       const meta = { getTransactionMetrics, getSnapshotTs };
       const layer = TransactionMetadata.layer(meta);
@@ -124,7 +126,7 @@ describe("TransactionMetadata", () => {
 
   it.effect("preserves synchronous snapshot failures as defects", () => {
     const failure = new Error("Snapshot unavailable");
-    const getSnapshotTs = vi.fn((): bigint => {
+    const getSnapshotTs = vi.fn<QueryMeta["getSnapshotTs"]>((): bigint => {
       throw failure;
     });
     return Effect.gen(function* () {

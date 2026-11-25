@@ -300,55 +300,34 @@ function makeDefinition<
   const fields: Fields = ref.args.fields;
   const execute = (args: FoldkitArgs | undefined) =>
     runWithArgs(
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- Foldkit supplies undefined only for empty fields; Confect exposes that case as an optional argument tuple.
       ...((args === undefined ? [] : [args]) as Ref.OptionalArgs<Ref_>),
     );
 
-  return Match.value(interrupt).pipe(
-    Match.withReturnType<
-      Definition<Name, Ref_, SuccessMessage | ErrorMessage>
-    >(),
-    Match.when(
-      undefined,
-      () =>
-        FoldkitCommand.define(name, {
-          args: fields,
-          messages,
-          execute,
-        }) as Definition<Name, Ref_, SuccessMessage | ErrorMessage>,
+  const definition = Match.value(interrupt).pipe(
+    Match.when(undefined, () =>
+      FoldkitCommand.define(name, { args: fields, messages, execute }),
     ),
-    Match.when(
-      true,
-      (nameKeyedInterrupt) =>
-        FoldkitCommand.define(name, {
-          args: fields,
-          messages,
-          interrupt: nameKeyedInterrupt,
-          execute,
-        }) as InterruptibleDefinition<
-          Name,
-          Ref_,
-          SuccessMessage | ErrorMessage
-        >,
+    Match.when(true, (nameKeyedInterrupt) =>
+      FoldkitCommand.define(name, {
+        args: fields,
+        messages,
+        interrupt: nameKeyedInterrupt,
+        execute,
+      }),
     ),
-    Match.when(Match.defined, (keyedInterrupt) => {
-      const definition: FoldkitCommand.CommandDefinitionWithArgs<
-        Name,
-        Fields,
-        ReturnType<typeof execute>
-      > = FoldkitCommand.define(name, {
+    Match.when(Match.defined, (keyedInterrupt) =>
+      FoldkitCommand.define(name, {
         args: fields,
         messages,
         interrupt: keyedInterrupt,
         execute,
-      });
-      return definition as Definition<
-        Name,
-        Ref_,
-        SuccessMessage | ErrorMessage
-      >;
-    }),
+      }),
+    ),
     Match.exhaustive,
   );
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- Foldkit's definition uses the ref's fields; Confect additionally exposes the matching optional call signature for argument-free refs.
+  return definition as Definition<Name, Ref_, SuccessMessage | ErrorMessage>;
 }
 
 /**

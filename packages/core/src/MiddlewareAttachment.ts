@@ -93,8 +93,12 @@ export const validateAll = (
     const equivalent =
       schema === undefined ? undefined : Schema.toEquivalence(schema);
     for (const [previousIndex, previous] of attachments.entries()) {
-      if (previousIndex === index) break;
-      if (previous.spec.key !== attachment.spec.key) continue;
+      if (previousIndex === index) {
+        break;
+      }
+      if (previous.spec.key !== attachment.spec.key) {
+        continue;
+      }
       if (previous.spec !== attachment.spec) {
         return Result.fail(
           ValidationError.ConflictingSpecs({

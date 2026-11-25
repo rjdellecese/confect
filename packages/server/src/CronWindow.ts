@@ -1,3 +1,4 @@
+import { fromPrototype } from "./internal/fromPrototype";
 import type { Crons } from "convex/server";
 import * as Predicate from "effect/Predicate";
 
@@ -49,7 +50,7 @@ export const isCronWindow = (u: unknown): u is CronWindow =>
 
 const Proto = {
   [TypeId]: TypeId,
-};
+} satisfies Pick<CronWindow, TypeId>;
 
 /**
  * Creates a window that recurs every hour at a minute chosen by Convex.
@@ -59,7 +60,7 @@ const Proto = {
  * @returns An hourly window to pass to `CronJob.make`.
  */
 export const hourly = (): CronWindow =>
-  Object.assign(Object.create(Proto), { _tag: "Hourly" });
+  Object.assign(fromPrototype(Proto), { _tag: "Hourly" as const });
 
 /**
  * Creates a window that recurs during the specified UTC hour each day.
@@ -80,8 +81,8 @@ export const hourly = (): CronWindow =>
  * @returns A daily window whose minute is chosen by Convex.
  */
 export const daily = (options: { readonly hourUtc: number }): CronWindow =>
-  Object.assign(Object.create(Proto), {
-    _tag: "Daily",
+  Object.assign(fromPrototype(Proto), {
+    _tag: "Daily" as const,
     hourUtc: options.hourUtc,
   });
 
@@ -108,8 +109,8 @@ export const weekly = (options: {
   readonly dayOfWeek: DayOfWeek;
   readonly hourUtc: number;
 }): CronWindow =>
-  Object.assign(Object.create(Proto), {
-    _tag: "Weekly",
+  Object.assign(fromPrototype(Proto), {
+    _tag: "Weekly" as const,
     dayOfWeek: options.dayOfWeek,
     hourUtc: options.hourUtc,
   });
@@ -143,8 +144,8 @@ export const monthly = (options: {
   readonly day: number;
   readonly hourUtc: number;
 }): CronWindow =>
-  Object.assign(Object.create(Proto), {
-    _tag: "Monthly",
+  Object.assign(fromPrototype(Proto), {
+    _tag: "Monthly" as const,
     day: options.day,
     hourUtc: options.hourUtc,
   });

@@ -27,16 +27,23 @@ describe("OmitKey", () => {
 
   test("retains named fields beside an index signature", () => {
     type Remaining = OmitKey<
+      // oxlint-disable-next-line quality/no-unsafe-dictionary-type -- OmitKey must retain an unknown-valued index signature when a known field is removed.
       { [key: string]: unknown; required: string; removed: number },
       "removed"
     >;
     expectTypeOf<Remaining["required"]>().toEqualTypeOf<string>();
     expectTypeOf<Remaining["removed"]>().toBeUnknown();
-    expectTypeOf<{}>().not.toExtend<Remaining>();
+    expectTypeOf({}).not.toExtend<Remaining>();
   });
 });
 
 describe("IsOptional", () => {
+  test("a string index signature requires no particular key", () => {
+    expectTypeOf<
+      IsOptional<Record<string, string>, string>
+    >().toEqualTypeOf<true>();
+  });
+
   test("{ foo?: any } = true", () => {
     expectTypeOf<IsOptional<{ foo?: any }, "foo">>().toEqualTypeOf<true>();
   });
@@ -64,7 +71,8 @@ describe("IsAny", () => {
   });
 
   test("{} = false", () => {
-    expectTypeOf<IsAny<{}>>().toEqualTypeOf<false>();
+    const empty = {};
+    expectTypeOf<IsAny<typeof empty>>().toEqualTypeOf<false>();
   });
 });
 
@@ -83,7 +91,7 @@ describe("IsUnion", () => {
 
   test("string | number[] | { foo: boolean } = true", () => {
     expectTypeOf<
-      IsUnion<string | number[] | { foo: boolean }>
+      IsUnion<string | Array<number> | { foo: boolean }>
     >().toEqualTypeOf<true>();
   });
 
@@ -117,8 +125,8 @@ describe("DeepMutable", () => {
 
     test("{ readonly foo: readonly number[]; readonly bar: any  }", () => {
       expectTypeOf<
-        DeepMutable<{ readonly foo: readonly number[]; readonly bar: any }>
-      >().toEqualTypeOf<{ foo: number[]; bar: any }>();
+        DeepMutable<{ readonly foo: ReadonlyArray<number>; readonly bar: any }>
+      >().toEqualTypeOf<{ foo: Array<number>; bar: any }>();
     });
   });
 
@@ -136,7 +144,7 @@ describe("DeepMutable", () => {
 
   test("ReadonlyArray", () => {
     expectTypeOf<DeepMutable<ReadonlyArray<number>>>().toEqualTypeOf<
-      number[]
+      Array<number>
     >();
   });
 
@@ -154,9 +162,9 @@ describe("DeepMutable", () => {
 
   test("deep readonly object", () => {
     expectTypeOf<
-      DeepMutable<{ readonly foo: { readonly bar: readonly number[] } }>
+      DeepMutable<{ readonly foo: { readonly bar: ReadonlyArray<number> } }>
     >().toEqualTypeOf<{
-      foo: { bar: number[] };
+      foo: { bar: Array<number> };
     }>();
   });
 
@@ -241,10 +249,12 @@ describe("IsRecord", () => {
     });
 
     test("Record<string, any>", () => {
+      // oxlint-disable-next-line quality/no-unsafe-dictionary-type -- IsRecord classifies dictionary shapes independently of their any-valued entries.
       expectTypeOf<IsRecord<Record<string, any>>>().toEqualTypeOf<true>();
     });
 
     test("Record<string, unknown>", () => {
+      // oxlint-disable-next-line quality/no-unsafe-dictionary-type -- An unknown-valued string dictionary is itself an input case for IsRecord.
       expectTypeOf<IsRecord<Record<string, unknown>>>().toEqualTypeOf<true>();
     });
 
@@ -341,7 +351,7 @@ describe("IsRecord", () => {
     });
 
     test("string[]", () => {
-      expectTypeOf<IsRecord<string[]>>().toEqualTypeOf<false>();
+      expectTypeOf<IsRecord<Array<string>>>().toEqualTypeOf<false>();
     });
 
     test("Array<number>", () => {
@@ -375,7 +385,8 @@ describe("IsRecord", () => {
 
   describe("edge cases", () => {
     test("empty object {}", () => {
-      expectTypeOf<IsRecord<{}>>().toEqualTypeOf<false>();
+      const empty = {};
+      expectTypeOf<IsRecord<typeof empty>>().toEqualTypeOf<false>();
     });
 
     test("Record<string, string> & { extraProp: number }", () => {
@@ -410,10 +421,10 @@ describe("IsRecursive", () => {
     });
 
     test("readonly arrays and their additional properties", () => {
-      type Recursive = readonly Recursive[];
+      type Recursive = ReadonlyArray<Recursive>;
       expectTypeOf<IsRecursive<Recursive>>().toEqualTypeOf<true>();
       expectTypeOf<
-        IsRecursive<readonly string[] & { child: Recursive }>
+        IsRecursive<ReadonlyArray<string> & { child: Recursive }>
       >().toEqualTypeOf<true>();
     });
 
@@ -423,7 +434,7 @@ describe("IsRecursive", () => {
     });
 
     test("array union", () => {
-      type RecursiveArrayUnion = number | RecursiveArrayUnion[];
+      type RecursiveArrayUnion = number | Array<RecursiveArrayUnion>;
       expectTypeOf<IsRecursive<RecursiveArrayUnion>>().toEqualTypeOf<true>();
     });
 
@@ -443,7 +454,7 @@ describe("IsRecursive", () => {
         | number
         | boolean
         | null
-        | JSONValue[]
+        | Array<JSONValue>
         | { [key: string]: JSONValue };
       expectTypeOf<IsRecursive<JSONValue>>().toEqualTypeOf<true>();
     });
@@ -452,7 +463,7 @@ describe("IsRecursive", () => {
       type NestedUnionArray =
         | number
         | string
-        | NestedUnionArray[]
+        | Array<NestedUnionArray>
         | { data: NestedUnionArray };
       expectTypeOf<IsRecursive<NestedUnionArray>>().toEqualTypeOf<true>();
     });
@@ -461,7 +472,7 @@ describe("IsRecursive", () => {
       type TreeNode = {
         children: TreeChildren;
       };
-      type TreeChildren = TreeNode[];
+      type TreeChildren = Array<TreeNode>;
       expectTypeOf<IsRecursive<TreeNode>>().toEqualTypeOf<true>();
     });
 
@@ -514,12 +525,12 @@ describe("IsRecursive", () => {
     test("mutable arrays only traverse their elements", () => {
       type Recursive = { next: Recursive };
       expectTypeOf<
-        IsRecursive<string[] & { child: Recursive }>
+        IsRecursive<Array<string> & { child: Recursive }>
       >().toEqualTypeOf<false>();
     });
 
     test("nested arrays with any", () => {
-      expectTypeOf<IsRecursive<any[][]>>().toEqualTypeOf<false>();
+      expectTypeOf<IsRecursive<Array<Array<any>>>>().toEqualTypeOf<false>();
     });
 
     test("nested struct assignable to its parent", () => {
@@ -545,7 +556,7 @@ describe("IsRecursive", () => {
     });
 
     test("array union", () => {
-      type ArrayUnion = number | string[];
+      type ArrayUnion = number | Array<string>;
       expectTypeOf<IsRecursive<ArrayUnion>>().toEqualTypeOf<false>();
     });
 
@@ -567,8 +578,8 @@ describe("IsRecursive", () => {
     });
 
     test("empty object", () => {
-      type EmptyObject = {};
-      expectTypeOf<IsRecursive<EmptyObject>>().toEqualTypeOf<false>();
+      const empty = {};
+      expectTypeOf<IsRecursive<typeof empty>>().toEqualTypeOf<false>();
     });
 
     test("empty array", () => {
@@ -605,7 +616,7 @@ describe("IsRecursive", () => {
     test("complex object", () => {
       type Complex = {
         a: string;
-        b: number[];
+        b: Array<number>;
         c: { d: boolean };
         e: readonly [string, number];
         f: Map<string, Set<number>>;

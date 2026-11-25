@@ -17,7 +17,7 @@ import * as MutationTransactionContext from "@confect/server/MutationTransaction
 import * as Storage from "@confect/server/Storage";
 import type { StorageWriter } from "@confect/server/StorageWriter";
 import type { StorageActionWriter } from "@confect/server/StorageActionWriter";
-import type { GenericId } from "convex/values";
+import { GenericId } from "@confect/core/GenericId";
 import { FunctionSpec, GroupSpec, MiddlewareSpec } from "@confect/core";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
@@ -186,13 +186,14 @@ describe("implementation options", () => {
 
 describe("handler environment widening", () => {
   it("accepts handlers consuming a service provided by an attached middleware", () => {
-    FunctionImpl.make(coveredGroup, "viewerName", () =>
+    const implementation = FunctionImpl.make(coveredGroup, "viewerName", () =>
       Effect.gen(function* () {
         const viewer = yield* Viewer;
 
         return viewer.username;
       }),
     );
+    expect(Layer.isLayer(implementation)).toBe(true);
   });
 
   it("widens the handler environment with middleware provides exactly when attached", () => {
@@ -239,13 +240,14 @@ describe("cross-middleware requires", () => {
   }) {}
 
   it("lets an implementation consume its declared requires", () => {
-    boundMiddleware.make(NeedsViewer, (effect) =>
+    const implementation = boundMiddleware.make(NeedsViewer, (effect) =>
       Effect.gen(function* () {
         const viewer = yield* Viewer;
 
         return viewer.username.length > 0 ? yield* effect : yield* effect;
       }),
     );
+    expect(Layer.isLayer(implementation)).toBe(true);
   });
 
   it("rejects a group whose function middleware has unsatisfied requires", () => {
@@ -253,8 +255,9 @@ describe("cross-middleware requires", () => {
       viewerName.middleware(NeedsViewer),
     );
 
-    // @ts-expect-error—nothing covering viewerName provides Viewer
-    GroupImpl.make(unsatisfied);
+    expectTypeOf(unsatisfied).not.toExtend<
+      Parameters<typeof GroupImpl.make<typeof unsatisfied>>[0]
+    >();
   });
 
   it("accepts a group whose provider middleware covers the requirement", () => {
@@ -262,7 +265,8 @@ describe("cross-middleware requires", () => {
       .middleware(ProvideViewer)
       .addFunction(viewerName.middleware(NeedsViewer));
 
-    GroupImpl.make(satisfied);
+    const implementation = GroupImpl.make(satisfied);
+    expect(Layer.isLayer(implementation)).toBe(true);
   });
 });
 
@@ -363,12 +367,13 @@ describe("implementation service bounds", () => {
       },
     ) {}
 
-    boundMiddleware.make(Transactions, (effect) =>
+    const implementation = boundMiddleware.make(Transactions, (effect) =>
       Effect.flatMap(
         QueryTransactionContext.QueryTransactionContext,
         () => effect,
       ),
     );
+    expect(Layer.isLayer(implementation)).toBe(true);
     boundMiddleware.make(Everywhere, (effect) =>
       // @ts-expect-error All-function middleware cannot require transaction controls.
       Effect.flatMap(
@@ -417,7 +422,7 @@ describe("implementation service bounds", () => {
         functionTypes: { query: true, mutation: false, action: true },
       },
     ) {}
-    const id = "storage-id" as GenericId<"_storage">;
+    const id = GenericId("_storage").make("storage-id");
     const read = Effect.gen(function* () {
       const storage = yield* Storage.Storage;
       return yield* storage.getUrl(id).pipe(Effect.orDie);
@@ -654,11 +659,12 @@ describe("implementation service bounds", () => {
   });
 
   it("accepts a provides-sugar implementation within the bounds", () => {
-    boundMiddleware.provides(
+    const implementation = boundMiddleware.provides(
       ProvideViewer,
       Viewer,
       Effect.succeed({ username: "static" }),
     );
+    expect(Layer.isLayer(implementation)).toBe(true);
   });
 });
 
@@ -689,7 +695,13 @@ describe("group assembly enforcement", () => {
   it("throws at build time when a middleware implementation is missing", () => {
     const missingMiddleware = GroupImpl.make(coveredGroup).pipe(
       Layer.provide(viewerNameImpl),
-    ) as unknown as Layer.Layer<GroupImpl.GroupImpl<"Unfinalized">>;
+      Layer.provide(
+        Layer.succeed(
+          MiddlewareImpl.MiddlewareImpl({ middlewareKey: "ProvideViewer" }),
+          { middlewareKey: "ProvideViewer" },
+        ),
+      ),
+    );
 
     expect(() =>
       RegisteredFunctions.buildForGroup<typeof coveredGroup>(

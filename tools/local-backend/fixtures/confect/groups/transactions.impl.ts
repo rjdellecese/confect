@@ -33,7 +33,9 @@ const write = FunctionImpl.make(
         .table(transactionNotesTable)
         .insert({ caseId, value })
         .pipe(Effect.orDie);
-      if (fail) return yield* RejectedWrite.make({ value });
+      if (fail) {
+        return yield* RejectedWrite.make({ value });
+      }
       return null;
     }),
 );
@@ -46,8 +48,9 @@ const seed = FunctionImpl.make(transactionsSpec, "seed", ({ caseId, count }) =>
       .table(transactionNotesTable)
       .index("by_caseId", (q) => q.eq("caseId", caseId))
       .collect();
-    for (const note of notes)
+    for (const note of notes) {
       yield* writer.table(transactionNotesTable).delete(note._id);
+    }
     for (let i = 0; i < count; i++) {
       yield* writer
         .table(transactionNotesTable)

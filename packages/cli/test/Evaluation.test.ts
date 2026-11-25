@@ -31,9 +31,20 @@ import * as Project from "./integration/Project";
 vi.mock("node:child_process", (importOriginal) =>
   importOriginal<typeof ChildProcess>().then((original) => ({
     ...original,
-    fork: vi.fn(original.fork),
+    fork: vi.fn<typeof original.fork>(original.fork),
   })),
 );
+
+const expectWorkersExited = () => {
+  const workers = vi.mocked(fork).mock.results;
+  expect(workers.length).toBeGreaterThan(0);
+  for (const result of workers) {
+    assert(result.type === "return");
+    expect(
+      result.value.exitCode !== null || result.value.signalCode !== null,
+    ).toBe(true);
+  }
+};
 
 layer(NodeServices.layer, { excludeTestServices: true })("Evaluation", (it) => {
   const setup = Effect.gen(function* () {
@@ -54,17 +65,6 @@ layer(NodeServices.layer, { excludeTestServices: true })("Evaluation", (it) => {
     vi.mocked(fork).mockClear();
     return { ...project, provide };
   });
-
-  const expectWorkersExited = () => {
-    const workers = vi.mocked(fork).mock.results;
-    expect(workers.length).toBeGreaterThan(0);
-    for (const result of workers) {
-      assert(result.type === "return");
-      expect(
-        result.value.exitCode !== null || result.value.signalCode !== null,
-      ).toBe(true);
-    }
-  };
 
   it.effect.each([
     { level: "Debug", reason: "CompileFailure" },
@@ -88,7 +88,7 @@ layer(NodeServices.layer, { excludeTestServices: true })("Evaluation", (it) => {
           vi.importActual<typeof ChildProcess>("node:child_process"),
         );
         const closed = yield* Deferred.make<void>();
-        const output: string[] = [];
+        const output: Array<string> = [];
         vi.mocked(fork).mockImplementationOnce((filename) => {
           const child = original.fork(filename, {
             serialization: "advanced",
@@ -130,7 +130,7 @@ layer(NodeServices.layer, { excludeTestServices: true })("Evaluation", (it) => {
         }
         expectWorkersExited();
       }).pipe(Effect.scoped),
-    { timeout: 30000 },
+    { timeout: 30_000 },
   );
 
   it.effect(
@@ -209,7 +209,7 @@ layer(NodeServices.layer, { excludeTestServices: true })("Evaluation", (it) => {
         ).toEqual(["list"]);
         expectWorkersExited();
       }).pipe(Effect.scoped),
-    { timeout: 30000 },
+    { timeout: 30_000 },
   );
 
   it.effect(
@@ -243,7 +243,7 @@ layer(NodeServices.layer, { excludeTestServices: true })("Evaluation", (it) => {
         expect(Equal.equals(second, first)).toBe(true);
         expectWorkersExited();
       }).pipe(Effect.scoped),
-    { timeout: 30000 },
+    { timeout: 30_000 },
   );
 
   it.effect(
@@ -277,7 +277,7 @@ if (globalThis.__confectEvaluationCount !== 1) throw new Error("Evaluation leake
         yield* project.provide(Evaluation.validate(paths));
         expectWorkersExited();
       }).pipe(Effect.scoped),
-    { timeout: 30000 },
+    { timeout: 30_000 },
   );
 
   it.effect(
@@ -301,7 +301,7 @@ if (globalThis.__confectEvaluationCount !== 1) throw new Error("Evaluation leake
         yield* project.provide(Evaluation.validate(paths));
         expectWorkersExited();
       }).pipe(Effect.scoped),
-    { timeout: 30000 },
+    { timeout: 30_000 },
   );
 
   it.effect(
@@ -325,7 +325,7 @@ if (globalThis.__confectEvaluationCount !== 1) throw new Error("Evaluation leake
         yield* Fiber.interrupt(fiber);
         expectWorkersExited();
       }).pipe(Effect.scoped),
-    { timeout: 15000 },
+    { timeout: 15_000 },
   );
 
   it.effect(
@@ -362,6 +362,6 @@ if (globalThis.__confectEvaluationCount !== 1) throw new Error("Evaluation leake
         yield* Fiber.interrupt(fiber).pipe(Effect.timeout("10 seconds"));
         expectWorkersExited();
       }).pipe(Effect.scoped),
-    { timeout: 30000 },
+    { timeout: 30_000 },
   );
 });

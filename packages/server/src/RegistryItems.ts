@@ -12,6 +12,7 @@ import * as MiddlewareRegistryItem from "./MiddlewareRegistryItem";
  * @internal
  */
 export interface RegistryItems {
+  // oxlint-disable-next-line quality/no-unsafe-dictionary-type -- The registry deliberately exposes unclassified entries to readers. Function and middleware guards establish each entry's contract at lookup.
   readonly [key: string]: unknown;
 }
 

@@ -145,7 +145,7 @@ describe("make", () => {
       Ref.ConfectRef<
         RuntimeAndFunctionType.ConvexQuery,
         "internal",
-        {},
+        Record<never, never>,
         typeof FnReturns
       >
     >();
@@ -182,7 +182,7 @@ describe("make", () => {
       Ref.ConfectRef<
         RuntimeAndFunctionType.ConvexQuery,
         "internal",
-        {},
+        Record<never, never>,
         typeof FnReturns
       >
     >();
@@ -216,7 +216,7 @@ describe("make", () => {
       Ref.ConfectRef<
         RuntimeAndFunctionType.ConvexQuery,
         "public",
-        {},
+        Record<never, never>,
         typeof FnReturns
       >
     >();
@@ -227,7 +227,7 @@ describe("make", () => {
 
   it("turns a plain Convex spec into refs", () => {
     type ListQueryArgs = { tag: string };
-    type ListQueryReturns = string[];
+    type ListQueryReturns = Array<string>;
 
     const listSpec =
       FunctionSpec.convexPublicQuery<
@@ -313,7 +313,7 @@ describe("make", () => {
 
   it("mixes Confect and plain Convex specs", () => {
     type ConvexQueryArgs = { cursor: string };
-    type ConvexQueryReturns = string[];
+    type ConvexQueryReturns = Array<string>;
 
     const ConfectQueryArgs = { limit: Schema.Finite };
     type ConfectQueryArgs = Schema.Struct.Type<typeof ConfectQueryArgs>;
@@ -364,8 +364,47 @@ describe("make", () => {
 });
 
 describe("middleware error unions", () => {
+  it("preserves the declared codecs on a ref with middleware errors", () => {
+    class NotFound extends Schema.TaggedError<
+      NotFound,
+      { readonly brand: unique symbol }
+    >()("NotFound", {
+      id: Schema.String,
+    }) {}
+    class Blocked extends Schema.TaggedError<
+      Blocked,
+      { readonly brand: unique symbol }
+    >()("Blocked", {}) {}
+    class Gate extends MiddlewareSpec.MiddlewareSpec<Gate>()("Gate", {
+      error: () => Blocked,
+      functionTypes: { query: true, mutation: false, action: false },
+    }) {}
+    const get = FunctionSpec.publicQuery({
+      name: "get",
+      returns: () => Schema.FiniteFromString,
+      error: () => NotFound,
+    });
+    const notes = GroupSpec.make().middleware(Gate).addFunction(get);
+    const refs = Refs.make({
+      [Spec.TypeId]: { notes: GroupSpec.withName("notes", notes) },
+    });
+    const ref = refs.public.notes.get;
+    const encoded = Result.getOrThrow(Schema.encodeResult(ref.returns)(1));
+    expectTypeOf(encoded).toEqualTypeOf<string>();
+    expect(encoded).toBe("1");
+
+    expectTypeOf<Ref.Error<typeof ref>>().toEqualTypeOf<NotFound | Blocked>();
+    expectTypeOf<NonNullable<typeof ref.error>>().toEqualTypeOf<
+      typeof NotFound
+    >();
+    expect(ref.error).toBe(NotFound);
+  });
+
   it("adds them to Confect refs and keeps them off plain Convex refs", () => {
-    class Blocked extends Schema.TaggedError<Blocked, {}>()("Blocked", {}) {}
+    class Blocked extends Schema.TaggedError<
+      Blocked,
+      { readonly brand: unique symbol }
+    >()("Blocked", {}) {}
 
     class GateMutations extends MiddlewareSpec.MiddlewareSpec<GateMutations>()(
       "GateMutations",
@@ -385,7 +424,7 @@ describe("middleware error unions", () => {
       )
       .addFunction(
         FunctionSpec.convexPublicQuery<
-          RegisteredQuery<"public", { cursor: string }, Promise<string[]>>
+          RegisteredQuery<"public", { cursor: string }, Promise<Array<string>>>
         >()("search"),
       );
     const spec = {
@@ -396,15 +435,16 @@ describe("middleware error unions", () => {
     expectTypeOf<
       Ref.Error<typeof refs.public.mixed.update>
     >().toEqualTypeOf<Blocked>();
+    expectTypeOf(refs.public.mixed.update.error).toBeUndefined();
     expectTypeOf<Ref.Error<typeof refs.public.mixed.search>>().toBeNever();
   });
 });
 
 describe("make with middleware options", () => {
-  class AccessDenied extends Schema.TaggedError<AccessDenied, {}>()(
-    "AccessDenied",
-    {},
-  ) {}
+  class AccessDenied extends Schema.TaggedError<
+    AccessDenied,
+    { readonly brand: unique symbol }
+  >()("AccessDenied", {}) {}
 
   class RequireRole extends MiddlewareSpec.MiddlewareSpec<RequireRole>()(
     "RequireRole",

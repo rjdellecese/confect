@@ -94,12 +94,8 @@ const KeyCutOrder: Order.Order<KeyCut> = Order.make((self, that) => {
   // always full keys, so an `exact` cut is never the shorter one here.)
   const selfIsShorter = selfKeyValues.length < thatKeyValues.length;
   const shorter = selfIsShorter ? self : that;
-  const shorterOrdering = KeyCut.$match(shorter, {
-    Predecessor: () => -1 as const,
-    Exact: () => 1 as const,
-    Successor: () => 1 as const,
-  });
-  return selfIsShorter ? shorterOrdering : (-shorterOrdering as -1 | 1);
+  const shorterPrecedes = shorter._tag === "Predecessor";
+  return selfIsShorter === shorterPrecedes ? -1 : 1;
 });
 
 const lowerCut = (bound: KeyBound): KeyCut =>

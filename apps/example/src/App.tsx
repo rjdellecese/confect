@@ -18,8 +18,8 @@ import * as Option from "effect/Option";
 import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 import { pipe } from "effect/Function";
-import { useEffect, useState } from "react";
-import type { Id } from "../confect/_generated/id";
+import * as React from "react";
+import { Id } from "../confect/_generated/id";
 import refs from "../confect/_generated/refs";
 import { Api } from "../confect/http/NotesApi";
 
@@ -39,17 +39,17 @@ const App = () => {
 };
 
 const Page = () => {
-  const [note, setNote] = useState("");
+  const [note, setNote] = React.useState("");
   const insertNote = useMutation(refs.public.notes_and_random.notes.insert);
 
-  const [randomNumber, setRandomNumber] = useState<number | null>(null);
+  const [randomNumber, setRandomNumber] = React.useState<number | null>(null);
   const getRandom = useAction(refs.public.notes_and_random.random.getNumber);
 
-  const retrieveRandomNumber = () => {
+  const retrieveRandomNumber = React.useCallback(() => {
     void getRandom({}).then((n) => setRandomNumber(n));
-  };
+  }, [getRandom]);
 
-  const [emailStatus, setEmailStatus] = useState<string | null>(null);
+  const [emailStatus, setEmailStatus] = React.useState<string | null>(null);
   const sendEmail = useAction(refs.public.email.send);
 
   const testEmail = () => {
@@ -60,12 +60,10 @@ const Page = () => {
       body: "Test email body",
     })
       .then(() => setEmailStatus("Sent!"))
-      .catch((error) => setEmailStatus(`Error: ${String(error)}`));
+      .catch((error: unknown) => setEmailStatus(`Error: ${String(error)}`));
   };
 
-  useEffect(() => {
-    retrieveRandomNumber();
-  }, []);
+  React.useEffect(retrieveRandomNumber, [retrieveRandomNumber]);
 
   const envVar = useQuery(refs.public.env.readEnvVar, {});
 
@@ -139,9 +137,9 @@ const Page = () => {
 };
 
 const ViewerDemo = () => {
-  const [username, setUsername] = useState("");
-  const [viewerNote, setViewerNote] = useState("");
-  const [postStatus, setPostStatus] = useState<string | null>(null);
+  const [username, setUsername] = React.useState("");
+  const [viewerNote, setViewerNote] = React.useState("");
+  const [postStatus, setPostStatus] = React.useState<string | null>(null);
 
   // `whoAmI` is covered by the `RequireViewer` middleware: it provides the
   // current viewer to the handler, or fails with the typed `NotSignedIn`
@@ -205,9 +203,11 @@ const ViewerDemo = () => {
   );
 };
 
+const NoteId = Id("notes");
+
 const NoteLookup = () => {
-  const [input, setInput] = useState("");
-  const [noteId, setNoteId] = useState<Id<"notes"> | undefined>();
+  const [input, setInput] = React.useState("");
+  const [noteId, setNoteId] = React.useState<Id<"notes"> | undefined>();
 
   const lookup = useQuery(
     refs.public.notes_and_random.notes.getOrFail,
@@ -223,7 +223,14 @@ const NoteLookup = () => {
         placeholder="note id"
         style={{ fontFamily: "monospace" }}
       />
-      <button type="button" onClick={() => setNoteId(input as Id<"notes">)}>
+      <button
+        type="button"
+        onClick={() =>
+          setNoteId(
+            Schema.decodeUnknownResult(NoteId)(input).pipe(Result.getOrThrow),
+          )
+        }
+      >
         Look up
       </button>
       <div>
@@ -240,7 +247,7 @@ const NoteLookup = () => {
 };
 
 const WorkpoolDemo = () => {
-  const [jobs, setJobs] = useState<Array<WorkId>>([]);
+  const [jobs, setJobs] = React.useState<Array<WorkId>>([]);
   const enqueue = useMutation(refs.public.workpool.enqueue);
 
   const handleEnqueue = () => {
@@ -396,7 +403,7 @@ const PaginatedNoteList = () => {
 };
 
 const StreamFeed = () => {
-  const [text, setText] = useState("");
+  const [text, setText] = React.useState("");
   const insertAuthored = useMutation(
     refs.public.notes_and_random.notes.insertAuthored,
   );
@@ -407,12 +414,15 @@ const StreamFeed = () => {
     { initialNumItems: 3 },
   );
 
-  const post = (role: "admin" | "user", hidden?: boolean) =>
-    void insertAuthored({
+  const post = (role: "admin" | "user", hidden?: boolean) => {
+    const args = {
       text: text === "" ? `Hello from ${role}` : text,
       role,
-      ...(hidden === true ? { hidden } : {}),
-    }).then(() => setText(""));
+    };
+    void insertAuthored(hidden === true ? { ...args, hidden } : args).then(() =>
+      setText(""),
+    );
+  };
 
   return (
     <div>
@@ -467,16 +477,17 @@ const getFirst = ApiClient.pipe(
 );
 
 const HttpEndpoints = () => {
-  const [getResponse, setGetResponse] = useState<Exit.Exit<any, any> | null>(
-    null,
-  );
+  const [getResponse, setGetResponse] = React.useState<Exit.Exit<
+    Effect.Success<typeof getFirst>,
+    Effect.Error<typeof getFirst>
+  > | null>(null);
 
   return (
     <div>
       <button
         type="button"
         onClick={() =>
-          getFirst
+          void getFirst
             .pipe(Effect.provide(FetchHttpClient.layer), Effect.runPromiseExit)
             .then((exit) => setGetResponse(exit))
         }

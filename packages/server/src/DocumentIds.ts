@@ -142,6 +142,9 @@ type NativeReader<Name extends string> = Pick<
   "normalizeId" | "system"
 >;
 
+const isSystemTable = (name: string): name is DatabaseSchema.SystemTableNames =>
+  Record.has<string, unknown>(Table.systemTables, name);
+
 /**
  * @internal
  */
@@ -150,27 +153,21 @@ export const make = <const AppTableName extends string>(
   reader: NativeReader<NoInfer<AppTableName>>,
 ): DocumentIdsService<AppTableName> => {
   type AllTableNames = AppTableName | DatabaseSchema.SystemTableNames;
-  const normalize = <Name extends AllTableNames>(
+  const normalize = (table: AllTableNames, input: string) =>
+    isSystemTable(table)
+      ? reader.system.normalizeId(table, input)
+      : reader.normalizeId(table, input);
+  const isIdForTable = <Name extends AllTableNames>(
     table: Name,
     input: string,
-  ): GenericId<Name> | null =>
-    (Record.has<string, unknown>(Table.systemTables, table)
-      ? reader.system.normalizeId(
-          table as DatabaseSchema.SystemTableNames,
-          input,
-        )
-      : reader.normalizeId(
-          table as AppTableName,
-          input,
-        )) as GenericId<Name> | null;
+  ): input is GenericId<Name> => normalize(table, input) === input;
 
   return {
     parse: Effect.fn("DocumentIds.parse")(
       <const Name extends AllTableNames>(table: Name, input: string) =>
-        Effect.sync(() => {
-          const id = normalize(table, input);
-          return id === input ? Option.some(id) : Option.none();
-        }),
+        Effect.sync(() =>
+          isIdForTable(table, input) ? Option.some(input) : Option.none(),
+        ),
     ),
     identify: Effect.fn("DocumentIds.identify")((input: string) =>
       Effect.sync(() => {
@@ -178,9 +175,12 @@ export const make = <const AppTableName extends string>(
           tableNames,
           Struct.keys(Table.systemTables),
         )) {
-          const id = normalize(table, input);
-          if (id === input) {
-            return Option.some({ table, id } as IdentifiedId<AllTableNames>);
+          if (isIdForTable(table, input)) {
+            // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- identify returns a discriminated union: the preceding successful check brands this very ID with this very table, a correlation the loop cannot express.
+            return Option.some({
+              table,
+              id: input,
+            } as IdentifiedId<AllTableNames>);
           }
         }
         return Option.none();

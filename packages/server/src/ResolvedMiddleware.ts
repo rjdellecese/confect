@@ -45,7 +45,7 @@ export const resolve = (
   );
   return Array.map(
     functionRegistryItem.middlewareAttachments,
-    ({ spec: middlewareSpec, options }) => {
+    ({ spec: middlewareSpec, options }): ResolvedMiddleware => {
       const registered = middlewareRegistryItems.get(middlewareSpec.key);
       if (registered === undefined) {
         throw new Error(

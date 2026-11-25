@@ -1,10 +1,12 @@
 import {
-  type GenericActionCtx,
-  type HttpRouter as HttpRouter_,
   httpActionGeneric,
   httpRouter,
   ROUTABLE_HTTP_METHODS,
-  type RouteSpecWithPathPrefix,
+} from "convex/server";
+import type {
+  GenericActionCtx,
+  HttpRouter as HttpRouter_,
+  RouteSpecWithPathPrefix,
 } from "convex/server";
 import * as Array from "effect/Array";
 import * as Console from "effect/Console";
@@ -103,8 +105,8 @@ export type Routes<
   | Path.Path
   | HttpRouter.Request<"Requires", Services<DatabaseSchema_>>
   | HttpRouter.Request<"GlobalRequires", Services<DatabaseSchema_>>
-  | HttpRouter.Request<"Error", any>
-  | HttpRouter.Request<"GlobalError", any>
+  | HttpRouter.Request<"Error", unknown>
+  | HttpRouter.Request<"GlobalError", unknown>
 >;
 
 /**
@@ -154,6 +156,7 @@ export const make = <DatabaseSchema_ extends DatabaseSchema.AnyWithProps>(
     // The ctx-backed service layers are all synchronous and finalizer-free,
     // so the scope can close as soon as the context is built.
     const services = RegisteredFunction.actionLayer<DatabaseSchema_>(
+      // oxlint-disable-next-line quality/no-chained-type-assertions, typescript/no-unsafe-type-assertion -- Convex erases the data model in httpActionGeneric. The generated router binds that deployment's schema to the per-request context for typed vector search.
       ctx as unknown as GenericActionCtx<
         DataModel.ToConvexDataModel<
           DataModel.FromDatabaseSchema<DatabaseSchema_>

@@ -1,12 +1,12 @@
 import * as Layer from "effect/Layer";
 import type { StorageReader as ConvexStorageReader } from "convex/server";
-import type { GenericId } from "convex/values";
+import { GenericId } from "@confect/core/GenericId";
 import { describe, expect, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import { BlobNotFoundError } from "@confect/server/BlobNotFoundError";
 import { StorageReader } from "@confect/server/StorageReader";
 
-const storageId = "storage-id" as GenericId<"_storage">;
+const storageId = GenericId("_storage").make("storage-id");
 
 const blobUrl =
   "https://happy-animal-123.convex.cloud/api/storage/11111111-2222-3333-4444-555555555555";

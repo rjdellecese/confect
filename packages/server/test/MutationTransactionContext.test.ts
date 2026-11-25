@@ -3,11 +3,25 @@ import { FunctionSpec, Ref } from "@confect/core";
 import { MutationTransactionContext as BarrelControls } from "@confect/server";
 import * as MutationTransactionContext from "@confect/server/MutationTransactionContext";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
-import type { AdvancedRunQueryOptions, TransactionLimits } from "convex/server";
+import type {
+  GenericDataModel,
+  GenericMutationCtx,
+  DefaultFunctionArgs,
+  AdvancedRunQueryOptions,
+  TransactionLimits,
+} from "convex/server";
 import { ConvexError } from "convex/values";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import { vi } from "vitest";
+
+type NativeCall = (
+  ref: Parameters<
+    GenericMutationCtx<GenericDataModel>["runQuery" | "runMutation"]
+  >[0],
+  args?: DefaultFunctionArgs,
+  options?: AdvancedRunQueryOptions,
+) => Promise<string>;
 
 class NotFound extends Schema.TaggedError<
   NotFound,
@@ -37,8 +51,8 @@ describe("MutationTransactionContext", () => {
   it.effect(
     "runs queries and mutations lazily with codecs and the original receiver and options",
     () => {
-      const runQuery = vi.fn().mockResolvedValue("2");
-      const runMutation = vi.fn().mockResolvedValue("3");
+      const runQuery = vi.fn<NativeCall>().mockResolvedValue("2");
+      const runMutation = vi.fn<NativeCall>().mockResolvedValue("3");
       const ctx = { runQuery, runMutation };
       const layer = MutationTransactionContext.layer(ctx);
       expect(runQuery).not.toHaveBeenCalled();
@@ -121,7 +135,7 @@ describe("MutationTransactionContext", () => {
     (kind) => {
       const defect = new Error("offline");
       const native = vi
-        .fn()
+        .fn<NativeCall>()
         .mockRejectedValueOnce(new ConvexError({ _tag: "NotFound", id: "abc" }))
         .mockResolvedValueOnce("invalid")
         .mockRejectedValueOnce(defect);

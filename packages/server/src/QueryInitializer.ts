@@ -2,6 +2,7 @@ import type {
   OrderedQuery as ConvexOrderedQuery,
   QueryInitializer as ConvexQueryInitializer,
   DocumentByInfo,
+  GenericDocument,
   GenericTableIndexes,
   Indexes,
   IndexRange,
@@ -14,7 +15,7 @@ import type {
   SearchFilterBuilder,
   SearchIndexes,
 } from "convex/server";
-import type { GenericId } from "convex/values";
+import type { GenericId, Value } from "convex/values";
 import { identity, pipe } from "effect/Function";
 import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
@@ -277,7 +278,8 @@ export const make = <
   >,
   table: Table.WithName<Tables, TableName>,
 ): QueryInitializer<DataModel.FromTables<Tables>, TableName> => {
-  const tableName = table.tableName;
+  const named: { readonly tableName: TableName } = table;
+  const tableName = named.tableName;
   type DataModel_ = DataModel.FromTables<Tables>;
   type ConvexDataModel_ = DataModel.ToConvexDataModel<DataModel_>;
   type ThisQueryInitializer = QueryInitializer<DataModel_, TableName>;
@@ -300,19 +302,21 @@ export const make = <
     DataModel.DocumentWithName<DataModel_, TableName>,
     Document.DocumentDecodeError | GetByIndexFailure
   > => {
-    const indexFieldPaths: GenericTableIndexes[keyof GenericTableIndexes] = (
-      table.indexes as GenericTableIndexes
-    )[indexName as keyof GenericTableIndexes]!;
+    const indexFieldPaths: GenericTableIndexes[keyof GenericTableIndexes] =
+      table.indexes[String(indexName)];
 
     return pipe(
       Effect.promise(() =>
         convexDatabaseReader
           .query(tableName)
           .withIndex(indexName, (q) =>
-            Array.reduce(
-              indexFieldValues,
-              q,
-              (q_, v, i) => q_.eq(indexFieldPaths[i] as any, v as any) as any,
+            Array.reduce(indexFieldValues, q as IndexRange, (range, value, i) =>
+              // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- Convex's tuple-indexed builder changes type after each eq; another remaining equality field proves the current range still supports eq.
+              (range as IndexRangeBuilder<GenericDocument, Array<string>>).eq(
+                indexFieldPaths[i],
+                // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- get types these stored values positionally against the selected index. Iterating the field tuple loses that evidence, but performs no decoding.
+                value as Value,
+              ),
             ),
           )
           .unique(),
@@ -322,7 +326,7 @@ export const make = <
           Result.fromNullishOr(value, () =>
             GetByIndexFailure.make({
               tableName,
-              indexName: indexName as string,
+              indexName: String(indexName),
               indexFieldValues,
             }),
           ),
@@ -332,22 +336,19 @@ export const make = <
     );
   };
 
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- get promises distinct typed failures for ID and index lookups. One variadic implementation dispatches between those overloads by arity.
   const get: QueryInitializerFunction<"get"> = ((
     ...args: Parameters<QueryInitializerFunction<"get">>
   ) => {
     if (args.length === 1) {
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- A single argument is the ID lookup overload; Parameters of the overloaded get exposes only its final index signature.
       const id = args[0] as GenericId<TableName>;
 
       return getById<Tables, TableName>(convexDatabaseReader, table)(id);
     } else {
       const [indexName, ...indexFieldValues] = args;
 
-      return getByIndex(
-        indexName as keyof Indexes<
-          DataModel.TableInfoWithName<DataModel_, TableName>
-        >,
-        indexFieldValues,
-      );
+      return getByIndex(indexName, indexFieldValues);
     }
   }) as QueryInitializerFunction<"get">;
 
@@ -417,11 +418,15 @@ export const make = <
     return OrderedQuery.make(orderedQuery, table);
   };
 
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- The public overloads retain literal order and the unconsumed index-field tuple. The reflection builder constructs precisely that range at runtime.
   const stream: QueryInitializerFunction<"stream"> = ((
     indexName: string,
     indexRangeOrOrder?:
       | ((
-          q: QueryStreamIndexRange.Builder<any, any>,
+          q: QueryStreamIndexRange.Builder<
+            GenericDocument,
+            ReadonlyArray<string>
+          >,
         ) => QueryStreamIndexRange.QueryStreamIndexRange)
       | OrderDirection,
     maybeOrder?: OrderDirection,
@@ -461,7 +466,7 @@ export const make = <
             );
 
     return QueryStream.fromReflection({
-      reader: convexDatabaseReader as QueryStream.ReflectionReader,
+      reader: convexDatabaseReader,
       table,
       indexName,
       indexFieldPaths,
@@ -494,8 +499,11 @@ export const make = <
  */
 export const getById =
   <Tables extends Table.AnyWithProps, TableName extends Table.Name<Tables>>(
-    convexDatabaseReader: BaseDatabaseReader<
-      DataModel.ToConvexDataModel<DataModel.FromTables<Tables>>
+    convexDatabaseReader: Pick<
+      BaseDatabaseReader<
+        DataModel.ToConvexDataModel<DataModel.FromTables<Tables>>
+      >,
+      "get"
     >,
     table: Table.WithName<Tables, TableName>,
   ) =>
@@ -504,9 +512,10 @@ export const getById =
       Effect.promise(() => convexDatabaseReader.get(id)),
       Effect.andThen((value) =>
         Effect.fromResult(
-          Result.fromNullishOr(value, () =>
-            GetByIdFailure.make({ tableName: table.tableName, id }),
-          ),
+          Result.fromNullishOr(value, () => {
+            const bound: Table.Any = table;
+            return GetByIdFailure.make({ tableName: bound.tableName, id });
+          }),
         ),
       ),
       Effect.andThen(Document.decode(table)),
@@ -519,23 +528,23 @@ export const getById =
  *
  * @category Errors
  */
-export class GetByIdFailure extends Schema.TaggedError<GetByIdFailure, {}>()(
-  "GetByIdFailure",
-  {
-    /**
-     * The requested document ID.
-     *
-     * @category Getters
-     */
-    id: Schema.String,
-    /**
-     * The selected table's name.
-     *
-     * @category Getters
-     */
-    tableName: Schema.String,
-  },
-) {
+export class GetByIdFailure extends Schema.TaggedError<
+  GetByIdFailure,
+  { readonly brand: unique symbol }
+>()("GetByIdFailure", {
+  /**
+   * The requested document ID.
+   *
+   * @category Getters
+   */
+  id: Schema.String,
+  /**
+   * The selected table's name.
+   *
+   * @category Getters
+   */
+  tableName: Schema.String,
+}) {
   /**
    * Returns a message identifying the table and missing document ID.
    *
@@ -559,7 +568,7 @@ export class GetByIdFailure extends Schema.TaggedError<GetByIdFailure, {}>()(
  */
 export class GetByIndexFailure extends Schema.TaggedError<
   GetByIndexFailure,
-  {}
+  { readonly brand: unique symbol }
 >()("GetByIndexFailure", {
   /**
    * The selected table's name.
@@ -590,7 +599,7 @@ export class GetByIndexFailure extends Schema.TaggedError<
     const fieldValues = Result.getOrThrowWith(
       Schema.encodeResult(
         Schema.fromJsonString(Schema.Unknown, {
-          replacer: (_key, value) =>
+          replacer: (_key, value: unknown) =>
             typeof value === "bigint" ? value.toString() : value,
         }),
       )(this.indexFieldValues),

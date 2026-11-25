@@ -26,7 +26,7 @@ type PageSize = typeof PageSize.Type;
  */
 export class InvalidPageSizeError extends Schema.TaggedError<
   InvalidPageSizeError,
-  {}
+  { readonly brand: unique symbol }
 >()("InvalidPageSizeError", {
   /**
    * Page size rejected by `QueryStream.paginate`.
@@ -57,7 +57,7 @@ export class InvalidPageSizeError extends Schema.TaggedError<
  */
 export class EmptyInitialPageError extends Schema.TaggedError<
   EmptyInitialPageError,
-  {}
+  { readonly brand: unique symbol }
 >()("EmptyInitialPageError", {}) {
   /**
    * Returns a message explaining why the first page cannot have size zero.
@@ -75,9 +75,9 @@ export class EmptyInitialPageError extends Schema.TaggedError<
  * @internal
  */
 export type Range = Data.TaggedEnum<{
-  Unpinned: {};
+  Unpinned: Record<never, never>;
   ThroughKey: { readonly key: QueryStreamKey.Complete };
-  ThroughEnd: {};
+  ThroughEnd: Record<never, never>;
 }>;
 /**
  * @experimental
@@ -92,7 +92,7 @@ export const Range = Data.taggedEnum<Range>();
  * @internal
  */
 export type Start = Data.TaggedEnum<{
-  Beginning: {};
+  Beginning: Record<never, never>;
   After: {
     readonly key: QueryStreamKey.Complete;
     readonly cursor: string;
@@ -259,7 +259,7 @@ export const record = <Doc>(
  * @internal
  */
 export type Continuation = Data.TaggedEnum<{
-  End: {};
+  End: Record<never, never>;
   Key: { readonly key: QueryStreamKey.Complete };
 }>;
 const Continuation = Data.taggedEnum<Continuation>();
@@ -292,7 +292,7 @@ export type Outcome<Doc> = Data.TaggedEnum<{
  */
 export class UnsafePageBoundaryError extends Schema.TaggedError<
   UnsafePageBoundaryError,
-  {}
+  { readonly brand: unique symbol }
 >()("UnsafePageBoundaryError", {
   reason: Schema.Literals(["NoProgress", "NoInteriorSplit"]),
 }) {
@@ -311,7 +311,7 @@ export class UnsafePageBoundaryError extends Schema.TaggedError<
   }
 }
 
-const SOFT_MAX_SCAN_LENGTH = 16000;
+const SOFT_MAX_SCAN_LENGTH = 16_000;
 
 /**
  * Decide the page result without reading a stream or serializing a cursor.
@@ -349,13 +349,14 @@ export const finish = <Doc>(
           );
         }
         const key = Chunk.lastNonEmpty(scanned);
-        if (readLimit)
+        if (readLimit) {
           return Result.succeed({
             _tag: "SplitRequired",
             page,
             continuation: Continuation.Key({ key }),
             splitKey,
           });
+        }
         return Result.succeed(
           Chunk.size(scanned) >= SOFT_MAX_SCAN_LENGTH
             ? {

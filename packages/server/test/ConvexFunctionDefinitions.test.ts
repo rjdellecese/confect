@@ -3,13 +3,14 @@ import * as ConvexFunctionDefinitions from "@confect/server/ConvexFunctionDefini
 import * as RegisteredConvexFunction from "@confect/server/RegisteredConvexFunction";
 import type * as DataModel from "@confect/server/DataModel";
 import { FunctionSpec, GroupSpec } from "@confect/core";
-import { type DatabaseSchema, FunctionImpl, GroupImpl } from "@confect/server";
+import { FunctionImpl, GroupImpl } from "@confect/server";
+import type { DatabaseSchema } from "@confect/server";
 import { assert, expect, expectTypeOf, it } from "@effect/vitest";
-import {
-  queryGeneric,
-  type GenericQueryCtx,
-  type GenericMutationCtx,
-  type GenericActionCtx,
+import { queryGeneric } from "convex/server";
+import type {
+  GenericQueryCtx,
+  GenericMutationCtx,
+  GenericActionCtx,
 } from "convex/server";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";

@@ -1,4 +1,4 @@
-import type { Predicate } from "effect";
+import * as Predicate from "effect/Predicate";
 import { describe, expect, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as Ref from "effect/Ref";
@@ -12,7 +12,7 @@ type NestedObject<T> = {
 };
 
 interface BranchLeaves<T> {
-  readonly path: string[];
+  readonly path: Array<string>;
   readonly values: Record<string, T>;
 }
 
@@ -128,9 +128,6 @@ describe("setNestedProperty", () => {
 });
 
 describe("forEachBranchLeaves", () => {
-  const isString = (value: unknown): value is string =>
-    typeof value === "string";
-
   describe("basic functionality", () => {
     it.effect("processes leaves at a single branch", () =>
       Effect.gen(function* () {
@@ -141,7 +138,7 @@ describe("forEachBranchLeaves", () => {
               leaf2: "value2",
             },
           },
-          isString,
+          Predicate.isString,
         );
 
         expect(results).toHaveLength(1);
@@ -165,7 +162,7 @@ describe("forEachBranchLeaves", () => {
               leaf4: "d",
             },
           },
-          isString,
+          Predicate.isString,
         );
 
         expect(results).toHaveLength(2);
@@ -191,7 +188,7 @@ describe("forEachBranchLeaves", () => {
               },
             },
           },
-          isString,
+          Predicate.isString,
         );
 
         expect(results).toHaveLength(1);
@@ -206,9 +203,6 @@ describe("forEachBranchLeaves", () => {
   describe("filtering with refinement", () => {
     it.effect("only processes values matching the refinement", () =>
       Effect.gen(function* () {
-        const isNumber = (value: unknown): value is number =>
-          typeof value === "number";
-
         const results = yield* collectLeaves(
           {
             branch: {
@@ -217,7 +211,7 @@ describe("forEachBranchLeaves", () => {
               num2: 100,
             },
           },
-          isNumber,
+          Predicate.isNumber,
         );
 
         expect(results).toHaveLength(1);
@@ -233,7 +227,7 @@ describe("forEachBranchLeaves", () => {
   describe("edge cases", () => {
     it.effect("handles empty objects", () =>
       Effect.gen(function* () {
-        const results = yield* collectLeaves({}, isString);
+        const results = yield* collectLeaves({}, Predicate.isString);
 
         expect(results).toHaveLength(0);
       }),
@@ -249,7 +243,7 @@ describe("forEachBranchLeaves", () => {
               },
             },
           },
-          isString,
+          Predicate.isString,
         );
 
         expect(results).toHaveLength(0);
@@ -267,7 +261,7 @@ describe("forEachBranchLeaves", () => {
               },
             },
           },
-          isString,
+          Predicate.isString,
         );
 
         expect(results).toHaveLength(2);
@@ -294,7 +288,7 @@ describe("forEachBranchLeaves", () => {
             b: { y: "2" },
             c: { z: "3" },
           },
-          isString,
+          Predicate.isString,
           () => Ref.update(count, (value) => value + 1),
         );
 
@@ -311,7 +305,7 @@ describe("forEachBranchLeaves", () => {
               leaf: "value",
             },
           },
-          isString,
+          Predicate.isString,
           () => Effect.fail("test error"),
         );
 
@@ -328,7 +322,7 @@ describe("forEachBranchLeaves", () => {
               leaf: "value",
             },
           },
-          isString,
+          Predicate.isString,
           () => Effect.void,
         );
 

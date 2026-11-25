@@ -82,11 +82,12 @@ test("discovers only published packages with readable valid manifests", () =>
       ] as const) {
         const directory = path.join(root, name);
         yield* fs.makeDirectory(directory);
-        if (manifest !== undefined)
+        if (manifest !== undefined) {
           yield* fs.writeFileString(
             path.join(directory, "package.json"),
             manifest,
           );
+        }
       }
       yield* fs.writeFileString(path.join(root, "not-a-directory"), "ignored");
       const packages = yield* publishedPackages(root);
@@ -141,5 +142,5 @@ test(
         expect(packError._tag).toBe("NpmPackError");
       }).pipe(Effect.scoped),
     ),
-  20000,
+  20_000,
 );

@@ -96,8 +96,8 @@ describe("runHandlerPromise", () => {
   it.effect("keeps the captured console across overlapping invocations", () =>
     Effect.gen(function* () {
       const original = globalThis.console;
-      const first = { ...original, info: vi.fn() };
-      const second = { ...original, info: vi.fn() };
+      const first = { ...original, info: vi.fn<typeof original.info>() };
+      const second = { ...original, info: vi.fn<typeof original.info>() };
       const release = yield* Deferred.make<void>();
       const run = RegisteredFunction.runHandlerPromise(undefined);
       yield* Effect.promise(() => {
@@ -128,8 +128,16 @@ describe("runHandlerPromise", () => {
       Effect.gen(function* () {
         const original = globalThis.console;
         Context.get(Context.empty(), Console.Console);
-        const first = { ...original, info: vi.fn(), log: vi.fn() };
-        const second = { ...original, info: vi.fn(), log: vi.fn() };
+        const first = {
+          ...original,
+          info: vi.fn<typeof original.info>(),
+          log: vi.fn<typeof original.log>(),
+        };
+        const second = {
+          ...original,
+          info: vi.fn<typeof original.info>(),
+          log: vi.fn<typeof original.log>(),
+        };
         const run = RegisteredFunction.runHandlerPromise(undefined);
         yield* Effect.promise(() => {
           globalThis.console = first;
@@ -159,8 +167,8 @@ describe("runHandlerPromise", () => {
       Effect.gen(function* () {
         const console = {
           ...(yield* TestConsole.make),
-          debug: vi.fn(),
-          info: vi.fn(),
+          debug: vi.fn<Console.Console["debug"]>(),
+          info: vi.fn<Console.Console["info"]>(),
         };
         const run = RegisteredFunction.runHandlerPromise(undefined);
         const loggers = yield* Effect.promise(() =>
@@ -181,7 +189,7 @@ describe("runHandlerPromise", () => {
           expect.objectContaining({ message: "visible" }),
         );
 
-        const custom = vi.fn();
+        const custom = vi.fn<Logger.Logger<unknown, void>["log"]>();
         yield* Effect.promise(() =>
           run(
             Effect.logInfo("custom").pipe(
@@ -204,8 +212,8 @@ describe("toConvexDefinition", () => {
     const args = { text: v.string() };
     const returns = v.array(v.string());
     const prepared = {
-      args: vi.fn(() => args),
-      returns: vi.fn(() => returns),
+      args: vi.fn<() => typeof args>(() => args),
+      returns: vi.fn<() => typeof returns>(() => returns),
       handler: (text: string) => [text],
     };
     const definition = RegisteredFunction.toConvexDefinition(prepared);
@@ -247,10 +255,10 @@ describe("toConvexDefinition", () => {
   it("propagates a compiler failure only when its validator is requested", () => {
     const failure = UnsupportedSchemaTypeError.make({ schemaType: "Symbol" });
     const prepared = {
-      args: vi.fn(() => {
+      args: vi.fn<() => never>(() => {
         throw failure;
       }),
-      returns: vi.fn(() => v.null()),
+      returns: vi.fn<typeof v.null>(() => v.null()),
       handler: () => null,
     };
     const definition = RegisteredFunction.toConvexDefinition(prepared);

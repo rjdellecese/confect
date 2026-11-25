@@ -1,7 +1,7 @@
 # Confect Oxlint rules
 
 This private workspace package registers the `confect` JavaScript plugin loaded
-by the root `.oxlintrc.json`.
+by the root `oxlint.config.ts`.
 
 ## `no-schema-codec-wrappers`
 

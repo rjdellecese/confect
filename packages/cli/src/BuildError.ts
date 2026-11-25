@@ -1,6 +1,6 @@
-import * as Array from "effect/Array";
 import * as Schema from "effect/Schema";
-import type * as esbuild from "esbuild";
+import * as Predicate from "effect/Predicate";
+import * as Array from "effect/Array";
 
 // --- Variants ---
 
@@ -40,16 +40,11 @@ export class BundlerError extends Schema.TaggedError<
   cause: Schema.Unknown,
 }) {}
 
-const isEsbuildBuildFailure = (error: unknown): error is esbuild.BuildFailure =>
-  typeof error === "object" &&
-  error !== null &&
-  "errors" in error &&
-  Array.isArray((error as esbuild.BuildFailure).errors);
-
 export const fromBundlerError = (
   file: string,
   error: BundlerError,
 ): BuildError =>
-  isEsbuildBuildFailure(error.cause)
+  Predicate.hasProperty(error.cause, "errors") &&
+  Array.isArray(error.cause.errors)
     ? BundleFailedError.make({ file, errors: error.cause.errors })
     : ImportFailedError.make({ file, cause: error.cause });

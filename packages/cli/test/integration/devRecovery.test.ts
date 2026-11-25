@@ -39,7 +39,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           const current3 = yield* Ref.get(watching.output);
           expect(current3).not.toContain("Optional runtime must not execute");
         }).pipe(Effect.scoped),
-      { timeout: 30000 },
+      { timeout: 30_000 },
     );
 
     it.effect(
@@ -67,7 +67,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           yield* project.write("confect/notes.impl.ts", Project.impl);
           yield* watching.waitFor(success);
         }).pipe(Effect.scoped),
-      { timeout: 30000 },
+      { timeout: 30_000 },
     );
 
     it.effect.each([
@@ -129,7 +129,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           );
           expect(actual3).toBe(true);
         }).pipe(Effect.scoped),
-      { timeout: 30000 },
+      { timeout: 30_000 },
     );
 
     it.effect(
@@ -149,7 +149,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           yield* project.write("confect/tables/notes.ts", Project.table);
           yield* watching.waitFor(success);
         }).pipe(Effect.scoped),
-      { timeout: 30000 },
+      { timeout: 30_000 },
     );
 
     it.effect(
@@ -178,7 +178,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           yield* fs.remove(path.join(project.root, "confect/schema.ts"));
           yield* watching.waitFor(success);
         }).pipe(Effect.scoped),
-      { timeout: 30000 },
+      { timeout: 30_000 },
     );
 
     it.effect.each(["immediately", "after watcher startup"] as const)(
@@ -209,7 +209,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           yield* project.write("confect/notes.impl.ts", Project.emptyImpl);
           yield* watching.waitFor(success);
         }).pipe(Effect.scoped),
-      { timeout: 30000 },
+      { timeout: 30_000 },
     );
 
     it.effect(
@@ -254,7 +254,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           const current11 = yield* Ref.get(watching.output);
           expect(current11).toBe(settled);
         }).pipe(Effect.scoped),
-      { timeout: 30000 },
+      { timeout: 30_000 },
     );
   },
 );

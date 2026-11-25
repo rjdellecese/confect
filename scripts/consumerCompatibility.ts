@@ -38,15 +38,21 @@ export type Profile = keyof typeof profiles;
 export type Lane = "baseline" | "fresh";
 export type Manager = "npm" | "pnpm";
 
-export const consumerDependencies = (profile: Profile, lane: Lane) => ({
-  effect: lane === "baseline" ? "4.1.0" : "~4.1.0",
-  convex: lane === "baseline" ? "1.48.0" : "^1.48.0",
-  "@effect/platform-node": lane === "baseline" ? "4.1.0" : "~4.1.0",
-  ...(lane === "baseline" ? { "@effect/platform-node-shared": "4.1.0" } : {}),
-  ...(lane === "baseline"
-    ? profiles[profile].baseline
-    : profiles[profile].hosts),
-});
+export const consumerDependencies = (profile: Profile, lane: Lane) =>
+  lane === "baseline"
+    ? {
+        effect: "4.1.0",
+        convex: "1.48.0",
+        "@effect/platform-node": "4.1.0",
+        "@effect/platform-node-shared": "4.1.0",
+        ...profiles[profile].baseline,
+      }
+    : {
+        effect: "~4.1.0",
+        convex: "^1.48.0",
+        "@effect/platform-node": "~4.1.0",
+        ...profiles[profile].hosts,
+      };
 
 export interface InstalledPackage {
   readonly path: string;
@@ -83,7 +89,7 @@ export const provenanceProblems = (
 
 export class ConsumerGateFailure extends Schema.TaggedError<
   ConsumerGateFailure,
-  {}
+  { readonly brand: unique symbol }
 >()("ConsumerGateFailure", { phase: Schema.String, details: Schema.Unknown }) {}
 
 export interface GraphProblem {
@@ -153,8 +159,9 @@ export const graphProblems = (
       if (
         peer === undefined &&
         manifest.peerDependenciesMeta?.[name]?.optional === true
-      )
+      ) {
         continue;
+      }
       if (
         peer === undefined ||
         !Bun.semver.satisfies(peer.manifest.version, range)
@@ -222,8 +229,9 @@ export const packedManifestProblems = (
   versions: Readonly<Record<string, string>>,
 ): ReadonlyArray<string> => {
   const problems: Array<string> = [];
-  if (source.name !== packed.name || source.version !== packed.version)
+  if (source.name !== packed.name || source.version !== packed.version) {
     problems.push("Packed identity differs from source");
+  }
   for (const field of [
     "dependencies",
     "peerDependencies",
@@ -234,14 +242,16 @@ export const packedManifestProblems = (
       if (
         Str.startsWith("workspace:")(expected) ||
         packed[field]?.[name] !== expected
-      )
+      ) {
         problems.push(
           `${field}.${name}: expected ${expected}, got ${packed[field]?.[name]}`,
         );
+      }
     }
     for (const name of Record.keys(packed[field] ?? {})) {
-      if (!(name in (source[field] ?? {})))
+      if (!(name in (source[field] ?? {}))) {
         problems.push(`Unexpected ${field}.${name}`);
+      }
     }
   }
   return problems;

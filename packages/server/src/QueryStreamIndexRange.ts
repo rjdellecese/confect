@@ -141,20 +141,25 @@ export interface LowerBoundedBuilder<
   ) => QueryStreamIndexRange<FieldPaths>;
 }
 
-const make = (constraints: Constraints): QueryStreamIndexRange => ({
+const make = <FieldPaths extends ReadonlyArray<string>>(
+  constraints: Constraints,
+): QueryStreamIndexRange<FieldPaths> => ({
   [TypeId]: {
     ...constraints,
-    _Remaining: identity as Types.Covariant<ReadonlyArray<string>>,
+    _Remaining: identity,
   },
 });
 
-const makeBuilder = (
+const makeBuilder = <
+  ConvexDoc extends GenericDocument,
+  FieldPaths extends ReadonlyArray<string>,
+>(
   equalities: ReadonlyArray<Equality>,
-): Builder<GenericDocument, ReadonlyArray<string>> => {
+): Builder<ConvexDoc, FieldPaths> => {
   const upper =
     (inclusive: boolean) =>
     (fieldPath: string, value: QueryStreamKeyValues.KeyValue) =>
-      make({
+      make<FieldPaths>({
         equalities,
         bounded: Option.some({
           fieldPath,
@@ -166,12 +171,12 @@ const makeBuilder = (
     (
       fieldPath: string,
       value: QueryStreamKeyValues.KeyValue,
-    ): LowerBoundedBuilder<GenericDocument, ReadonlyArray<string>> => {
+    ): LowerBoundedBuilder<ConvexDoc, FieldPaths> => {
       const endpoint = { value, inclusive };
       const finish =
         (upperInclusive: boolean) =>
         (_fieldPath: string, upperValue: QueryStreamKeyValues.KeyValue) =>
-          make({
+          make<FieldPaths>({
             equalities,
             bounded: Option.some({
               fieldPath,
@@ -182,7 +187,7 @@ const makeBuilder = (
             }),
           });
       return {
-        ...make({
+        ...make<FieldPaths>({
           equalities,
           bounded: Option.some({
             fieldPath,
@@ -194,9 +199,11 @@ const makeBuilder = (
       };
     };
   return {
-    ...make({ equalities, bounded: Option.none() }),
+    ...make<FieldPaths>({ equalities, bounded: Option.none() }),
     eq: (fieldPath, value) =>
-      makeBuilder(Array.append(equalities, { fieldPath, value })),
+      makeBuilder<ConvexDoc, Tail<FieldPaths>>(
+        Array.append(equalities, { fieldPath, value }),
+      ),
     gt: lower(false),
     gte: lower(true),
     lt: upper(false),
@@ -214,8 +221,7 @@ const makeBuilder = (
 export const builder = <
   ConvexDoc extends GenericDocument,
   FieldPaths extends ReadonlyArray<string>,
->(): Builder<ConvexDoc, FieldPaths> =>
-  makeBuilder([]) as unknown as Builder<ConvexDoc, FieldPaths>;
+>(): Builder<ConvexDoc, FieldPaths> => makeBuilder([]);
 
 /**
  * Number of index fields pinned by equality constraints.
@@ -262,7 +268,7 @@ interface ConvexRangeBuilder extends ConvexUpperBoundBuilder {
  */
 export const apply = (
   self: QueryStreamIndexRange,
-  q: ConvexIndexRangeBuilder<GenericDocument, string[]>,
+  q: ConvexIndexRangeBuilder<GenericDocument, Array<string>>,
 ): ConvexIndexRange => {
   const { equalities, bounded } = self[TypeId];
   // Convex tracks equality progress through a static field tuple. These paths
@@ -270,6 +276,7 @@ export const apply = (
   // supports further equality calls, even when the SDK type has lost the tuple.
   const prefix = Array.reduce(
     equalities,
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- apply accepts dynamically named fields; the SDK types eq on string[] as terminal, even before all equality fields have been applied.
     q as ConvexRangeBuilder,
     (target, { fieldPath, value }) => target.eq(fieldPath, value),
   );

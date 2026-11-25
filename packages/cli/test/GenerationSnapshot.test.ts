@@ -105,26 +105,31 @@ const metadataGroup = (
   groups,
 });
 
+const makeFields = () => Schema.Struct({ title: Schema.String });
+
+const makeArgs = () => ({ title: Schema.String });
+
+const makeSnapshot = (
+  options: Pick<GenerationSnapshot.GroupTree, "experimental_reuseContext"> = {},
+) =>
+  Result.getOrThrow(
+    GenerationSnapshot.parse([
+      [
+        "notes.spec.ts",
+        {
+          runtime: "Convex",
+          functionNames: ["list"],
+          groups: { child: metadataGroup(["list"]) },
+          ...options,
+        },
+      ],
+    ]),
+  );
+
 describe("GenerationSnapshot parsing", () => {
   test("roundtrips context reuse and detects flag-only changes without inheriting them", () => {
-    const makeSnapshot = (enabled?: boolean) =>
-      Result.getOrThrow(
-        GenerationSnapshot.parse([
-          [
-            "notes.spec.ts",
-            {
-              runtime: "Convex",
-              functionNames: ["list"],
-              groups: { child: metadataGroup(["list"]) },
-              ...(enabled === undefined
-                ? {}
-                : { experimental_reuseContext: enabled }),
-            },
-          ],
-        ]),
-      );
     const before = makeSnapshot();
-    const after = roundtrip(makeSnapshot(true));
+    const after = roundtrip(makeSnapshot({ experimental_reuseContext: true }));
     expect(getLeaf(after, "notes.spec.ts").experimental_reuseContext).toBe(
       true,
     );
@@ -146,7 +151,12 @@ describe("GenerationSnapshot parsing", () => {
         functionNames: ["list"],
       },
     ]);
-    expect(GenerationSnapshot.diff(before, makeSnapshot(false))).toEqual({
+    expect(
+      GenerationSnapshot.diff(
+        before,
+        makeSnapshot({ experimental_reuseContext: false }),
+      ),
+    ).toEqual({
       removed: [],
       changed: [],
     });
@@ -221,7 +231,7 @@ describe("GenerationSnapshot parsing", () => {
         "notes//child.spec.ts",
         "notes/./child.spec.ts",
         "notes/../child.spec.ts",
-        "notes\\child.spec.ts",
+        String.raw`notes\child.spec.ts`,
         "C:notes.spec.ts",
         "C:/notes.spec.ts",
         "notes\0.spec.ts",
@@ -435,11 +445,11 @@ layer(Layer.merge(baseLayer, NodePath.layerPosix))(
       "roundtrips only metadata without forcing schemas or changing inputs",
       () =>
         Effect.gen(function* () {
-          const fields = vi.fn(() => Schema.Struct({ title: Schema.String }));
+          const fields = vi.fn<typeof makeFields>(makeFields);
           const table = Table.make(fields)("notes");
-          const args = vi.fn(() => ({ title: Schema.String }));
-          const returns = vi.fn(() => table.Doc);
-          const error = vi.fn(() => Schema.String);
+          const args = vi.fn<typeof makeArgs>(makeArgs);
+          const returns = vi.fn<() => typeof table.Doc>(() => table.Doc);
+          const error = vi.fn<() => typeof Schema.String>(() => Schema.String);
           const fn = FunctionSpec.publicQuery({
             name: "zebra",
             args,
@@ -528,8 +538,9 @@ layer(Layer.merge(baseLayer, NodePath.layerPosix))(
           expect(spec.name).toBe("notTheFilesystemName");
           expect(empty.name).toBe("originalEmpty");
           expect(node.name).toBe("originalNode");
-          for (const thunk of [fields, args, returns, error])
+          for (const thunk of [fields, args, returns, error]) {
             expect(thunk).not.toHaveBeenCalled();
+          }
         }),
     );
 

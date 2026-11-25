@@ -17,7 +17,7 @@ import * as HttpClientRequest from "effect/http/HttpClientRequest";
  */
 export class AiGatewayDisabled extends Schema.TaggedError<
   AiGatewayDisabled,
-  {}
+  { readonly brand: unique symbol }
 >()("AiGatewayDisabled", {}) {
   /**
    * Returns guidance for restoring the team's gateway access.
@@ -39,7 +39,7 @@ export class AiGatewayDisabled extends Schema.TaggedError<
  */
 export class AiGatewayUnavailable extends Schema.TaggedError<
   AiGatewayUnavailable,
-  {}
+  { readonly brand: unique symbol }
 >()("AiGatewayUnavailable", {}) {
   /**
    * Returns the local deployment requirements and an alternative for

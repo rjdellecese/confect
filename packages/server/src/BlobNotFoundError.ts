@@ -13,7 +13,7 @@ import * as Schema from "effect/Schema";
  */
 export class BlobNotFoundError extends Schema.TaggedError<
   BlobNotFoundError,
-  {}
+  { readonly brand: unique symbol }
 >()("BlobNotFoundError", {
   /**
    * Storage ID supplied to the operation that failed.

@@ -183,6 +183,9 @@ importers:
       '@changesets/config':
         specifier: 4.0.1
         version: 4.0.1
+      '@cloudflare/oxlint-config':
+        specifier: 0.2.0
+        version: 0.2.0(eslint@10.10.0(jiti@1.21.7)(supports-color@10.2.2))(oxlint@1.94.0(vite-plus@1.7.0(@types/node@26.6.6)(@vitest/coverage-v8@5.1.0)(@vitest/ui@5.1.0)(esbuild@0.28.2)(happy-dom@21.0.4)(jiti@1.21.7)(tsx@4.23.15)(typescript@5.9.3)(unrun@0.3.1)(yaml@2.9.0)))(tsrs@7.1.0-beta.tsrs3)(vite-plus@1.7.0(@types/node@26.6.6)(@vitest/coverage-v8@5.1.0)(@vitest/ui@5.1.0)(esbuild@0.28.2)(happy-dom@21.0.4)(jiti@1.21.7)(tsx@4.23.15)(typescript@5.9.3)(unrun@0.3.1)(yaml@2.9.0))
       '@effect/platform-bun':
         specifier: 4.1.0
         version: 4.1.0(effect@4.1.0)
@@ -990,6 +993,21 @@ packages:
   '@clack/prompts@1.7.0':
     resolution: {integrity: sha512-y7/yvZ2TPAnR9+jnc00klvNNLkJiXFFrQA/hlLCcxA9a2A4zQIOimyFQ9XfwYKiGD1fb5GY8vbKIIgO8d5Tb2A==}
     engines: {node: '>= 20.12.0'}
+
+  '@cloudflare/oxlint-config@0.2.0':
+    resolution: {integrity: sha512-HENc8yIzCuIPvUyQbX47UKv2kgA26iZt1XRsrlQXayJG6cWmBNlnHXfPy7oNCghqWpTBcbFRdGwsHd1Ahe3zhw==}
+    engines: {node: ^22.18.0 || >=24.0.0}
+    peerDependencies:
+      oxlint: ^1.94.0
+      tsrs: '>=7.1.0-beta.tsrs2'
+      vite-plus: '>=1.7.0'
+    peerDependenciesMeta:
+      oxlint:
+        optional: true
+      tsrs:
+        optional: true
+      vite-plus:
+        optional: true
 
   '@convex-dev/batch-worker@0.3.6':
     resolution: {integrity: sha512-tR+9DaHR3jG3oqkIFX0ok/6944h7UHEQgT6HTmiuxU+lERYuYMsxA2IWwFD5yTFbCpO3YJhqXU4QdGY90sgUqQ==}
@@ -1925,6 +1943,31 @@ packages:
     peerDependencies:
       '@emnapi/core': ^1.7.1 || 2.0.0-beta.2
       '@emnapi/runtime': ^1.7.1 || 2.0.0-beta.2
+
+  '@nkzw/eslint-plugin@3.0.0':
+    resolution: {integrity: sha512-J6Ms/OzUxx7BNBggCKOqFWbESgAJYjvXvekCjjpxVJA2fBv5xOsC5P+2WDYqQUMCvDOU3GxBgG/jrmbqf+/wQA==}
+    peerDependencies:
+      eslint: '>= 9'
+    peerDependenciesMeta:
+      eslint:
+        optional: true
+
+  '@nkzw/oxlint-config@4.1.0':
+    resolution: {integrity: sha512-uFJxSqD8LPGe+uYVh+EC9BwndUGr3h7+aHQhKcdUANNSV4c1vvRoOqqHUTlML5RnHtvABtapW1ZyY4gkz6sKOA==}
+    peerDependencies:
+      eslint-plugin-perfectionist: ^5.14.0
+      oxlint: '>=1.94.0'
+      tsrs: '>=0.25.0-ts7.1.0-beta || ^7.1.0-beta.tsrs2'
+      vite-plus: '>=1.7.0'
+    peerDependenciesMeta:
+      eslint-plugin-perfectionist:
+        optional: true
+      oxlint:
+        optional: true
+      tsrs:
+        optional: true
+      vite-plus:
+        optional: true
 
   '@nodable/entities@2.2.0':
     resolution: {integrity: sha512-9uGyhaQavEUMC8AIddIjau4NsnsXhou+j5sBAGojCM1oxmQpVKTWR/9JxABD6UAv12vpIms55fPZKFQEhG6uBg==}
@@ -4228,6 +4271,10 @@ packages:
     peerDependenciesMeta:
       typescript:
         optional: true
+
+  eslint-plugin-no-only-tests@3.4.0:
+    resolution: {integrity: sha512-4S3/9Nb7A2tiMcpzEQE9bQSlpeOz6WJkgryBuou/SA8W2x2c8Zf4j0NvTKBjv6qNhF9T79tmkecm/0CHqV0UGg==}
+    engines: {node: '>=5.0.0'}
 
   eslint-scope@9.1.2:
     resolution: {integrity: sha512-xS90H51cKw0jltxmvmHy2Iai1LIqrfbw57b79w/J7MfvDfkIkFZ+kj6zC3BjtUwh150HsSSdxXZcsuv72miDFQ==}
@@ -7225,6 +7272,17 @@ snapshots:
       fast-wrap-ansi: 0.2.2
       sisteransi: 1.0.5
 
+  '@cloudflare/oxlint-config@0.2.0(eslint@10.10.0(jiti@1.21.7)(supports-color@10.2.2))(oxlint@1.94.0(vite-plus@1.7.0(@types/node@26.6.6)(@vitest/coverage-v8@5.1.0)(@vitest/ui@5.1.0)(esbuild@0.28.2)(happy-dom@21.0.4)(jiti@1.21.7)(tsx@4.23.15)(typescript@5.9.3)(unrun@0.3.1)(yaml@2.9.0)))(tsrs@7.1.0-beta.tsrs3)(vite-plus@1.7.0(@types/node@26.6.6)(@vitest/coverage-v8@5.1.0)(@vitest/ui@5.1.0)(esbuild@0.28.2)(happy-dom@21.0.4)(jiti@1.21.7)(tsx@4.23.15)(typescript@5.9.3)(unrun@0.3.1)(yaml@2.9.0))':
+    dependencies:
+      '@nkzw/oxlint-config': 4.1.0(eslint@10.10.0(jiti@1.21.7)(supports-color@10.2.2))(oxlint@1.94.0(vite-plus@1.7.0(@types/node@26.6.6)(@vitest/coverage-v8@5.1.0)(@vitest/ui@5.1.0)(esbuild@0.28.2)(happy-dom@21.0.4)(jiti@1.21.7)(tsx@4.23.15)(typescript@5.9.3)(unrun@0.3.1)(yaml@2.9.0)))(tsrs@7.1.0-beta.tsrs3)(vite-plus@1.7.0(@types/node@26.6.6)(@vitest/coverage-v8@5.1.0)(@vitest/ui@5.1.0)(esbuild@0.28.2)(happy-dom@21.0.4)(jiti@1.21.7)(tsx@4.23.15)(typescript@5.9.3)(unrun@0.3.1)(yaml@2.9.0))
+    optionalDependencies:
+      oxlint: 1.94.0(vite-plus@1.7.0(@types/node@26.6.6)(@vitest/coverage-v8@5.1.0)(@vitest/ui@5.1.0)(esbuild@0.28.2)(happy-dom@21.0.4)(jiti@1.21.7)(tsx@4.23.15)(typescript@5.9.3)(unrun@0.3.1)(yaml@2.9.0))
+      tsrs: 7.1.0-beta.tsrs3
+      vite-plus: 1.7.0(@types/node@26.6.6)(@vitest/coverage-v8@5.1.0)(@vitest/ui@5.1.0)(esbuild@0.28.2)(happy-dom@21.0.4)(jiti@1.21.7)(tsx@4.23.15)(typescript@5.9.3)(unrun@0.3.1)(yaml@2.9.0)
+    transitivePeerDependencies:
+      - eslint
+      - eslint-plugin-perfectionist
+
   '@convex-dev/batch-worker@0.3.6(@standard-schema/spec@1.1.0)(convex@1.51.0(react@19.3.1))(hono@4.13.5)(prettier@3.9.5)(react@19.3.1)(typescript@5.9.3)(zod@3.25.76)':
     dependencies:
       convex: 1.51.0(react@19.3.1)
@@ -8118,6 +8176,21 @@ snapshots:
       '@emnapi/runtime': 2.0.0-beta.2
       '@tybys/wasm-util': 0.10.3
     optional: true
+
+  '@nkzw/eslint-plugin@3.0.0(eslint@10.10.0(jiti@1.21.7)(supports-color@10.2.2))':
+    optionalDependencies:
+      eslint: 10.10.0(jiti@1.21.7)(supports-color@10.2.2)
+
+  '@nkzw/oxlint-config@4.1.0(eslint@10.10.0(jiti@1.21.7)(supports-color@10.2.2))(oxlint@1.94.0(vite-plus@1.7.0(@types/node@26.6.6)(@vitest/coverage-v8@5.1.0)(@vitest/ui@5.1.0)(esbuild@0.28.2)(happy-dom@21.0.4)(jiti@1.21.7)(tsx@4.23.15)(typescript@5.9.3)(unrun@0.3.1)(yaml@2.9.0)))(tsrs@7.1.0-beta.tsrs3)(vite-plus@1.7.0(@types/node@26.6.6)(@vitest/coverage-v8@5.1.0)(@vitest/ui@5.1.0)(esbuild@0.28.2)(happy-dom@21.0.4)(jiti@1.21.7)(tsx@4.23.15)(typescript@5.9.3)(unrun@0.3.1)(yaml@2.9.0))':
+    dependencies:
+      '@nkzw/eslint-plugin': 3.0.0(eslint@10.10.0(jiti@1.21.7)(supports-color@10.2.2))
+      eslint-plugin-no-only-tests: 3.4.0
+    optionalDependencies:
+      oxlint: 1.94.0(vite-plus@1.7.0(@types/node@26.6.6)(@vitest/coverage-v8@5.1.0)(@vitest/ui@5.1.0)(esbuild@0.28.2)(happy-dom@21.0.4)(jiti@1.21.7)(tsx@4.23.15)(typescript@5.9.3)(unrun@0.3.1)(yaml@2.9.0))
+      tsrs: 7.1.0-beta.tsrs3
+      vite-plus: 1.7.0(@types/node@26.6.6)(@vitest/coverage-v8@5.1.0)(@vitest/ui@5.1.0)(esbuild@0.28.2)(happy-dom@21.0.4)(jiti@1.21.7)(tsx@4.23.15)(typescript@5.9.3)(unrun@0.3.1)(yaml@2.9.0)
+    transitivePeerDependencies:
+      - eslint
 
   '@nodable/entities@2.2.0': {}
 
@@ -10125,6 +10198,8 @@ snapshots:
       typescript: 5.9.3
     transitivePeerDependencies:
       - supports-color
+
+  eslint-plugin-no-only-tests@3.4.0: {}
 
   eslint-scope@9.1.2:
     dependencies:

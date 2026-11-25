@@ -1,7 +1,11 @@
 import { FunctionSpec, Ref } from "@confect/core";
 import { it } from "@effect/vitest";
 import { renderHook } from "@testing-library/react";
+import { runInNewContext } from "node:vm";
 import { ConvexError } from "convex/values";
+import type { Value } from "convex/values";
+import type { FunctionReference } from "convex/server";
+import type { RequestForQueries } from "convex/react";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as Result from "effect/Result";
@@ -24,7 +28,10 @@ import type {
   ReactMutation,
   UsePaginatedQueryArgs,
 } from "@confect/react";
-import type { OptimisticUpdate as ConvexOptimisticUpdate } from "convex/browser";
+import type {
+  OptimisticUpdate as ConvexOptimisticUpdate,
+  OptimisticLocalStore as NativeStore,
+} from "convex/browser";
 import * as Leaf from "@confect/react/OptimisticLocalStore";
 import {
   PaginatedQueryResult,
@@ -39,20 +46,58 @@ import {
   useQuery,
 } from "@confect/react";
 
-const useConvexQueryMock = vi.fn();
-const useConvexMutationMock = vi.fn();
-const useConvexActionMock = vi.fn();
-const useConvexPaginatedQueryInternalMock = vi.fn();
+const user = (
+  partial: Partial<{
+    results: Array<unknown>;
+    status: string;
+    isLoading: boolean;
+    loadMore: (numItems: number) => void;
+    error: unknown;
+  }>,
+) => ({
+  user: {
+    results: [],
+    status: "CanLoadMore",
+    isLoading: false,
+    loadMore: vi.fn<(numItems: number) => void>(),
+    ...partial,
+  },
+});
+
+type WireCall = (args: Record<string, Value>) => Promise<Value>;
+const {
+  useConvexQueriesMock,
+  useConvexMutationMock,
+  useConvexActionMock,
+  useConvexPaginatedQueryInternalMock,
+} = vi.hoisted(() => ({
+  useConvexQueriesMock:
+    vi.fn<
+      (queries: RequestForQueries) => { query?: Value | Error | undefined }
+    >(),
+  useConvexMutationMock:
+    vi.fn<(mutation: FunctionReference<"mutation">) => WireCall>(),
+  useConvexActionMock:
+    vi.fn<(action: FunctionReference<"action">) => WireCall>(),
+  useConvexPaginatedQueryInternalMock:
+    vi.fn<
+      (
+        query: FunctionReference<"query">,
+        args: Record<string, Value> | "skip",
+        options: { initialNumItems: number },
+        throwOnError: boolean,
+      ) => ReturnType<typeof user>
+    >(),
+}));
 
 vi.mock("convex/react", () => ({
-  useQuery: (...args: unknown[]) => useConvexQueryMock(...args),
-  useMutation: (...args: unknown[]) => useConvexMutationMock(...args),
-  useAction: (...args: unknown[]) => useConvexActionMock(...args),
+  useQueries: useConvexQueriesMock,
+  useMutation: useConvexMutationMock,
+  useAction: useConvexActionMock,
   usePaginatedQuery: () => {
     throw new Error("unexpected call to the public usePaginatedQuery");
   },
-  usePaginatedQueryInternal: (...args: unknown[]) =>
-    useConvexPaginatedQueryInternalMock(...args),
+  usePaginatedQueryInternal: useConvexPaginatedQueryInternalMock,
 }));
 
 class NotFound extends Schema.TaggedError<
@@ -118,15 +163,21 @@ const actionNoError = Ref.make(
 );
 
 beforeEach(() => {
-  useConvexQueryMock.mockReset();
+  useConvexQueriesMock.mockReset();
   useConvexMutationMock.mockReset();
   useConvexActionMock.mockReset();
   useConvexPaginatedQueryInternalMock.mockReset();
 });
 
+const foreignError = () => {
+  const error: unknown = runInNewContext('new Error("foreign failure")');
+  assert(Error.isError(error));
+  return error;
+};
+
 describe("useQuery", () => {
   test("returns Loading when convex returns undefined", () => {
-    useConvexQueryMock.mockReturnValue(undefined);
+    useConvexQueriesMock.mockReturnValue({});
 
     const { result } = renderHook(() => useQuery(queryNoError, {}));
 
@@ -135,7 +186,7 @@ describe("useQuery", () => {
   });
 
   test("returns Success with decoded value", () => {
-    useConvexQueryMock.mockReturnValue([{ text: "hello" }]);
+    useConvexQueriesMock.mockReturnValue({ query: [{ text: "hello" }] });
 
     const { result } = renderHook(() => useQuery(queryNoError, {}));
 
@@ -144,8 +195,8 @@ describe("useQuery", () => {
   });
 
   test("Failure carries decoded typed error for a matching ConvexError", () => {
-    useConvexQueryMock.mockImplementation(() => {
-      throw new ConvexError({ _tag: "NotFound", id: "abc" });
+    useConvexQueriesMock.mockReturnValue({
+      query: new ConvexError({ _tag: "NotFound", id: "abc" }),
     });
 
     const { result } = renderHook(() =>
@@ -157,11 +208,63 @@ describe("useQuery", () => {
     expect(result.current.error.id).toBe("abc");
   });
 
+  test("decodes a declared ConvexError from another realm", () => {
+    const error = Object.assign(foreignError(), {
+      [Symbol.for("ConvexError")]: true,
+      data: { _tag: "NotFound", id: "abc" },
+    });
+    expect(error).not.toBeInstanceOf(Error);
+    useConvexQueriesMock.mockReturnValue({ query: error });
+
+    const { result } = renderHook(() =>
+      useQuery(queryWithError, { id: "abc" }),
+    );
+
+    assert(QueryResult.isFailure(result.current));
+    expect(result.current.error).toBeInstanceOf(NotFound);
+    expect(result.current.error.id).toBe("abc");
+  });
+
+  test.each(["ConvexError", "Error"])(
+    "rethrows an undeclared foreign %s unchanged",
+    (kind) => {
+      const error =
+        kind === "ConvexError"
+          ? Object.assign(foreignError(), {
+              [Symbol.for("ConvexError")]: true,
+              data: { _tag: "Other" },
+            })
+          : foreignError();
+      expect(error).not.toBeInstanceOf(Error);
+      useConvexQueriesMock.mockReturnValue({ query: error });
+
+      const thrown = Result.try(() =>
+        renderHook(() => useQuery(queryWithError, { id: "abc" })),
+      ).pipe(Result.flip, Result.getOrThrow);
+      expect(thrown).toBe(error);
+    },
+  );
+
+  test("decodes an error-shaped Convex record as a success", () => {
+    useConvexQueriesMock.mockReturnValue({
+      query: {
+        name: "ConvexError",
+        message: "ordinary data",
+        data: { _tag: "NotFound", id: "abc" },
+        text: "hello",
+      },
+    });
+
+    const { result } = renderHook(() =>
+      useQuery(queryWithError, { id: "abc" }),
+    );
+
+    expect(result.current).toEqual(QueryResult.succeed({ text: "hello" }));
+  });
+
   test("rethrows a non-ConvexError as a defect", () => {
     const transportError = new Error("network down");
-    useConvexQueryMock.mockImplementation(() => {
-      throw transportError;
-    });
+    useConvexQueriesMock.mockReturnValue({ query: transportError });
 
     expect(() =>
       renderHook(() => useQuery(queryWithError, { id: "abc" })),
@@ -170,9 +273,7 @@ describe("useQuery", () => {
 
   test("rethrows a ConvexError from a ref without an error schema", () => {
     const convexError = new ConvexError({ _tag: "Anything", id: "abc" });
-    useConvexQueryMock.mockImplementation(() => {
-      throw convexError;
-    });
+    useConvexQueriesMock.mockReturnValue({ query: convexError });
 
     expect(() => renderHook(() => useQuery(queryNoError, {}))).toThrow(
       convexError,
@@ -180,50 +281,49 @@ describe("useQuery", () => {
   });
 
   test("`skip` on a query with no args returns Loading with skipped true", () => {
-    useConvexQueryMock.mockReturnValue(undefined);
+    useConvexQueriesMock.mockReturnValue({});
 
     const { result } = renderHook(() => useQuery(queryNoError, "skip"));
 
     assert(QueryResult.isLoading(result.current));
     expect(result.current.skipped).toBe(true);
-    expect(useConvexQueryMock).toHaveBeenLastCalledWith(
-      expect.anything(),
-      "skip",
-    );
+    expect(useConvexQueriesMock).toHaveBeenLastCalledWith({});
   });
 
   test("`skip` on a query with required args returns Loading with skipped true", () => {
-    useConvexQueryMock.mockReturnValue(undefined);
+    useConvexQueriesMock.mockReturnValue({});
 
     const { result } = renderHook(() => useQuery(queryWithError, "skip"));
 
     assert(QueryResult.isLoading(result.current));
     expect(result.current.skipped).toBe(true);
-    expect(useConvexQueryMock).toHaveBeenLastCalledWith(
-      expect.anything(),
-      "skip",
-    );
+    expect(useConvexQueriesMock).toHaveBeenLastCalledWith({});
   });
 
   test("preserves QueryResult identity across rerenders for an unchanged convex result", () => {
     const encodedResult = [{ text: "hello" }];
-    useConvexQueryMock.mockReturnValue(encodedResult);
+    useConvexQueriesMock.mockReturnValue({ query: encodedResult });
 
     const { result, rerender } = renderHook(() => useQuery(queryNoError, {}));
     const first = result.current;
 
+    const requests = useConvexQueriesMock.mock.lastCall?.[0];
+    expect(requests).toEqual({
+      query: { query: Ref.getFunctionReference(queryNoError), args: {} },
+    });
     rerender();
+    expect(useConvexQueriesMock.mock.lastCall?.[0]).toBe(requests);
 
     expect(result.current).toBe(first);
   });
 
   test("produces a new QueryResult when the convex result identity changes", () => {
-    useConvexQueryMock.mockReturnValue([{ text: "hello" }]);
+    useConvexQueriesMock.mockReturnValue({ query: [{ text: "hello" }] });
 
     const { result, rerender } = renderHook(() => useQuery(queryNoError, {}));
     const first = result.current;
 
-    useConvexQueryMock.mockReturnValue([{ text: "hello" }]);
+    useConvexQueriesMock.mockReturnValue({ query: [{ text: "hello" }] });
     rerender();
 
     expect(result.current).not.toBe(first);
@@ -232,7 +332,7 @@ describe("useQuery", () => {
   });
 
   test("preserves Loading identity across rerenders while convex returns undefined", () => {
-    useConvexQueryMock.mockReturnValue(undefined);
+    useConvexQueriesMock.mockReturnValue({});
 
     const { result, rerender } = renderHook(() => useQuery(queryNoError, {}));
     const first = result.current;
@@ -244,9 +344,7 @@ describe("useQuery", () => {
 
   test("preserves Failure identity across rerenders for an unchanged ConvexError", () => {
     const convexError = new ConvexError({ _tag: "NotFound", id: "abc" });
-    useConvexQueryMock.mockImplementation(() => {
-      throw convexError;
-    });
+    useConvexQueriesMock.mockReturnValue({ query: convexError });
 
     const { result, rerender } = renderHook(() =>
       useQuery(queryWithError, { id: "abc" }),
@@ -259,12 +357,35 @@ describe("useQuery", () => {
     expect(result.current).toBe(first);
   });
 
+  test("resubscribes with changed arguments and recovers from a declared error", () => {
+    useConvexQueriesMock.mockReturnValue({
+      query: new ConvexError({ _tag: "NotFound", id: "missing" }),
+    });
+    const { result, rerender } = renderHook(
+      ({ id }) => useQuery(queryWithError, { id }),
+      { initialProps: { id: "missing" } },
+    );
+    assert(QueryResult.isFailure(result.current));
+    expect(result.current.error.id).toBe("missing");
+
+    useConvexQueriesMock.mockReturnValue({ query: { text: "found" } });
+    rerender({ id: "present" });
+    expect(useConvexQueriesMock).toHaveBeenLastCalledWith({
+      query: {
+        query: Ref.getFunctionReference(queryWithError),
+        args: { id: "present" },
+      },
+    });
+    expect(result.current).toEqual(QueryResult.succeed({ text: "found" }));
+  });
+
   test("produces a new Loading when `skipped` changes while convex returns undefined", () => {
-    useConvexQueryMock.mockReturnValue(undefined);
+    useConvexQueriesMock.mockReturnValue({});
 
     const { result, rerender } = renderHook(
-      ({ args }: { args: {} | "skip" }) => useQuery(queryNoError, args),
-      { initialProps: { args: {} as {} | "skip" } },
+      ({ args }: { args: Record<string, never> | "skip" }) =>
+        useQuery(queryNoError, args),
+      { initialProps: { args: {} } },
     );
     const first = result.current;
     assert(QueryResult.isLoading(first));
@@ -278,51 +399,57 @@ describe("useQuery", () => {
   });
 });
 
+const promiseUpdate: (
+  store: OptimisticLocalStore.OptimisticLocalStore,
+  args: Ref.Args<typeof mutationNoError>,
+) => Promise<void> = () => Promise.resolve();
+
+const checkPromiseCallbacks = (
+  mutation: ReactMutation<typeof mutationNoError>,
+) => {
+  // @ts-expect-error Optimistic callbacks must be synchronous.
+  // oxlint-disable-next-line effecttsgo/async-function -- Regression coverage must exercise an async callback.
+  mutation.withOptimisticUpdate(async () => {});
+  // @ts-expect-error Returning a promise without async is also invalid.
+  mutation.withOptimisticUpdate(() => Promise.resolve("note-1"));
+
+  // @ts-expect-error Explicit promise return types must also be rejected.
+  mutation.withOptimisticUpdate(promiseUpdate);
+
+  const configured = mutation.withOptimisticUpdate(() => {});
+  // @ts-expect-error Configured handles retain the synchronous constraint.
+  configured.withOptimisticUpdate(promiseUpdate);
+};
+
+const synchronousUpdate: OptimisticUpdate<typeof mutationNoError> = (
+  store,
+  args,
+) => {
+  expectTypeOf(
+    store,
+  ).toEqualTypeOf<OptimisticLocalStore.OptimisticLocalStore>();
+  expectTypeOf(args).toEqualTypeOf<{ readonly text: string }>();
+};
+
+const checkSynchronousCallbacks = (
+  mutation: ReactMutation<typeof mutationNoError>,
+) => {
+  const configured = mutation.withOptimisticUpdate(synchronousUpdate);
+  expectTypeOf(configured).toEqualTypeOf<
+    ReactMutation<typeof mutationNoError>
+  >();
+  expectTypeOf(configured({ text: "hi" })).toEqualTypeOf<Promise<string>>();
+  mutation.withOptimisticUpdate(() => undefined);
+  mutation.withOptimisticUpdate((_store, args) => args.text.length);
+};
+
 describe("useMutation", () => {
   test("rejects inferred and explicitly typed promise-returning optimistic callbacks", () => {
-    const check = (mutation: ReactMutation<typeof mutationNoError>) => {
-      // @ts-expect-error Optimistic callbacks must be synchronous.
-      // oxlint-disable-next-line effecttsgo/async-function -- Regression coverage must exercise an async callback.
-      mutation.withOptimisticUpdate(async () => {});
-      // @ts-expect-error Returning a promise without async is also invalid.
-      mutation.withOptimisticUpdate(() => Promise.resolve("note-1"));
-
-      const promiseUpdate: (
-        store: OptimisticLocalStore.OptimisticLocalStore,
-        args: Ref.Args<typeof mutationNoError>,
-      ) => Promise<void> = () => Promise.resolve();
-      // @ts-expect-error Explicit promise return types must also be rejected.
-      mutation.withOptimisticUpdate(promiseUpdate);
-
-      const configured = mutation.withOptimisticUpdate(() => {});
-      // @ts-expect-error Configured handles retain the synchronous constraint.
-      configured.withOptimisticUpdate(promiseUpdate);
-    };
-
-    expect(check).toBeDefined();
+    expect(checkPromiseCallbacks).toBeDefined();
   });
 
   test("preserves synchronous callback forms and callable handle types", () => {
-    const check = (mutation: ReactMutation<typeof mutationNoError>) => {
-      const update: OptimisticUpdate<typeof mutationNoError> = (
-        store,
-        args,
-      ) => {
-        expectTypeOf(
-          store,
-        ).toEqualTypeOf<OptimisticLocalStore.OptimisticLocalStore>();
-        expectTypeOf(args).toEqualTypeOf<{ readonly text: string }>();
-      };
-      const configured = mutation.withOptimisticUpdate(update);
-      expectTypeOf(configured).toEqualTypeOf<
-        ReactMutation<typeof mutationNoError>
-      >();
-      expectTypeOf(configured({ text: "hi" })).toEqualTypeOf<Promise<string>>();
-      mutation.withOptimisticUpdate(() => undefined);
-      mutation.withOptimisticUpdate((_store, args) => args.text.length);
-    };
-
-    expect(check).toBeDefined();
+    expect(checkSynchronousCallbacks).toBeDefined();
   });
 
   it.effect(
@@ -347,29 +474,31 @@ describe("useMutation", () => {
         );
         const encodedArgs = { count: "41" };
         const args = { count: 41 };
-        const store = {
-          getQuery: vi.fn().mockReturnValue("41"),
-          getAllQueries: vi.fn(),
-          setQuery: vi.fn(),
+        const setQuery = vi.fn<NativeStore["setQuery"]>();
+        const store: NativeStore = {
+          getQuery: () => undefined,
+          getAllQueries: () => [],
+          setQuery,
         };
-        const next = Object.assign(vi.fn().mockResolvedValue("42"), {
-          withOptimisticUpdate: vi.fn(),
+        const getQuery = vi.spyOn(store, "getQuery").mockReturnValue("41");
+        const next = Object.assign(vi.fn<WireCall>().mockResolvedValue("42"), {
+          withOptimisticUpdate:
+            vi.fn<
+              (update: ConvexOptimisticUpdate<{ count: string }>) => WireCall
+            >(),
         });
         const attach = vi
           .fn<
             (update: ConvexOptimisticUpdate<{ count: string }>) => typeof next
           >()
           .mockReturnValue(next);
-        const original = Object.assign(vi.fn(), {
+        const original = Object.assign(vi.fn<WireCall>(), {
           withOptimisticUpdate: attach,
         });
         useConvexMutationMock.mockReturnValue(original);
         const { result } = renderHook(() => useMutation(mutation));
-        const update = vi.fn(
-          (
-            localStore: OptimisticLocalStore.OptimisticLocalStore,
-            decodedArgs: Ref.Args<typeof mutation>,
-          ) => {
+        const update = vi.fn<OptimisticUpdate<typeof mutation>>(
+          (localStore, decodedArgs) => {
             expect(decodedArgs).toEqual(args);
             const value = localStore.getQuery(query, decodedArgs);
             expect(value).toEqual(Option.some(41));
@@ -395,11 +524,11 @@ describe("useMutation", () => {
         assert(wrappedUpdate !== undefined);
         wrappedUpdate(store, encodedArgs);
         expect(update).toHaveBeenCalledOnce();
-        expect(store.getQuery).toHaveBeenCalledWith(
+        expect(getQuery).toHaveBeenCalledWith(
           Ref.getFunctionReference(query),
           encodedArgs,
         );
-        expect(store.setQuery).toHaveBeenCalledWith(
+        expect(setQuery).toHaveBeenCalledWith(
           Ref.getFunctionReference(query),
           encodedArgs,
           "42",
@@ -424,7 +553,7 @@ describe("useMutation", () => {
 
   it.effect("resolves directly to decoded result without an error schema", () =>
     Effect.gen(function* () {
-      const inner = vi.fn().mockResolvedValue("note-1");
+      const inner = vi.fn<WireCall>().mockResolvedValue("note-1");
       useConvexMutationMock.mockReturnValue(inner);
 
       const { result } = renderHook(() => useMutation(mutationNoError));
@@ -438,7 +567,7 @@ describe("useMutation", () => {
     "resolves to Result.Success with decoded result when error schema succeeds",
     () =>
       Effect.gen(function* () {
-        const inner = vi.fn().mockResolvedValue(null);
+        const inner = vi.fn<WireCall>().mockResolvedValue(null);
         useConvexMutationMock.mockReturnValue(inner);
 
         const { result } = renderHook(() => useMutation(mutationWithError));
@@ -458,7 +587,7 @@ describe("useMutation", () => {
     () =>
       Effect.gen(function* () {
         const inner = vi
-          .fn()
+          .fn<WireCall>()
           .mockRejectedValue(new ConvexError({ _tag: "NotFound", id: "abc" }));
         useConvexMutationMock.mockReturnValue(inner);
 
@@ -479,7 +608,7 @@ describe("useMutation", () => {
   it.effect("rejects with the original error for a non-ConvexError", () =>
     Effect.gen(function* () {
       const transportError = new Error("network down");
-      const inner = vi.fn().mockRejectedValue(transportError);
+      const inner = vi.fn<WireCall>().mockRejectedValue(transportError);
       useConvexMutationMock.mockReturnValue(inner);
 
       const { result } = renderHook(() => useMutation(mutationNoError));
@@ -495,7 +624,7 @@ describe("useMutation", () => {
     () =>
       Effect.gen(function* () {
         const convexError = new ConvexError({ _tag: "Anything", id: "abc" });
-        const inner = vi.fn().mockRejectedValue(convexError);
+        const inner = vi.fn<WireCall>().mockRejectedValue(convexError);
         useConvexMutationMock.mockReturnValue(inner);
 
         const { result } = renderHook(() => useMutation(mutationNoError));
@@ -507,7 +636,7 @@ describe("useMutation", () => {
   );
 
   test("preserves callback identity across rerenders", () => {
-    const inner = vi.fn().mockResolvedValue("note-1");
+    const inner = vi.fn<WireCall>().mockResolvedValue("note-1");
     useConvexMutationMock.mockReturnValue(inner);
 
     const { result, rerender } = renderHook(() => useMutation(mutationNoError));
@@ -531,7 +660,7 @@ describe("useAction", () => {
 
   it.effect("resolves directly to decoded result without an error schema", () =>
     Effect.gen(function* () {
-      const inner = vi.fn().mockResolvedValue("pong");
+      const inner = vi.fn<WireCall>().mockResolvedValue("pong");
       useConvexActionMock.mockReturnValue(inner);
 
       const { result } = renderHook(() => useAction(actionNoError));
@@ -545,7 +674,7 @@ describe("useAction", () => {
     "resolves to Result.Success with decoded result when error schema succeeds",
     () =>
       Effect.gen(function* () {
-        const inner = vi.fn().mockResolvedValue(null);
+        const inner = vi.fn<WireCall>().mockResolvedValue(null);
         useConvexActionMock.mockReturnValue(inner);
 
         const { result } = renderHook(() => useAction(actionWithError));
@@ -565,7 +694,7 @@ describe("useAction", () => {
     () =>
       Effect.gen(function* () {
         const inner = vi
-          .fn()
+          .fn<WireCall>()
           .mockRejectedValue(new ConvexError({ _tag: "NotFound", id: "abc" }));
         useConvexActionMock.mockReturnValue(inner);
 
@@ -586,7 +715,7 @@ describe("useAction", () => {
   it.effect("rejects with the original error for a non-ConvexError", () =>
     Effect.gen(function* () {
       const transportError = new Error("network down");
-      const inner = vi.fn().mockRejectedValue(transportError);
+      const inner = vi.fn<WireCall>().mockRejectedValue(transportError);
       useConvexActionMock.mockReturnValue(inner);
 
       const { result } = renderHook(() => useAction(actionNoError));
@@ -598,7 +727,7 @@ describe("useAction", () => {
   );
 
   test("preserves callback identity across rerenders", () => {
-    const inner = vi.fn().mockResolvedValue("pong");
+    const inner = vi.fn<WireCall>().mockResolvedValue("pong");
     useConvexActionMock.mockReturnValue(inner);
 
     const { result, rerender } = renderHook(() => useAction(actionNoError));
@@ -643,24 +772,6 @@ describe("usePaginatedQuery", () => {
       error: () => PaginationFailed,
     }),
   );
-
-  const user = (
-    partial: Partial<{
-      results: unknown[];
-      status: string;
-      isLoading: boolean;
-      loadMore: (numItems: number) => void;
-      error: unknown;
-    }>,
-  ) => ({
-    user: {
-      results: [],
-      status: "CanLoadMore",
-      isLoading: false,
-      loadMore: vi.fn(),
-      ...partial,
-    },
-  });
 
   test("encodes args via the user-args schema and disables throwOnError", () => {
     useConvexPaginatedQueryInternalMock.mockReturnValue(user({}));
@@ -739,7 +850,7 @@ describe("usePaginatedQuery", () => {
   ] as const)(
     "carries convex's loadMore on %s: %s",
     (status, carriesLoadMore) => {
-      const loadMore = vi.fn();
+      const loadMore = vi.fn<(numItems: number) => void>();
       useConvexPaginatedQueryInternalMock.mockReturnValue(
         user({
           status,
@@ -754,9 +865,11 @@ describe("usePaginatedQuery", () => {
       );
 
       expect("loadMore" in result.current).toBe(carriesLoadMore);
-      if (PaginatedQueryResult.isCanLoadMore(result.current)) {
-        expect(result.current.loadMore).toBe(loadMore);
-      }
+      expect(
+        PaginatedQueryResult.isCanLoadMore(result.current)
+          ? result.current.loadMore
+          : undefined,
+      ).toBe(carriesLoadMore ? loadMore : undefined);
     },
   );
 
@@ -914,6 +1027,17 @@ describe("usePaginatedQuery", () => {
     });
   });
 
+  const useInvalidArgs = () =>
+    usePaginatedQuery(
+      paginatedQuery,
+      {
+        count: 42,
+        // @ts-expect-error—paginationOpts is managed by the hook, not the caller
+        paginationOpts: { numItems: 10, cursor: null },
+      },
+      { initialNumItems: 10 },
+    );
+
   describe("UsePaginatedQueryArgs", () => {
     test("accepts the user args, or `skip`", () => {
       expectTypeOf<{ count: number }>().toExtend<
@@ -925,7 +1049,7 @@ describe("usePaginatedQuery", () => {
     });
 
     test("accepts only the empty object or `skip` when there are no user args", () => {
-      expectTypeOf<{}>().toExtend<
+      expectTypeOf({}).toExtend<
         UsePaginatedQueryArgs<typeof paginatedQueryNoExtraArgs>
       >();
       expectTypeOf<"skip">().toExtend<
@@ -942,18 +1066,7 @@ describe("usePaginatedQuery", () => {
     });
 
     test("rejects paginationOpts in an args literal", () => {
-      const check = () =>
-        usePaginatedQuery(
-          paginatedQuery,
-          {
-            count: 42,
-            // @ts-expect-error—paginationOpts is managed by the hook, not the caller
-            paginationOpts: { numItems: 10, cursor: null },
-          },
-          { initialNumItems: 10 },
-        );
-
-      expect(check).toBeDefined();
+      expect(useInvalidArgs).toBeDefined();
     });
   });
 });

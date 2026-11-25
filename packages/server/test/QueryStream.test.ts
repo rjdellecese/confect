@@ -292,17 +292,18 @@ describe("QueryStream key layouts", () => {
   );
 
   it("requires the constructor layout to witness its declared visible labels", () => {
-    const invalid = new QueryStream.QueryStream<
-      string,
-      QueryStreamKeyLabels.QueryStreamKeyLabels<["_id"]>,
-      "asc"
-    >(
-      "asc",
-      // @ts-expect-error An implicit ID is absent from the visible labels.
-      Result.getOrThrowWith(QueryStreamKeyLayout.fromIndex([]), identity),
-      Stream.empty,
+    type RequiredLayout = ConstructorParameters<
+      typeof QueryStream.QueryStream<
+        string,
+        QueryStreamKeyLabels.QueryStreamKeyLabels<["_id"]>,
+        "asc"
+      >
+    >[1];
+    const implicitId = Result.getOrThrowWith(
+      QueryStreamKeyLayout.fromIndex([]),
+      identity,
     );
-    void invalid;
+    expectTypeOf(implicitId).not.toExtend<RequiredLayout>();
   });
 });
 
@@ -372,11 +373,9 @@ describe.each(["asc", "desc"] as const)(
             cursor: start
               ? yield* encodeCursor(source.keyLayout)([values[1]])
               : null,
-            ...(end
-              ? {
-                  endCursor: yield* encodeCursor(source.keyLayout)([values[3]]),
-                }
-              : {}),
+            ...(end && {
+              endCursor: yield* encodeCursor(source.keyLayout)([values[3]]),
+            }),
             numItems: 10,
           });
 

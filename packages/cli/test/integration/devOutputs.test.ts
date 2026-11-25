@@ -57,7 +57,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
             ).toBe(1000);
           }
         }).pipe(Effect.scoped),
-      { timeout: process.platform === "win32" ? 60000 : 30000 },
+      { timeout: process.platform === "win32" ? 60_000 : 30_000 },
     );
 
     it.effect.each([
@@ -108,7 +108,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
             Option.getOrThrow((yield* fs.stat(schema)).mtime).getTime(),
           ).toBe(1000);
         }).pipe(Effect.scoped),
-      { timeout: 30000 },
+      { timeout: 30_000 },
     );
 
     it.effect(
@@ -134,7 +134,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
             expect(contents2).toBe(contents);
           }
         }).pipe(Effect.scoped),
-      { timeout: 30000 },
+      { timeout: 30_000 },
     );
 
     it.effect.each([
@@ -177,7 +177,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           const actual3 = yield* fs.exists(generated);
           expect(actual3).toBe(false);
         }).pipe(Effect.scoped),
-      { timeout: 30000 },
+      { timeout: 30_000 },
     );
 
     it.effect(
@@ -214,7 +214,7 @@ layer(NodeServices.layer, { excludeTestServices: true })(
           );
           expect(actual6).toBe(false);
         }).pipe(Effect.scoped),
-      { timeout: 30000 },
+      { timeout: 30_000 },
     );
   },
 );

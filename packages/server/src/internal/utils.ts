@@ -1,56 +1,56 @@
-import type { Predicate } from "effect";
+import type { RegistryItems } from "../RegistryItems";
+import * as Predicate from "effect/Predicate";
 import * as Array from "effect/Array";
 import * as Effect from "effect/Effect";
 import * as Record from "effect/Record";
 
-type NestedObject<T> = {
+interface NestedObject<T> {
   [key: string]: T | NestedObject<T>;
-};
+}
 
 /**
  * @internal
  */
 export const mapLeaves = <T, U>(
-  obj: NestedObject<T>,
+  obj: RegistryItems,
   leafRefinement: Predicate.Refinement<unknown, T>,
   f: (value: T) => U,
 ): NestedObject<U> => {
-  const result: any = {};
-
+  const result: NestedObject<U> = {};
   for (const key in obj) {
     const value = obj[key];
-
-    if (leafRefinement(value)) {
-      result[key] = f(value as T);
-    } else {
-      result[key] = mapLeaves(value as NestedObject<T>, leafRefinement, f);
-    }
+    result[key] = leafRefinement(value)
+      ? f(value)
+      : mapLeaves(
+          Predicate.isObject(value) ? value : Object.assign({}, value),
+          leafRefinement,
+          f,
+        );
   }
-
   return result;
 };
 
 const collectBranchLeaves = <T>(
   obj: NestedObject<T>,
   leafRefinement: Predicate.Refinement<unknown, T>,
-  path: string[] = [],
-): { path: string[]; values: Record<string, T> }[] => {
-  const leaves = Record.filter(obj, leafRefinement) as Record<string, T>;
+  path: Array<string> = [],
+): Array<{ path: Array<string>; values: Record<string, T> }> => {
+  const leaves = Record.filter(obj, leafRefinement);
   const hasLeaves = Record.keys(leaves).length > 0;
 
   const currentBranch = hasLeaves ? [{ path, values: leaves }] : [];
 
-  const nestedBranches = Array.flatMap(Record.keys(obj), (key) => {
-    const value = obj[key];
+  const nestedBranches = Array.flatMap(
+    Record.keys<string, T | NestedObject<T>>(obj),
+    (key) => {
+      const value = obj[key];
 
-    if (!leafRefinement(value) && typeof value === "object") {
-      return collectBranchLeaves(value as NestedObject<T>, leafRefinement, [
-        ...path,
-        key,
-      ]);
-    }
-    return [];
-  });
+      if (!leafRefinement(value) && typeof value === "object") {
+        return collectBranchLeaves(value, leafRefinement, [...path, key]);
+      }
+      return [];
+    },
+  );
 
   return [...currentBranch, ...nestedBranches];
 };
@@ -62,7 +62,7 @@ export const forEachBranchLeaves = <T, A, E, R>(
   obj: NestedObject<T>,
   leafRefinement: Predicate.Refinement<unknown, T>,
   f: (branchLeaves: {
-    path: string[];
+    path: Array<string>;
     values: Record<string, T>;
   }) => Effect.Effect<A, E, R>,
 ): Effect.Effect<void, E, R> => {
@@ -75,22 +75,22 @@ export const forEachBranchLeaves = <T, A, E, R>(
  */
 export const setNestedProperty = <T extends object>(
   obj: T,
-  path: PropertyKey[],
-  value: any,
+  path: Array<PropertyKey>,
+  value: unknown,
 ): T => {
   if (path.length === 0) {
     return obj;
   }
 
   if (path.length === 1) {
-    const key = path[0] as keyof T;
+    const key = path[0];
     return { ...obj, [key]: value };
   }
 
-  const [head, ...tail] = path;
-  const key = head as keyof T;
-  return {
-    ...obj,
-    [key]: setNestedProperty((obj as any)[key] ?? {}, tail, value),
-  };
+  const [key, ...tail] = path;
+  const branch = Predicate.hasProperty(obj, key) ? obj[key] : undefined;
+  const nested = Predicate.isObjectKeyword(branch)
+    ? branch
+    : Object.assign({}, branch);
+  return { ...obj, [key]: setNestedProperty(nested, tail, value) };
 };

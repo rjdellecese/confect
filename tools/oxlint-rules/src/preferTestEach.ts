@@ -41,7 +41,9 @@ const variableAt = (
     scope = scope.upper
   ) {
     const variable = scope.set.get(node.name);
-    if (variable !== undefined) return variable;
+    if (variable !== undefined) {
+      return variable;
+    }
   }
   return undefined;
 };
@@ -58,7 +60,9 @@ const resolveApi = (
   node: ESTree.Node,
   seen = new Set<ESTree.Node>(),
 ): Api | undefined => {
-  if (seen.has(node)) return undefined;
+  if (seen.has(node)) {
+    return undefined;
+  }
   const next = new Set([...seen, node]);
   if (node.type === "Identifier") {
     const variable = variableAt(source, node);
@@ -68,36 +72,51 @@ const resolveApi = (
         variable.references,
         (reference) => reference.isWrite() && !reference.init,
       )
-    )
+    ) {
       return undefined;
+    }
     const definition = variable.defs[0];
-    if (definition === undefined || variable.defs.length !== 1)
+    if (definition === undefined || variable.defs.length !== 1) {
       return undefined;
+    }
     const declaration = definition.node;
     if (
       declaration.type === "ImportSpecifier" ||
       declaration.type === "ImportNamespaceSpecifier"
     ) {
       const parent = declaration.parent;
-      if (parent.type !== "ImportDeclaration" || parent.importKind === "type")
+      if (parent.type !== "ImportDeclaration" || parent.importKind === "type") {
         return undefined;
+      }
       const effect = parent.source.value === "@effect/vitest";
-      if (!effect && parent.source.value !== "vitest") return undefined;
-      if (declaration.type === "ImportNamespaceSpecifier")
+      if (!effect && parent.source.value !== "vitest") {
+        return undefined;
+      }
+      if (declaration.type === "ImportNamespaceSpecifier") {
         return effect ? "effect-namespace" : "plain-namespace";
-      if (declaration.importKind === "type") return undefined;
+      }
+      if (declaration.importKind === "type") {
+        return undefined;
+      }
       const name =
         declaration.imported.type === "Identifier"
           ? declaration.imported.name
           : declaration.imported.value;
-      if (name === "it") return effect ? "effect-it" : "plain-it";
-      if (name === "test") return "plain-it";
-      if (name === "layer" && effect) return "layer";
+      if (name === "it") {
+        return effect ? "effect-it" : "plain-it";
+      }
+      if (name === "test") {
+        return "plain-it";
+      }
+      if (name === "layer" && effect) {
+        return "layer";
+      }
     }
     if (
       declaration.type === "VariableDeclarator" &&
       declaration.id.type === "Identifier" &&
-      declaration.init != null &&
+      declaration.init !== null &&
+      declaration.init !== undefined &&
       declaration.parent.type === "VariableDeclaration" &&
       declaration.parent.kind === "const"
     ) {
@@ -115,23 +134,35 @@ const resolveApi = (
         call.arguments.at(-1) === declaration &&
         call.callee.type === "CallExpression" &&
         resolveApi(source, call.callee.callee, next) === "layer"
-      )
+      ) {
         return "effect-it";
+      }
     }
     return undefined;
   }
-  if (node.type !== "MemberExpression" || node.optional) return undefined;
+  if (node.type !== "MemberExpression" || node.optional) {
+    return undefined;
+  }
   const base = resolveApi(source, node.object, next);
   const name = propertyName(node);
   if (base === "effect-namespace" || base === "plain-namespace") {
-    if (name === "it")
+    if (name === "it") {
       return base === "effect-namespace" ? "effect-it" : "plain-it";
-    if (name === "test") return "plain-it";
-    if (name === "layer" && base === "effect-namespace") return "layer";
+    }
+    if (name === "test") {
+      return "plain-it";
+    }
+    if (name === "layer" && base === "effect-namespace") {
+      return "layer";
+    }
   }
   if (base === "effect-it") {
-    if (name === "effect" || name === "live") return "effect";
-    if (name === "layer") return "layer";
+    if (name === "effect" || name === "live") {
+      return "effect";
+    }
+    if (name === "layer") {
+      return "layer";
+    }
   }
   if (
     (base === "effect-it" || base === "plain-it" || base === "effect") &&
@@ -140,8 +171,9 @@ const resolveApi = (
       name === "fails" ||
       name === "concurrent" ||
       name === "sequential")
-  )
+  ) {
     return "modified";
+  }
   return undefined;
 };
 
@@ -153,7 +185,9 @@ const registrationLoop = (
     parent !== null;
     parent = parent.parent
   ) {
-    if (parent.type === "ForOfStatement") return parent;
+    if (parent.type === "ForOfStatement") {
+      return parent;
+    }
     if (isFunction(parent)) {
       const call = parent.parent;
       if (
@@ -161,8 +195,9 @@ const registrationLoop = (
         call.arguments[0] === parent &&
         call.callee.type === "MemberExpression" &&
         propertyName(call.callee) === "forEach"
-      )
+      ) {
         return call;
+      }
       return undefined;
     }
   }
@@ -175,8 +210,9 @@ const insideTest = (source: OxlintSourceCode, node: ESTree.Node): boolean => {
     parent !== null;
     parent = parent.parent
   ) {
-    if (!isFunction(parent) || parent.parent?.type !== "CallExpression")
+    if (!isFunction(parent) || parent.parent?.type !== "CallExpression") {
       continue;
+    }
     const call = parent.parent;
     const callee =
       call.callee.type === "CallExpression" &&
@@ -190,26 +226,29 @@ const insideTest = (source: OxlintSourceCode, node: ESTree.Node): boolean => {
       api === "effect-it" ||
       api === "plain-it" ||
       api === "modified"
-    )
+    ) {
       return true;
+    }
   }
   return false;
 };
 
 const isLiteralData = (node: ESTree.Node): boolean => {
-  if (node.type === "Literal")
+  if (node.type === "Literal") {
     return (
       typeof node.value === "string" ||
       typeof node.value === "number" ||
       typeof node.value === "boolean" ||
       node.value === null
     );
-  if (node.type === "ArrayExpression")
+  }
+  if (node.type === "ArrayExpression") {
     return Array.every(
       node.elements,
       (element) => element !== null && isLiteralData(element),
     );
-  if (node.type === "ObjectExpression")
+  }
+  if (node.type === "ObjectExpression") {
     return Array.every(
       node.properties,
       (property) =>
@@ -219,6 +258,7 @@ const isLiteralData = (node: ESTree.Node): boolean => {
         property.kind === "init" &&
         isLiteralData(property.value),
     );
+  }
   return false;
 };
 
@@ -227,14 +267,17 @@ const eachTitle = (
   row: string,
   rows: ESTree.ArrayExpression,
 ): string | undefined => {
-  if (node.type === "Literal" && typeof node.value === "string")
+  if (node.type === "Literal" && typeof node.value === "string") {
     return /[%$]/.test(node.value) ? undefined : node.value;
-  if (node.type !== "TemplateLiteral" || node.expressions.length !== 1)
+  }
+  if (node.type !== "TemplateLiteral" || node.expressions.length !== 1) {
     return undefined;
+  }
   const [expression] = node.expressions;
   const parts = Array.map(node.quasis, (quasi) => quasi.value.cooked);
-  if (Array.some(parts, (part) => part === null || /[%$]/.test(part)))
+  if (Array.some(parts, (part) => part === null || /[%$]/.test(part))) {
     return undefined;
+  }
   if (
     expression.type === "Identifier" &&
     expression.name === row &&
@@ -243,8 +286,9 @@ const eachTitle = (
       (element) =>
         element?.type === "Literal" && typeof element.value === "string",
     )
-  )
+  ) {
     return `${parts[0]}%s${parts[1]}`;
+  }
   if (
     expression.type === "MemberExpression" &&
     expression.object.type === "Identifier" &&
@@ -280,8 +324,9 @@ const eachTitle = (
               typeof property.value.value === "string",
           ),
       )
-    )
+    ) {
       return `${parts[0]}$${name}${parts[1]}`;
+    }
   }
   return undefined;
 };
@@ -299,46 +344,58 @@ const replacement = (
     loop.left.kind !== "const" ||
     loop.left.declarations.length !== 1 ||
     api === "modified"
-  )
+  ) {
     return undefined;
+  }
   const row = loop.left.declarations[0].id;
-  if (row.type !== "Identifier" || row.typeAnnotation != null) return undefined;
+  if (
+    row.type !== "Identifier" ||
+    (row.typeAnnotation !== null && row.typeAnnotation !== undefined)
+  ) {
+    return undefined;
+  }
   const statements =
     loop.body.type === "BlockStatement" ? loop.body.body : [loop.body];
   if (
     statements.length !== 1 ||
     statements[0].type !== "ExpressionStatement" ||
     statements[0].expression !== call
-  )
+  ) {
     return undefined;
+  }
   const rows = unwrap(loop.right);
   if (
     rows.type !== "ArrayExpression" ||
     rows.elements.length === 0 ||
     !isLiteralData(rows)
-  )
+  ) {
     return undefined;
+  }
   if (
     api !== "effect" &&
     Array.some(rows.elements, (element) => element?.type === "ArrayExpression")
-  )
+  ) {
     return undefined;
+  }
   const [title, callback, timeout] = call.arguments;
   if (
     title === undefined ||
     callback === undefined ||
     callback.type !== "ArrowFunctionExpression" ||
     callback.params.length !== 0 ||
-    callback.typeParameters != null ||
-    callback.returnType != null ||
+    (callback.typeParameters !== null &&
+      callback.typeParameters !== undefined) ||
+    (callback.returnType !== null && callback.returnType !== undefined) ||
     call.arguments.length > 3 ||
     (timeout !== undefined &&
       (timeout.type !== "Literal" || typeof timeout.value !== "number"))
-  )
+  ) {
     return undefined;
+  }
   const name = eachTitle(title, row.name, rows);
-  if (name === undefined || source.getScope(callback).set.has(row.name))
+  if (name === undefined || source.getScope(callback).set.has(row.name)) {
     return undefined;
+  }
   const variable = variableAt(source, row);
   if (
     variable === undefined ||
@@ -346,8 +403,9 @@ const replacement = (
       variable.references,
       (reference) => reference.isWrite() && !reference.init,
     )
-  )
+  ) {
     return undefined;
+  }
   const comments = Array.filter(
     source.getAllComments(),
     (comment) =>
@@ -364,27 +422,33 @@ const replacement = (
             comment.range[1] <= kept.range[1],
         ),
     )
-  )
+  ) {
     return undefined;
+  }
   const scope = source.getScope(callback);
   if (
     Array.some(
       scope.through,
       (reference) => reference.identifier.name === "arguments",
     )
-  )
+  ) {
     return undefined;
+  }
   const opening = Option.getOrUndefined(
     Array.findFirst(source.getTokens(callback), (token) => token.value === "("),
   );
-  if (opening === undefined) return undefined;
+  if (opening === undefined) {
+    return undefined;
+  }
   const callbackText = source.getText(callback);
   const offset = opening.range[1] - callback.range[0];
   const arrow = `${Str.slice(0, offset)(callbackText)}${row.name}${Str.slice(offset)(callbackText)}`;
   const encodedName = Schema.encodeResult(Schema.fromJsonString(Schema.String))(
     name,
   );
-  if (Result.isFailure(encodedName)) return undefined;
+  if (Result.isFailure(encodedName)) {
+    return undefined;
+  }
   return `${source.getText(call.callee)}.each(${source.getText(loop.right)})(${encodedName.success}, ${arrow}${timeout !== undefined ? `, ${source.getText(timeout)}` : ""});`;
 };
 
@@ -395,7 +459,7 @@ export const preferTestEach = Rule.define({
     description: "Register parameterized tests with each instead of a loop.",
     fixable: "code",
   }),
-  create: function* () {
+  *create() {
     const ctx = yield* RuleContext;
     return Visitor.on("CallExpression", (node) => {
       const api = resolveApi(ctx.sourceCode, node.callee);
@@ -405,11 +469,13 @@ export const preferTestEach = Rule.define({
         api === "effect-namespace" ||
         api === "plain-namespace" ||
         node.optional
-      )
+      ) {
         return Effect.void;
+      }
       const loop = registrationLoop(node);
-      if (loop === undefined || insideTest(ctx.sourceCode, node))
+      if (loop === undefined || insideTest(ctx.sourceCode, node)) {
         return Effect.void;
+      }
       const diagnostic = Diagnostic.make({
         node,
         message:

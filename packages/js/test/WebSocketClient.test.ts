@@ -1,6 +1,6 @@
 import { FunctionSpec, Ref } from "@confect/core";
 import { expectTypeOf, it } from "@effect/vitest";
-import type * as WebSocketClient from "@confect/js/WebSocketClient";
+import * as WebSocketClient from "@confect/js/WebSocketClient";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
@@ -79,6 +79,21 @@ class NotFound extends Schema.TaggedError<
   id: Schema.String,
 }) {}
 
+it("distinguishes WebSocketClientError from an independently declared error with the same shape", () => {
+  class OtherError extends Schema.TaggedError<
+    OtherError,
+    { readonly brand: unique symbol }
+  >()("WebSocketClientError", { cause: Schema.Defect() }) {}
+  const fields = { cause: new Error("connection closed") };
+  expectTypeOf(WebSocketClient.WebSocketClientError).toBeConstructibleWith(
+    fields,
+  );
+  expectTypeOf(
+    WebSocketClient.WebSocketClientError.make(fields),
+  ).toEqualTypeOf<WebSocketClient.WebSocketClientError>();
+  expectTypeOf<OtherError>().not.toExtend<WebSocketClient.WebSocketClientError>();
+});
+
 const queryWithError = Ref.make(
   "notes",
   FunctionSpec.publicQuery({
@@ -109,88 +124,90 @@ const actionWithError = Ref.make(
   }),
 );
 
+const checkFunctionCalls = (client: WebSocketClient.WebSocketClient) => {
+  expectTypeOf(client.query<typeof noArgsQueryRef>).parameters.toEqualTypeOf<
+    [ref: typeof noArgsQueryRef, args?: Ref.Args<typeof noArgsQueryRef>]
+  >();
+  expectTypeOf(client.query<typeof argsQueryRef>).parameters.toEqualTypeOf<
+    [ref: typeof argsQueryRef, args: { readonly id: string }]
+  >();
+  expectTypeOf(
+    client.mutation<typeof noArgsMutationRef>,
+  ).parameters.toEqualTypeOf<
+    [ref: typeof noArgsMutationRef, args?: Ref.Args<typeof noArgsMutationRef>]
+  >();
+  expectTypeOf(
+    client.mutation<typeof argsMutationRef>,
+  ).parameters.toEqualTypeOf<
+    [ref: typeof argsMutationRef, args: { readonly text: string }]
+  >();
+  expectTypeOf(client.action<typeof argsActionRef>).parameters.toEqualTypeOf<
+    [ref: typeof argsActionRef, args: { readonly to: string }]
+  >();
+  expectTypeOf(client.action<typeof noArgsActionRef>).parameters.toEqualTypeOf<
+    [ref: typeof noArgsActionRef, args?: Ref.Args<typeof noArgsActionRef>]
+  >();
+  expectTypeOf(client.query(queryWithError, { id: "abc" })).toEqualTypeOf<
+    Effect.Effect<
+      { readonly text: string },
+      NotFound | WebSocketClient.WebSocketClientError | Schema.SchemaError
+    >
+  >();
+  expectTypeOf(client.mutation(mutationWithError, { id: "abc" })).toEqualTypeOf<
+    Effect.Effect<
+      null,
+      NotFound | WebSocketClient.WebSocketClientError | Schema.SchemaError
+    >
+  >();
+  expectTypeOf(client.action(actionWithError, { id: "abc" })).toEqualTypeOf<
+    Effect.Effect<
+      null,
+      NotFound | WebSocketClient.WebSocketClientError | Schema.SchemaError
+    >
+  >();
+};
+
 it("preserves generic arguments, results, and error channels", () => {
-  const check = (client: WebSocketClient.WebSocketClient) => {
-    expectTypeOf(client.query<typeof noArgsQueryRef>).parameters.toEqualTypeOf<
-      [ref: typeof noArgsQueryRef, args?: {}]
-    >();
-    expectTypeOf(client.query<typeof argsQueryRef>).parameters.toEqualTypeOf<
-      [ref: typeof argsQueryRef, args: { readonly id: string }]
-    >();
-    expectTypeOf(
-      client.mutation<typeof noArgsMutationRef>,
-    ).parameters.toEqualTypeOf<[ref: typeof noArgsMutationRef, args?: {}]>();
-    expectTypeOf(
-      client.mutation<typeof argsMutationRef>,
-    ).parameters.toEqualTypeOf<
-      [ref: typeof argsMutationRef, args: { readonly text: string }]
-    >();
-    expectTypeOf(client.action<typeof argsActionRef>).parameters.toEqualTypeOf<
-      [ref: typeof argsActionRef, args: { readonly to: string }]
-    >();
-    expectTypeOf(
-      client.action<typeof noArgsActionRef>,
-    ).parameters.toEqualTypeOf<[ref: typeof noArgsActionRef, args?: {}]>();
-    expectTypeOf(client.query(queryWithError, { id: "abc" })).toEqualTypeOf<
-      Effect.Effect<
-        { readonly text: string },
-        NotFound | WebSocketClient.WebSocketClientError | Schema.SchemaError
-      >
-    >();
-    expectTypeOf(
-      client.mutation(mutationWithError, { id: "abc" }),
-    ).toEqualTypeOf<
-      Effect.Effect<
-        null,
-        NotFound | WebSocketClient.WebSocketClientError | Schema.SchemaError
-      >
-    >();
-    expectTypeOf(client.action(actionWithError, { id: "abc" })).toEqualTypeOf<
-      Effect.Effect<
-        null,
-        NotFound | WebSocketClient.WebSocketClientError | Schema.SchemaError
-      >
-    >();
-  };
-  expectTypeOf(check).toBeFunction();
+  expectTypeOf(checkFunctionCalls).toBeFunction();
 });
 
+const checkAuthCallbacks = (client: WebSocketClient.WebSocketClient) => {
+  expectTypeOf(
+    client.setAuth(
+      () => Effect.flatMap(TokenProvider, (tokens) => tokens.fetch(false)),
+      (authenticated) =>
+        Effect.flatMap(AuthObserver, (observer) =>
+          observer.notify(authenticated),
+        ),
+    ),
+  ).toEqualTypeOf<Effect.Effect<void, never, TokenProvider | AuthObserver>>();
+  expectTypeOf(
+    client.setAuth(() => Effect.succeed(null), undefined),
+  ).toEqualTypeOf<Effect.Effect<void>>();
+  expectTypeOf(
+    client.setAuth(
+      () => Effect.succeed(null),
+      (authenticated) =>
+        Effect.flatMap(AuthObserver, (observer) =>
+          observer.notify(authenticated),
+        ),
+    ),
+  ).toEqualTypeOf<Effect.Effect<void, never, AuthObserver>>();
+  expectTypeOf(
+    client.setAuth(
+      // @ts-expect-error Token callbacks must handle typed failures.
+      () => Effect.fail("token failure"),
+    ),
+  );
+  expectTypeOf(
+    client.setAuth(
+      () => Effect.succeed(null),
+      // @ts-expect-error Observer callbacks must handle typed failures.
+      () => Effect.fail("observer failure"),
+    ),
+  );
+};
+
 it("infers auth callback dependencies and requires handled errors", () => {
-  const check = (client: WebSocketClient.WebSocketClient) => {
-    expectTypeOf(
-      client.setAuth(
-        () => Effect.flatMap(TokenProvider, (tokens) => tokens.fetch(false)),
-        (authenticated) =>
-          Effect.flatMap(AuthObserver, (observer) =>
-            observer.notify(authenticated),
-          ),
-      ),
-    ).toEqualTypeOf<Effect.Effect<void, never, TokenProvider | AuthObserver>>();
-    expectTypeOf(
-      client.setAuth(() => Effect.succeed(null), undefined),
-    ).toEqualTypeOf<Effect.Effect<void>>();
-    expectTypeOf(
-      client.setAuth(
-        () => Effect.succeed(null),
-        (authenticated) =>
-          Effect.flatMap(AuthObserver, (observer) =>
-            observer.notify(authenticated),
-          ),
-      ),
-    ).toEqualTypeOf<Effect.Effect<void, never, AuthObserver>>();
-    expectTypeOf(
-      client.setAuth(
-        // @ts-expect-error Token callbacks must handle typed failures.
-        () => Effect.fail("token failure"),
-      ),
-    );
-    expectTypeOf(
-      client.setAuth(
-        () => Effect.succeed(null),
-        // @ts-expect-error Observer callbacks must handle typed failures.
-        () => Effect.fail("observer failure"),
-      ),
-    );
-  };
-  expectTypeOf(check).toBeFunction();
+  expectTypeOf(checkAuthCallbacks).toBeFunction();
 });

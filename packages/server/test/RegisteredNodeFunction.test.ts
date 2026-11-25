@@ -10,6 +10,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 import { vi } from "vitest";
+import { convexDeploymentExport } from "./convexDeploymentExport";
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -27,7 +28,7 @@ it("registers a Node group without a factory parameter", () => {
   const registered = RegisteredNodeFunction.buildForGroup<typeof group>(layer);
   expect(registered.run).toBeDefined();
   expectTypeOf(registered.run).toExtend<
-    RegisteredAction<"public", Record<string, unknown>, unknown>
+    RegisteredAction<"public", Record<string, never>, Promise<string>>
   >();
   expectTypeOf<
     Parameters<typeof RegisteredNodeFunction.buildForGroup>["length"]
@@ -56,20 +57,16 @@ it.each([
   expect(compileArgs).not.toHaveBeenCalled();
   expect(compileReturns).not.toHaveBeenCalled();
 
-  const exported = registered as unknown as {
-    exportArgs: () => string;
-    exportReturns: () => string;
-  };
   expect(
     Schema.decodeResult(Schema.fromJsonString(Schema.Unknown))(
-      exported.exportReturns(),
+      convexDeploymentExport(registered, "exportReturns"),
     ).pipe(Result.getOrThrow),
   ).toEqual({ type: "boolean" });
   expect(compileReturns).toHaveBeenCalledOnce();
   expect(compileArgs).not.toHaveBeenCalled();
   expect(
     Schema.decodeResult(Schema.fromJsonString(Schema.Unknown))(
-      exported.exportArgs(),
+      convexDeploymentExport(registered, "exportArgs"),
     ).pipe(Result.getOrThrow),
   ).toEqual({
     type: "object",
@@ -80,8 +77,8 @@ it.each([
       },
     },
   });
-  exported.exportReturns();
-  exported.exportArgs();
+  convexDeploymentExport(registered, "exportReturns");
+  convexDeploymentExport(registered, "exportArgs");
   expect(compileArgs).toHaveBeenCalledOnce();
   expect(compileReturns).toHaveBeenCalledOnce();
 });

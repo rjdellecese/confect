@@ -8,7 +8,7 @@
 import { Ref } from "@confect/core";
 import * as NodeHttpClient from "@effect/platform-node/NodeHttpClient";
 import { expect, layer } from "@effect/vitest";
-import type { GenericId } from "convex/values";
+import { GenericId } from "@confect/core/GenericId";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
@@ -19,7 +19,7 @@ import refs from "confect-local-backend/refs";
 import * as LocalBackend from "confect-local-backend/LocalBackend";
 
 const UploadResponse = Schema.fromJsonString(
-  Schema.Struct({ storageId: Schema.String }),
+  Schema.Struct({ storageId: GenericId("_storage") }),
 );
 
 layer(Layer.mergeAll(LocalBackend.layer, NodeHttpClient.layerUndici), {
@@ -169,8 +169,11 @@ layer(Layer.mergeAll(LocalBackend.layer, NodeHttpClient.layerUndici), {
             }),
           );
           expect(result.text).toBe("pending");
-          if (stale) expect(result.url).toBeNull();
-          else expect(result.url).toContain("/api/storage/");
+          if (stale) {
+            expect(result.url).toBeNull();
+          } else {
+            expect(result.url).toContain("/api/storage/");
+          }
           const committed = yield* Effect.promise(() =>
             client.mutation(Ref.getFunctionReference(storage.getMutation), {
               storageId: result.storageId,
@@ -217,7 +220,9 @@ layer(Layer.mergeAll(LocalBackend.layer, NodeHttpClient.layerUndici), {
           }),
         );
         expect(result.failures).toHaveLength(2);
-        for (const failure of result.failures) expect(failure).toMatch(error);
+        for (const failure of result.failures) {
+          expect(failure).toMatch(error);
+        }
         expect(result.storageIds).toHaveLength(written);
         expect(result.metrics).toEqual({
           filesRead: 0,
@@ -281,7 +286,9 @@ layer(Layer.mergeAll(LocalBackend.layer, NodeHttpClient.layerUndici), {
           }),
         );
         expect(result.failures).toHaveLength(2);
-        for (const failure of result.failures) expect(failure).toMatch(error);
+        for (const failure of result.failures) {
+          expect(failure).toMatch(error);
+        }
         expect(result.metrics).toEqual({
           filesRead: 1,
           fileReadBytes: 4,
@@ -360,7 +367,7 @@ layer(Layer.mergeAll(LocalBackend.layer, NodeHttpClient.layerUndici), {
         const blobUrl = yield* Effect.promise(() =>
           client.query(
             Ref.getFunctionReference(refs.public.groups.storage.getUrl),
-            { storageId: storageId as GenericId<"_storage"> },
+            { storageId },
           ),
         );
         expect(new URL(blobUrl).pathname).toContain("/api/storage/");

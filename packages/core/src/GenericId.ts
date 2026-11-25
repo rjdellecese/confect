@@ -41,8 +41,12 @@ export type GenericId<TableName extends string> = ConvexGenericId<TableName>;
  */
 export const tableName = <TableName extends string>(
   ast: SchemaAST.AST,
-): Option.Option<TableName> =>
-  Option.fromNullishOr(
-    (ast.annotations?.[ConvexId] as TableName | undefined) ??
-      SchemaAST.resolveAt<TableName>(ConvexId)(ast),
-  );
+): Option.Option<TableName> => {
+  const name =
+    ast.annotations?.[ConvexId] ?? SchemaAST.resolveAt<unknown>(ConvexId)(ast);
+  if (typeof name !== "string") {
+    return Option.none();
+  }
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- GenericId records the table literal in the annotation, while the unparameterized AST retains only its runtime string.
+  return Option.some(name as TableName);
+};

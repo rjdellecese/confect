@@ -2,7 +2,14 @@ import * as Record from "effect/Record";
 import { compileTableSchema } from "@confect/core/SchemaToValidator";
 import * as Table_ from "@confect/core/Table";
 import * as Schema from "effect/Schema";
-import { defineTable, type TableDefinition } from "convex/server";
+import { defineTable } from "convex/server";
+import type {
+  GenericTableIndexes,
+  GenericTableSearchIndexes,
+  GenericTableVectorIndexes,
+  TableDefinition,
+} from "convex/server";
+import type { GenericValidator } from "convex/values";
 
 export {
   TypeId,
@@ -59,9 +66,16 @@ export {
 // Specs and generated refs reach `Fields`/`Doc` through `@confect/core`,
 // so this helper is only called from `_generated/convexSchema.ts`.
 
+type NativeTableDefinition = TableDefinition<
+  GenericValidator,
+  GenericTableIndexes,
+  GenericTableSearchIndexes,
+  GenericTableVectorIndexes
+>;
+
 const tableDefinitionCache = new WeakMap<
   Table_.AnyWithProps,
-  TableDefinition<any, any, any, any>
+  NativeTableDefinition
 >();
 
 /**
@@ -81,41 +95,27 @@ export const tableDefinition = <Table extends Table_.AnyWithProps>(
 > => {
   const cached = tableDefinitionCache.get(table);
   if (cached !== undefined) {
-    return cached as TableDefinition<
-      Table_.TableValidator<Table>,
-      Table_.Indexes<Table>,
-      Table_.SearchIndexes<Table>,
-      Table_.VectorIndexes<Table>
-    >;
+    return cached;
   }
 
-  let definition: TableDefinition<any, any, any, any> = table.Fields.pipe(
+  let definition: NativeTableDefinition = table.Fields.pipe(
     compileTableSchema,
     defineTable,
   );
-  for (const [name, indexFields] of Record.toEntries(
-    table.indexes as Record<string, any>,
-  )) {
+  const { indexes, searchIndexes, vectorIndexes } =
+    Table_.indexDefinitions(table);
+  for (const [name, indexFields] of Record.toEntries(indexes)) {
     definition = definition.index(name, indexFields);
   }
-  for (const [name, config] of Record.toEntries(
-    table.searchIndexes as Record<string, any>,
-  )) {
+  for (const [name, config] of Record.toEntries(searchIndexes)) {
     definition = definition.searchIndex(name, config);
   }
-  for (const [name, config] of Record.toEntries(
-    table.vectorIndexes as Record<string, any>,
-  )) {
+  for (const [name, config] of Record.toEntries(vectorIndexes)) {
     definition = definition.vectorIndex(name, config);
   }
 
   tableDefinitionCache.set(table, definition);
-  return definition as TableDefinition<
-    Table_.TableValidator<Table>,
-    Table_.Indexes<Table>,
-    Table_.SearchIndexes<Table>,
-    Table_.VectorIndexes<Table>
-  >;
+  return definition;
 };
 
 // -----------------------------------------------------------------------------

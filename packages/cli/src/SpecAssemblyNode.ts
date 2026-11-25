@@ -30,7 +30,7 @@ const assemblyNodesAtDepth = (
   depth: number,
 ): ReadonlyArray<SpecAssemblyNode> =>
   pipe(
-    Array.groupBy(leaves, (leaf) => leaf.pathSegments[depth]!),
+    Array.groupBy(leaves, (leaf) => leaf.pathSegments[depth]),
     Record.toEntries,
     Array.sortBy(Order.mapInput(Order.String, ([segment]) => segment)),
     Array.map(([segment, groupLeaves]) => {

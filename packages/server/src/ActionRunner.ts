@@ -1,5 +1,5 @@
 import * as Ref from "@confect/core/Ref";
-import { type GenericActionCtx } from "convex/server";
+import type { GenericActionCtx, GenericDataModel } from "convex/server";
 import * as Effect from "effect/Effect";
 import * as Context from "effect/Context";
 import * as Layer from "effect/Layer";
@@ -9,7 +9,7 @@ const run = Effect.fn("ActionRunner.runAction")(
   <A, E>(effect: Effect.Effect<A, E>): Effect.Effect<A, E> => effect,
 );
 
-const make = (runAction: GenericActionCtx<any>["runAction"]) => ({
+const make = (runAction: GenericActionCtx<GenericDataModel>["runAction"]) => ({
   /**
    * Runs a generated action with decoded arguments from another action or an
    * HTTP handler. Action calls have no transaction-options argument.
@@ -33,7 +33,7 @@ const make = (runAction: GenericActionCtx<any>["runAction"]) => ({
     run(
       Ref.runWithCodec(
         action,
-        (args[0] ?? {}) as Ref.Args<Action>,
+        Ref.argsOrEmpty<Action>(args),
         (functionReference, encodedArgs) =>
           runAction(functionReference, encodedArgs),
       ),
@@ -61,5 +61,6 @@ export type ActionRunner = typeof ActionRunner.Identifier;
 /**
  * @internal
  */
-export const layer = (runAction: GenericActionCtx<any>["runAction"]) =>
-  Layer.succeed(ActionRunner, make(runAction));
+export const layer = (
+  runAction: GenericActionCtx<GenericDataModel>["runAction"],
+) => Layer.succeed(ActionRunner, make(runAction));

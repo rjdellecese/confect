@@ -43,7 +43,9 @@ const systemFieldNames: ReadonlyArray<string> = Record.keys(
 const isSystemFieldKey = (key: string | symbol): key is string =>
   Predicate.isString(key) && Array.contains(systemFieldNames, key);
 
-const splitSystemFields = (input: { [key: PropertyKey]: unknown }) => {
+const splitSystemFields = <Value>(
+  input: Readonly<Record<PropertyKey, Value>>,
+) => {
   const keys = Reflect.ownKeys(input);
   const pick = (pickedKeys: ReadonlyArray<string | symbol>) =>
     Record.fromEntries(
@@ -62,8 +64,8 @@ const splitSystemFields = (input: { [key: PropertyKey]: unknown }) => {
  * fields would be dropped at every transformation step.
  */
 const wrapGetter = <R>(
-  getter: SchemaGetter.Getter<any, any, R>,
-): SchemaGetter.Getter<any, any, R> =>
+  getter: SchemaGetter.Getter<unknown, unknown, R>,
+): SchemaGetter.Getter<unknown, unknown, R> =>
   SchemaGetter.transformOptionalEffect((input, options) => {
     if (Option.isNone(input) || !Predicate.isObject(input.value)) {
       return SchemaGetter.run(getter, input, options);
@@ -80,7 +82,7 @@ const wrapGetter = <R>(
 
 const wrapTransformation = (
   transformation: SchemaAST.Link["transformation"],
-): SchemaTransformation.Transformation<any, any, any, any> => {
+) => {
   if (!SchemaTransformation.isTransformation(transformation)) {
     throw new Error(
       "Cannot extend a table schema that uses decoding/encoding middleware with system fields",
@@ -173,7 +175,7 @@ const makeExtendAst = (
  */
 export const extendWithSystemFields = <
   TableName extends string,
-  TableSchema extends Schema.Codec<any, any>,
+  TableSchema extends Schema.Codec<unknown>,
 >(
   tableName: TableName,
   schema: TableSchema,
@@ -194,8 +196,13 @@ export const extendWithSystemFields = <
     if (
       s.ast.encoding === undefined &&
       SchemaAST.isUnion(s.ast) &&
-      Array.isArray((s as { readonly members?: unknown }).members)
+      "members" in s &&
+      Array.isArray(s.members) &&
+      Array.every(s.members, Schema.isSchema) &&
+      "mapMembers" in s &&
+      typeof s.mapMembers === "function"
     ) {
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- A Union AST, schema members, and mapMembers identify Effect's mapping API; preserve its checks and union mode.
       return (s as Schema.Union<ReadonlyArray<Schema.Top>>).mapMembers(
         Array.map(extend),
         { unsafePreserveChecks: true },
@@ -204,8 +211,12 @@ export const extendWithSystemFields = <
     if (
       s.ast.encoding === undefined &&
       SchemaAST.isObjects(s.ast) &&
-      typeof (s as { readonly mapFields?: unknown }).mapFields === "function"
+      "fields" in s &&
+      Predicate.isObject(s.fields) &&
+      "mapFields" in s &&
+      typeof s.mapFields === "function"
     ) {
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- An Objects AST with fields and mapFields identifies Effect's Struct API; preserve its checks.
       return (s as Schema.Struct<Schema.Struct.Fields>).mapFields(
         Struct.assign(system),
         { unsafePreserveChecks: true },
@@ -214,10 +225,8 @@ export const extendWithSystemFields = <
     return Schema.make(extendAst(s.ast));
   };
 
-  return extend(schema) as unknown as ExtendWithSystemFields<
-    TableName,
-    TableSchema
-  >;
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- The walker extends every encoding step, mapping Struct fields and Union members exactly as ExtendWithSystemFields models.
+  return extend(schema) as ExtendWithSystemFields<TableName, TableSchema>;
 };
 
 /**

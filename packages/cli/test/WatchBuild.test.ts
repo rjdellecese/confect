@@ -447,26 +447,29 @@ it("signals initial build recovery without inventing a second full generation", 
   });
 });
 
+const failedBuild = (inputs: WatchBuild.Fingerprints) =>
+  WatchBuild.Outcome.Failed({
+    fingerprints: inputs,
+    failures: [WatchBuild.Failure.InvalidBuildResult({ missing: "metafile" })],
+    warnings: [],
+  });
+
 it("defers newly discovered dependencies until a successful graph can identify their consumers", () => {
   const initialInputs = HashMap.make(["group.impl.ts", "source"]);
-  const failed = (inputs: WatchBuild.Fingerprints) =>
-    WatchBuild.Outcome.Failed({
-      fingerprints: inputs,
-      failures: [
-        WatchBuild.Failure.InvalidBuildResult({ missing: "metafile" }),
-      ],
-      warnings: [],
-    });
+
   const initial = WatchBuild.observe(
     WatchBuild.State.Initial(),
-    failed(initialInputs),
+    failedBuild(initialInputs),
   );
   const discoveredInputs = HashMap.set(initialInputs, "library.ts", "library");
-  const discovered = WatchBuild.observe(initial, failed(discoveredInputs));
+  const discovered = WatchBuild.observe(initial, failedBuild(discoveredInputs));
   expect(WatchBuild.diff(initial, discovered, "_generated/")._tag).toBe(
     "Affected",
   );
-  const unchanged = WatchBuild.observe(discovered, failed(discoveredInputs));
+  const unchanged = WatchBuild.observe(
+    discovered,
+    failedBuild(discoveredInputs),
+  );
   const current = snapshot(
     HashMap.set(discoveredInputs, "_generated/schema.ts", "generated"),
     HashMap.make(
@@ -480,7 +483,7 @@ it("defers newly discovered dependencies until a successful graph can identify t
   });
   const edited = WatchBuild.observe(
     discovered,
-    failed(HashMap.set(discoveredInputs, "library.ts", "edited")),
+    failedBuild(HashMap.set(discoveredInputs, "library.ts", "edited")),
   );
   expect(WatchBuild.diff(discovered, edited, "_generated/")).toEqual(
     WatchBuild.Change.Full(),
