@@ -16,6 +16,37 @@ describe("isGroupSpec", () => {
   });
 });
 
+describe("functions", () => {
+  const query = <const Name extends string>(name: Name) =>
+    FunctionSpec.publicQuery({ name, returns: () => Schema.String });
+
+  it("types each function by its own name", () => {
+    const get = query("get");
+    const count = query("count");
+    const group = GroupSpec.make().addFunction(get).addFunction(count);
+
+    expectTypeOf(group.functions.get).toEqualTypeOf<typeof get>();
+    expectTypeOf(group.functions).not.toHaveProperty("missing");
+  });
+
+  it("lists a function with a union name under each name", () => {
+    const either = query<"first" | "second">("first");
+    const group = GroupSpec.make().addFunction(either);
+
+    expectTypeOf(group.functions.second).toEqualTypeOf<typeof either>();
+  });
+
+  it("keeps every function at each key when a name is a plain string", () => {
+    const get = query("get");
+    const widened = query<string>("other");
+    const group = GroupSpec.make().addFunction(get).addFunction(widened);
+
+    expectTypeOf(group.functions.get).toEqualTypeOf<
+      typeof get | typeof widened
+    >();
+  });
+});
+
 describe("experimental_reuseContext", () => {
   it("is opt-in and is not accepted by the Node constructor", () => {
     expect(GroupSpec.make().experimental_reuseContext).toBe(false);

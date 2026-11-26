@@ -77,13 +77,17 @@ export interface GroupSpec<
    *
    * @category Models
    */
-  readonly functions: {
-    [
-      FunctionName in FunctionSpec.Name<
-        FunctionSpec.AnyWithPropsWithRuntime<Runtime>
-      >
-    ]: FunctionSpec.WithName<Functions_, FunctionName>;
-  };
+  readonly functions: string extends FunctionSpec.Name<Functions_>
+    ? {
+        [
+          FunctionName in FunctionSpec.Name<
+            FunctionSpec.AnyWithPropsWithRuntime<Runtime>
+          >
+        ]: FunctionSpec.WithName<Functions_, FunctionName>;
+      }
+    : {
+        [Function_ in Functions_ as FunctionSpec.Name<Function_>]: Function_;
+      };
   /**
    * Codegen-assembled child groups; each child may use a different runtime.
    *
